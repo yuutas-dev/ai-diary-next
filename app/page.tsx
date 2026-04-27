@@ -1224,8 +1224,8 @@ export default function Page() {
         </div>
 
         {/* 💎 CTA 下部固定浮遊 */}
-        <div className="sticky-submit" style={{pointerEvents: "auto", zIndex: 50}}>
-          <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"} onClick={generateDiary} disabled={isGenerating} style={{pointerEvents: "auto", position: "relative", zIndex: 51}}>{isGenerating ? "執筆中..." : "✨ AIで作成する"}</button>
+        <div className="sticky-submit" style={{pointerEvents: "auto", zIndex: 1200}}>
+          <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"} onClick={generateDiary} disabled={isGenerating} style={{pointerEvents: "auto", position: "relative", zIndex: 1201}}>{isGenerating ? "執筆中..." : "✨ AIで作成する"}</button>
         </div>
 
       </div>
@@ -1421,9 +1421,9 @@ export default function Page() {
       </div>
     </main>
 
-    <footer className="fixed-footer">
-      <nav className="bottom-nav">
-        <label htmlFor="nav-create" className="nav-item tab-create" onClick={() => setActiveTab("create")}><span style={{fontSize: "18px"}}>📝</span>作成</label>
+    <footer className="fixed-footer" style={{zIndex: 1200}}>
+      <nav className="bottom-nav" style={{zIndex: 1201}}>
+        <label htmlFor="nav-create" className="nav-item tab-create" onClick={() => { setActiveTab("create"); setIsCreateDetailsOpen(false); }}><span style={{fontSize: "18px"}}>📝</span>作成</label>
         <label htmlFor="nav-data" className="nav-item tab-data" onClick={() => { setActiveTab("data"); setIsCreateDetailsOpen(false); }}><span style={{fontSize: "18px"}}>📖</span>顧客</label>
         <label htmlFor="nav-settings" className="nav-item tab-settings" onClick={() => { setActiveTab("settings"); setIsCreateDetailsOpen(false); }}><span style={{fontSize: "18px"}}>⚙️</span>設定</label>
       </nav>

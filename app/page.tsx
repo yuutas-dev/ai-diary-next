@@ -134,20 +134,6 @@ function getTargetDummyTag(businessType: BusinessType) {
   return "キャバ客";
 }
 
-function getFactTagsHistoryKey(businessType: BusinessType) {
-  return `factTagsHistory_${businessType}`;
-}
-
-function getDefaultFactTags(businessType: BusinessType) {
-  return INDUSTRY_FACT_CONFIGS[businessType] || INDUSTRY_FACT_CONFIGS.cabaret;
-}
-
-function normalizeTagList(tags: unknown) {
-  return (Array.isArray(tags) ? tags : [])
-    .map((tag) => String(tag).trim())
-    .filter(Boolean);
-}
-
 function getDaysSinceLastVisit(memoStr?: string) {
   const allMemos = parseMemoToJSON(memoStr);
   const visitMemos = allMemos.filter((memo) => !memo.type || memo.type === "visit" || memo.status === "legacy");
@@ -252,14 +238,11 @@ export default function Page() {
   const [customerSearchText, setCustomerSearchText] = useState("");
   const [selectedMoodTags, setSelectedMoodTags] = useState<string[]>([]);
   const [selectedFactTags, setSelectedFactTags] = useState<string[]>([]);
-  const [commonFactTags, setCommonFactTags] = useState<string[]>(getDefaultFactTags("cabaret"));
-  const [customFactTagInput, setCustomFactTagInput] = useState("");
   const [editAttributeTags, setEditAttributeTags] = useState<string[]>([]);
   const [customAttrInput, setCustomAttrInput] = useState("");
   const [memoBlocks, setMemoBlocks] = useState<MemoBlock[]>([]);
   const [isCreateCustomerMode, setIsCreateCustomerMode] = useState(false);
   const [editCustomerName, setEditCustomerName] = useState("");
-  const [memoCustomTagInputs, setMemoCustomTagInputs] = useState<Record<string, string>>({});
 
   const fetchCustomers = useCallback(async (targetUserId: string) => {
     setIsCustomersLoading(true);
@@ -341,17 +324,6 @@ export default function Page() {
     setIsCompactMode(localStorage.getItem("isCompactMode") === "true");
   }, []);
 
-  useEffect(() => {
-    const defaultTags = getDefaultFactTags(selectedBusinessType);
-    let historyTags: string[] = [];
-    try {
-      historyTags = normalizeTagList(JSON.parse(localStorage.getItem(getFactTagsHistoryKey(selectedBusinessType)) || "[]"));
-    } catch {
-      historyTags = [];
-    }
-    setCommonFactTags(Array.from(new Set([...historyTags, ...defaultTags])));
-  }, [selectedBusinessType]);
-
   const targetDummyTag = getTargetDummyTag(selectedBusinessType);
   const baseVisibleCustomers = customerData.filter((customer) => {
     if (customer.tagsArray.includes("非表示")) return false;
@@ -404,7 +376,7 @@ export default function Page() {
     ? customerData.find((customer) => customer.id === selectedCustomerId) || null
     : null;
   const moodTags = INDUSTRY_MOOD_CONFIGS[selectedBusinessType] || INDUSTRY_MOOD_CONFIGS.cabaret;
-  const factTags = commonFactTags;
+  const factTags = INDUSTRY_FACT_CONFIGS[selectedBusinessType] || INDUSTRY_FACT_CONFIGS.cabaret;
   const editAttributeOptions = Array.from(new Set([
     ...(INDUSTRY_ATTRIBUTE_TAGS[selectedBusinessType] || INDUSTRY_ATTRIBUTE_TAGS.cabaret),
     ...(selectedCustomer?.tagsArray || []),
@@ -446,27 +418,7 @@ export default function Page() {
     setter((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
   }
 
-  function rememberFactTag(tag: string, shouldPrependToCurrentList = false) {
-    const normalizedTag = tag.trim();
-    if (!normalizedTag) return;
-
-    const storageKey = getFactTagsHistoryKey(selectedBusinessType);
-    let historyTags: string[] = [];
-    try {
-      historyTags = normalizeTagList(JSON.parse(localStorage.getItem(storageKey) || "[]"));
-    } catch {
-      historyTags = [];
-    }
-    const nextHistory = [normalizedTag, ...historyTags.filter((currentTag) => currentTag !== normalizedTag)];
-    localStorage.setItem(storageKey, JSON.stringify(nextHistory));
-
-    if (shouldPrependToCurrentList) {
-      setCommonFactTags((current) => current.includes(normalizedTag) ? current : [normalizedTag, ...current]);
-    }
-  }
-
   function toggleFactTag(tag: string) {
-    rememberFactTag(tag);
     toggleStringValue(tag, setSelectedFactTags);
   }
 
@@ -490,7 +442,6 @@ export default function Page() {
     setEditAttributeTags([]);
     setCustomAttrInput("");
     setMemoBlocks([createMemoBlock({}, true)]);
-    setMemoCustomTagInputs({});
     setIsTagAccordionOpen(false);
     setActiveModal("edit");
   }
@@ -516,14 +467,6 @@ export default function Page() {
     });
   }
 
-  function addCustomFactTag() {
-    const newTag = customFactTagInput.trim();
-    if (!newTag) return;
-    rememberFactTag(newTag, true);
-    setSelectedFactTags((current) => current.includes(newTag) ? current : [...current, newTag]);
-    setCustomFactTagInput("");
-  }
-
   function addCustomAttributeTag() {
     const newTag = customAttrInput.trim();
     if (!newTag) return;
@@ -543,23 +486,7 @@ export default function Page() {
     setMemoBlocks((current) => current.filter((block) => block.id !== id));
   }
 
-  function setMemoCustomTagInput(blockId: string, value: string) {
-    setMemoCustomTagInputs((current) => ({ ...current, [blockId]: value }));
-  }
-
-  function addCustomMemoTag(blockId: string) {
-    const newTag = (memoCustomTagInputs[blockId] || "").trim();
-    if (!newTag) return;
-    rememberFactTag(newTag, true);
-    setMemoBlocks((current) => current.map((block) => {
-      if (block.id !== blockId) return block;
-      return { ...block, tags: block.tags.includes(newTag) ? block.tags : [...block.tags, newTag] };
-    }));
-    setMemoCustomTagInput(blockId, "");
-  }
-
   function toggleMemoTag(blockId: string, tag: string) {
-    rememberFactTag(tag);
     setMemoBlocks((current) => current.map((block) => {
       if (block.id !== blockId) return block;
       const isSelected = block.tags.includes(tag);
@@ -709,10 +636,6 @@ export default function Page() {
             <div key={tag} className={`chip${selectedFactTags.includes(tag) ? " selected-fact-chip active" : ""}`} onClick={() => toggleFactTag(tag)}>{tag}</div>
           ))}
         </div>
-      </div>
-      <div style={{marginTop: "8px", display: "flex", gap: "8px", marginBottom: "16px"}}>
-        <input type="text" id="customFactTagInput" placeholder="＋オリジナル出来事追加" className="input-field" value={customFactTagInput} onChange={(event) => setCustomFactTagInput(event.target.value)} style={{padding: "10px", fontSize: "12px", background: "var(--input-bg)", border: "1px solid transparent", flex: "1"}} />
-        <button data-original-click={"addCustomFactTag()"} onClick={addCustomFactTag} style={{background: "var(--text-sub)", color: "#fff", border: "none", padding: "0 14px", borderRadius: "10px", fontWeight: "700", fontSize: "12px", cursor: "pointer"}}>追加</button>
       </div>
 
       {/* 本文 */}
@@ -870,10 +793,6 @@ export default function Page() {
                         const isSelected = block.tags.includes(tag);
                         return <div key={`${block.id}-${tag}`} className={`chip${isSelected ? " selected-fact-chip active" : ""}`} onClick={() => toggleMemoTag(block.id, tag)}>{tag}</div>;
                       })}
-                    </div>
-                    <div style={{display: "flex", gap: "8px", marginTop: "12px", borderTop: "1px dashed var(--border-color)", paddingTop: "12px"}}>
-                      <input type="text" id={`customMemoTagInput-${block.id}`} className="input-field" placeholder="オリジナルタグ追加..." value={memoCustomTagInputs[block.id] || ""} onChange={(event) => setMemoCustomTagInput(block.id, event.target.value)} style={{padding: "8px", fontSize: "12px", background: "#FFF", border: "1px solid var(--border-color)", flex: 1}} />
-                      <button type="button" onClick={() => addCustomMemoTag(block.id)} style={{background: "var(--text-sub)", color: "#FFF", border: "none", borderRadius: "8px", padding: "0 12px", fontWeight: "700", fontSize: "12px", whiteSpace: "nowrap"}}>追加</button>
                     </div>
                     <div style={{textAlign: "right", marginTop: "8px"}}>
                       <button type="button" onClick={() => updateMemoBlock(block.id, { isDropdownOpen: false })} style={{background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "6px 12px", borderRadius: "10px", fontSize: "11px", fontWeight: "700", cursor: "pointer"}}>閉じる</button>

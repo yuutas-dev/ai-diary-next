@@ -333,7 +333,6 @@ export default function Page() {
   const [activeCustomerMenuId, setActiveCustomerMenuId] = useState<string | null>(null);
   const [hidingCustomerIds, setHidingCustomerIds] = useState<string[]>([]);
   const [vipBounceCustomerIds, setVipBounceCustomerIds] = useState<string[]>([]);
-  const [filterPillStyle, setFilterPillStyle] = useState({ left: 0, top: 0, width: 0, height: 0 });
   const actionToastTimerRef = useRef<number | null>(null);
   const cuteToastTimerRef = useRef<number | null>(null);
   const inlineResultRef = useRef<HTMLDivElement | null>(null);
@@ -462,27 +461,6 @@ export default function Page() {
     window.setTimeout(() => {
       filterButtonRefs.current[currentListFilter]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
     }, 80);
-  }, [activeTab, dataView, currentListFilter]);
-
-  useEffect(() => {
-    if (activeTab !== "data" || dataView !== "customer") return;
-    const updateFilterPill = () => {
-      const container = filterContainerRef.current;
-      const button = filterButtonRefs.current[currentListFilter];
-      if (!container || !button) return;
-      const containerRect = container.getBoundingClientRect();
-      const buttonRect = button.getBoundingClientRect();
-      setFilterPillStyle({
-        left: buttonRect.left - containerRect.left + container.scrollLeft,
-        top: buttonRect.top - containerRect.top,
-        width: buttonRect.width,
-        height: buttonRect.height,
-      });
-    };
-    updateFilterPill();
-    window.setTimeout(updateFilterPill, 120);
-    window.addEventListener("resize", updateFilterPill);
-    return () => window.removeEventListener("resize", updateFilterPill);
   }, [activeTab, dataView, currentListFilter]);
 
   const targetDummyTag = getTargetDummyTag(selectedBusinessType);
@@ -748,7 +726,9 @@ export default function Page() {
   function setListFilter(filterType: ListFilter) {
     const nextFilter = currentListFilter === filterType && filterType !== "all" ? "all" : filterType;
     setCurrentListFilter(nextFilter);
-    filterButtonRefs.current[nextFilter]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    window.requestAnimationFrame(() => {
+      filterButtonRefs.current[nextFilter]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    });
   }
 
   function setBusinessType(value: BusinessType) {
@@ -1584,8 +1564,7 @@ export default function Page() {
             <div id="clearSearchBtn" style={{position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.05)", color: "var(--text-sub)", width: "22px", height: "22px", borderRadius: "50%", display: customerSearchText ? "flex" : "none", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "bold", cursor: "pointer"}} data-original-click={"clearSearch()"} onClick={() => setCustomerSearchText("")}>×</div>
           </div>
 
-          <div className="filter-container magic-filter-container" ref={filterContainerRef} style={{paddingBottom: "10px", marginBottom: "0", display: dataView === "customer" ? "flex" : "none"}}>
-            <div className={`filter-magic-pill ${currentListFilter === "alert" ? "alert" : ""}`} style={{left: `${filterPillStyle.left}px`, top: `${filterPillStyle.top}px`, width: `${filterPillStyle.width}px`, height: `${filterPillStyle.height}px`, opacity: filterPillStyle.width ? 1 : 0}}></div>
+          <div className="filter-container" ref={filterContainerRef} style={{paddingBottom: "10px", marginBottom: "0", display: dataView === "customer" ? "flex" : "none"}}>
             <div ref={(element) => { filterButtonRefs.current.alert = element; }} className={`filter-btn ${currentListFilter === "alert" ? "active-filter" : ""}`} id="filter-btn-alert" data-original-click={"setListFilter('alert')"} onClick={() => setListFilter("alert")}>
               ⚠️ 要連絡
               <div id="alertBadge" style={{display: alertCount > 0 ? "flex" : "none", position: "absolute", top: "-6px", right: "-6px", background: "var(--alert-text)", color: "#FFF", fontSize: "9px", fontWeight: "700", minWidth: "16px", height: "16px", borderRadius: "8px", padding: "0 4px", alignItems: "center", justifyContent: "center"}}>{alertCount}</div>

@@ -110,6 +110,18 @@ const MODE_LABELS: Record<BusinessType, { main: string; thanks: string }> = {
   garuba: { main: "ブログ・SNS", thanks: "お礼LINE" },
 };
 
+const STYLE_MODAL_TEXTS = {
+  cute: "🎀 可愛らしく、絵文字を多用した親しみやすい文体。",
+  neat: "💎 上品で丁寧な言葉遣い。落ち着いた大人っぽい文体。",
+  custom: "⚙️ 過去の文章を貼り付けると、AIがあなたの口調を学習します。",
+};
+
+const STYLE_PLACEHOLDERS: Record<BusinessType, string> = {
+  cabaret: "（例）昨日はお店来てくれて本当にありがとう🥺✨\n久しぶりに〇〇くんの顔見れて、めちゃくちゃ楽しかったよ💗",
+  fuzoku: "（例）今日は指名してくれてありがとう🧸💓\n〇〇さんと一緒にいる時間、すごく落ち着くし癒されちゃった🛁✨",
+  garuba: "（例）今日はお店来てくれてありがとな🍾✨\n最近会えてなかったから、〇〇の顔見れて普通にテンション上がったわ😎",
+};
+
 function parseMemoToJSON(memoStr?: string) {
   if (!memoStr) return [];
   try {
@@ -475,6 +487,7 @@ export default function Page() {
     : null;
   const messageMode = createMode === "photo" ? "diary" : "line";
   const modeLabels = MODE_LABELS[selectedBusinessType] || MODE_LABELS.cabaret;
+  const stylePlaceholder = STYLE_PLACEHOLDERS[selectedBusinessType] || STYLE_PLACEHOLDERS.cabaret;
   const moodTags = INDUSTRY_MOOD_CONFIGS[selectedBusinessType] || INDUSTRY_MOOD_CONFIGS.cabaret;
   const lineFactTags = INDUSTRY_FACT_CONFIGS[selectedBusinessType] || INDUSTRY_FACT_CONFIGS.cabaret;
   const diaryFactTags = DIARY_FACT_CONFIGS[selectedBusinessType] || DIARY_FACT_CONFIGS.cabaret;
@@ -1106,18 +1119,18 @@ export default function Page() {
       </div>
       <div className="style-content-wrapper">
         <div className="style-desc-cute">
-          <div id="text-style-cute" className="style-desc-box"></div>
+          <div id="text-style-cute" className="style-desc-box">{STYLE_MODAL_TEXTS.cute}</div>
         </div>
         <div className="style-desc-custom">
-          <div id="text-style-custom" className="style-desc-box"></div>
-          <textarea id="customStyleText" className="input-field" style={{height: "100px", marginBottom: "16px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}} data-original-change={"saveStyleSettings()"}></textarea>
+          <div id="text-style-custom" className="style-desc-box">{STYLE_MODAL_TEXTS.custom}</div>
+          <textarea id="customStyleText" className="input-field" placeholder={stylePlaceholder} style={{height: "100px", marginBottom: "16px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}} data-original-change={"saveStyleSettings()"}></textarea>
           <div style={{display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}><span>テンション（低）</span><span>（高）</span></div>
           <input type="range" id="tensionSlider" min="1" max="5" value="3" style={{width: "100%", marginBottom: "16px"}} data-original-change={"saveStyleSettings()"} />
           <div style={{display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}><span>絵文字の量（少）</span><span>（多）</span></div>
           <input type="range" id="emojiSlider" min="1" max="5" value="4" style={{width: "100%", marginBottom: "10px"}} data-original-change={"saveStyleSettings()"} />
         </div>
         <div className="style-desc-neat">
-          <div id="text-style-neat" className="style-desc-box"></div>
+          <div id="text-style-neat" className="style-desc-box">{STYLE_MODAL_TEXTS.neat}</div>
         </div>
       </div>
       <button data-original-click={"closeStyleModal()"} onClick={closeModal} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", marginTop: "8px"}}>設定を保存して閉じる</button>
@@ -1489,7 +1502,17 @@ export default function Page() {
           {historyItems.length === 0 ? (
             <div style={{textAlign: "center", padding: "40px 20px", color: "var(--text-muted)", fontWeight: "700", fontSize: "13px"}}>生成履歴がありません<br /><span style={{fontSize: "11px", fontWeight: "normal", marginTop: "8px", display: "inline-block"}}>AIでメッセージを作成するとここに保存されます</span></div>
           ) : (
-            historyItems.map((item, index) => {
+            <>
+              {currentFavoriteIds.length === 0 ? (
+                <div style={{background: "var(--primary-light)", border: "1px dashed var(--primary)", borderRadius: "16px", padding: "12px", marginBottom: "16px", textAlign: "center", boxShadow: "var(--shadow-sm)"}}>
+                  <div style={{fontSize: "16px", marginBottom: "4px"}}>🎀</div>
+                  <div style={{fontSize: "12px", fontWeight: "700", color: "var(--primary)", lineHeight: 1.5}}>
+                    ヒント：うまく書けた文章は「☆」をタップしてね！<br />
+                    お気に入りに登録すると、AIがあなたの口調を学習するよ✨
+                  </div>
+                </div>
+              ) : null}
+              {historyItems.map((item, index) => {
               const itemId = String(item.id || "");
               const viewId = itemId || `history-${index}`;
               const isExpanded = expandedHistoryIds.includes(viewId);
@@ -1520,7 +1543,8 @@ export default function Page() {
                   </div>
                 </div>
               );
-            })
+            })}
+            </>
           )}
         </div>
         <div className="fab" role="button" tabIndex={0} data-original-click={"openCreateModal()"} onClick={openCreateCustomerModal} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCreateCustomerModal(); } }} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); openCreateModal(); }"} style={{display: dataView === "customer" ? "flex" : "none"}}>＋</div>
@@ -1532,7 +1556,7 @@ export default function Page() {
         <div className="card" style={{marginBottom: "24px"}}>
           <div className="setting-item" style={{borderBottom: "1px solid var(--border-color)", paddingBottom: "16px", marginBottom: "16px"}} data-original-click={"openStyleModal()"} onClick={() => setActiveModal("style")}>
             <span>🎨 AIスタイル・口調設定</span>
-            <span className="settings-val" id="styleOverviewText">かわいい・清楚・カスタム</span>
+            <span className="settings-val" id="styleOverviewText">かわいい・カスタム・清楚</span>
           </div>
           <div className="setting-item" style={{borderBottom: "1px solid var(--border-color)", paddingBottom: "16px", marginBottom: "16px"}}>
             <span>🏢 業態設定</span>

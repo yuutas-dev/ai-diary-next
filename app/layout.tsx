@@ -1,5 +1,20 @@
 import type { Metadata, Viewport } from "next";
+import { Noto_Serif_JP, Zen_Maru_Gothic } from "next/font/google";
 import "./globals.css";
+
+const zenMaruGothic = Zen_Maru_Gothic({
+  subsets: ["latin"],
+  weight: ["400", "500", "700", "900"],
+  variable: "--font-maru",
+  display: "swap",
+});
+
+const notoSerifJp = Noto_Serif_JP({
+  subsets: ["latin"],
+  weight: ["400", "500", "700", "900"],
+  variable: "--font-mincho",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "AI Diary",
@@ -20,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body className={`${zenMaruGothic.variable} ${notoSerifJp.variable}`}>{children}</body>
     </html>
   );
 }

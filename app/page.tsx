@@ -11,6 +11,8 @@ type DataView = "customer" | "history";
 type BusinessType = "cabaret" | "fuzoku" | "garuba";
 type ListFilter = "alert" | "all" | "vip" | "new" | "second" | "regular";
 type IconTheme = "glass" | "jewel" | "perfume" | "moon_star" | "flower" | "teacup" | "symbol";
+type AppTheme = "sweet" | "noir" | "chic";
+type AppFont = "standard" | "maru" | "mincho";
 
 interface MemoBlock {
   id: string;
@@ -127,6 +129,18 @@ const STYLE_DEFAULTS: Record<BusinessType, { tension: string; emoji: string }> =
   fuzoku: { tension: "3", emoji: "4" },
   garuba: { tension: "3", emoji: "2" },
 };
+
+const APP_THEME_OPTIONS: { value: AppTheme; label: string; description: string }[] = [
+  { value: "sweet", label: "Sweet", description: "やさしいピンク" },
+  { value: "noir", label: "Noir", description: "夜っぽい黒×ピンク" },
+  { value: "chic", label: "Chic", description: "大人の白黒×ゴールド" },
+];
+
+const APP_FONT_OPTIONS: { value: AppFont; label: string; description: string }[] = [
+  { value: "standard", label: "Standard", description: "いつもの読みやすさ" },
+  { value: "maru", label: "Maru", description: "やわらか丸ゴシック" },
+  { value: "mincho", label: "Mincho", description: "大人っぽい明朝" },
+];
 
 function parseMemoToJSON(memoStr?: string) {
   if (!memoStr) return [];
@@ -301,6 +315,8 @@ export default function Page() {
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState("");
   const [selectedBusinessType, setSelectedBusinessType] = useState<BusinessType>("cabaret");
   const [iconTheme, setIconTheme] = useState<IconTheme>("glass");
+  const [appTheme, setAppTheme] = useState<AppTheme>("sweet");
+  const [appFont, setAppFont] = useState<AppFont>("standard");
   const [currentListFilter, setCurrentListFilter] = useState<ListFilter>("all");
   const [isCompactMode, setIsCompactMode] = useState(false);
   const [customerSearchText, setCustomerSearchText] = useState("");
@@ -436,6 +452,14 @@ export default function Page() {
     if (savedIconTheme && ["glass", "jewel", "perfume", "moon_star", "flower", "teacup", "symbol"].includes(savedIconTheme)) {
       setIconTheme(savedIconTheme);
     }
+    const savedAppTheme = localStorage.getItem("appTheme") as AppTheme | null;
+    if (savedAppTheme && ["sweet", "noir", "chic"].includes(savedAppTheme)) {
+      setAppTheme(savedAppTheme);
+    }
+    const savedAppFont = localStorage.getItem("appFont") as AppFont | null;
+    if (savedAppFont && ["standard", "maru", "mincho"].includes(savedAppFont)) {
+      setAppFont(savedAppFont);
+    }
     const savedStyle = localStorage.getItem("selectedStyle") as StyleTab | null;
     if (savedStyle && ["cute", "custom", "neat"].includes(savedStyle)) {
       setStyleTab(savedStyle);
@@ -443,6 +467,11 @@ export default function Page() {
     setCustomStyleText(localStorage.getItem("customStyleText") || "");
     setIsCompactMode(localStorage.getItem("isCompactMode") === "true");
   }, []);
+
+  useEffect(() => {
+    document.body.dataset.appTheme = appTheme;
+    document.body.dataset.appFont = appFont;
+  }, [appTheme, appFont]);
 
   useEffect(() => {
     const defaults = STYLE_DEFAULTS[selectedBusinessType] || STYLE_DEFAULTS.cabaret;
@@ -805,6 +834,16 @@ export default function Page() {
   function setSelectedIconTheme(value: IconTheme) {
     setIconTheme(value);
     localStorage.setItem("iconTheme", value);
+  }
+
+  function setSelectedAppTheme(value: AppTheme) {
+    setAppTheme(value);
+    localStorage.setItem("appTheme", value);
+  }
+
+  function setSelectedAppFont(value: AppFont) {
+    setAppFont(value);
+    localStorage.setItem("appFont", value);
   }
 
   function toggleCompactMode() {
@@ -1206,7 +1245,7 @@ export default function Page() {
   <div id="createDetailsHalfModal" className={`half-modal create-details-half-modal ${isCreateDetailsOpen ? "open" : ""}`} onClick={(event) => event.stopPropagation()} style={{height: isCreateDetailsOpen ? "320px" : undefined}}>
     <div className="half-modal-handle" data-original-click={"closeCreateDetailsModal()"} role="button" tabIndex={0} onClick={() => setIsCreateDetailsOpen(false)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setIsCreateDetailsOpen(false); } }} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); closeCreateDetailsModal(); }"}></div>
     <div className="create-details-modal-header">
-      <span className="label" style={{margin: "0"}}>📝 詳細を追加</span>
+      <span className="label" style={{margin: "0"}}>📝 今日のメモを追加</span>
       <button type="button" className="create-details-modal-close" data-original-click={"closeCreateDetailsModal()"} onClick={() => setIsCreateDetailsOpen(false)} aria-label="閉じる">×</button>
     </div>
     <div id="createDetailsContent" className="create-details-modal-scroll">
@@ -1602,10 +1641,10 @@ export default function Page() {
           </div>
         </div>
 
-        {/* 📝 詳細を追加 */}
+        {/* 📝 今日のメモを追加 */}
         <div style={{textAlign: "center", margin: "12px 0"}}>
           <div className="accordion-header" data-original-click={"toggleCreateDetails()"} id="createDetailsHeader" onClick={() => setIsCreateDetailsOpen((isOpen) => !isOpen)} style={{display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "8px 24px", background: "#FFF", border: "1px solid var(--border-color)", borderRadius: "24px", fontSize: "13px", fontWeight: "700", color: "var(--text-main)", boxShadow: "var(--shadow-sm)", cursor: "pointer", transform: "translateY(-20px)"}}>
-            📝 詳細を追加 <span style={{color: "var(--text-sub)", fontSize: "11px", fontWeight: "normal"}}>(任意)</span> <span id="createDetailsIcon">{isCreateDetailsOpen ? "▲" : "▼"}</span>
+            📝 今日のメモを追加 <span style={{color: "var(--text-sub)", fontSize: "11px", fontWeight: "normal"}}>(任意)</span> <span id="createDetailsIcon">{isCreateDetailsOpen ? "▲" : "▼"}</span>
           </div>
         </div>
 
@@ -1635,11 +1674,11 @@ export default function Page() {
 
       <div className="page page-data">
         <div id="dataStickyHeader" style={{position: "sticky", top: "-10px", zIndex: "10", margin: "-10px -16px 0", padding: "10px 16px 0"}}>
-          <div style={{position: "absolute", top: "0", left: "0", width: "100%", height: "100%", background: "rgba(248, 247, 245, 0.85)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", zIndex: "-1", borderBottom: "1px solid var(--border-color)"}}></div>
+          <div style={{position: "absolute", top: "0", left: "0", width: "100%", height: "100%", background: "var(--header-bg)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", zIndex: "-1", borderBottom: "1px solid var(--border-color)"}}></div>
 
           <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px"}}>
-            <h2 style={{margin: "0", fontWeight: "700", fontSize: "18px"}}>顧客カルテ</h2>
-            <div className="view-toggle" data-original-click={"toggleCompactMode()"} onClick={toggleCompactMode}><span id="viewIcon">{isCompactMode ? "📋 コンパクト" : "🗂️ 詳細表示"}</span></div>
+            <h2 style={{margin: "0", fontWeight: "700", fontSize: "18px"}}>お客様ノート</h2>
+            <div className="view-toggle" data-original-click={"toggleCompactMode()"} onClick={toggleCompactMode}><span id="viewIcon">{isCompactMode ? "📋 すっきり" : "🗂️ くわしく"}</span></div>
           </div>
 
           <div style={{display: "flex", justifyContent: "center", marginBottom: "12px"}}>
@@ -1647,8 +1686,8 @@ export default function Page() {
               <input type="radio" name="data-view" id="view-customer" className="ui-state" checked={dataView === "customer"} onChange={() => setDataView("customer")} />
               <input type="radio" name="data-view" id="view-history" className="ui-state" checked={dataView === "history"} onChange={() => setDataView("history")} />
               <div className="toggle-container" style={{background: "transparent", boxShadow: "none"}}>
-                <label htmlFor="view-customer" className="toggle-label" style={{fontSize: "13px", zIndex: "2"}}>👥 顧客カルテ</label>
-                <label htmlFor="view-history" className="toggle-label" style={{fontSize: "13px", zIndex: "2"}}>📝 生成履歴</label>
+                <label htmlFor="view-customer" className="toggle-label" style={{fontSize: "13px", zIndex: "2"}}>👥 お客様ノート</label>
+                <label htmlFor="view-history" className="toggle-label" style={{fontSize: "13px", zIndex: "2"}}>📝 作った文章</label>
               </div>
             </div>
           </div>
@@ -1745,7 +1784,7 @@ export default function Page() {
         </div>
         <div id="historyListArea" style={{display: dataView === "history" ? "block" : "none", marginTop: "12px", position: "relative", zIndex: "1"}}>
           {historyItems.length === 0 ? (
-            <div style={{textAlign: "center", padding: "40px 20px", color: "var(--text-muted)", fontWeight: "700", fontSize: "13px"}}>生成履歴がありません<br /><span style={{fontSize: "11px", fontWeight: "normal", marginTop: "8px", display: "inline-block"}}>AIでメッセージを作成するとここに保存されます</span></div>
+            <div style={{textAlign: "center", padding: "40px 20px", color: "var(--text-muted)", fontWeight: "700", fontSize: "13px"}}>作った文章はまだありません<br /><span style={{fontSize: "11px", fontWeight: "normal", marginTop: "8px", display: "inline-block"}}>AIでメッセージを作るとここに保存されます</span></div>
           ) : (
             <>
               {currentFavoriteIds.length === 0 ? (
@@ -1796,39 +1835,65 @@ export default function Page() {
       </div>
 
       <div className="page page-settings" style={{position: "relative"}}>
-        <h2 style={{margin: "0 0 16px", fontWeight: "700", fontSize: "18px"}}>設定・情報</h2>
+        <h2 style={{margin: "0 0 14px", fontWeight: "700", fontSize: "18px"}}>マイページ・設定</h2>
 
-        <div className="card" style={{marginBottom: "24px", padding: "22px"}}>
-          <div className="setting-item" style={{borderBottom: "1px solid var(--border-color)", paddingBottom: "20px", marginBottom: "18px", minHeight: "58px"}} data-original-click={"openStyleModal()"} onClick={() => setActiveModal("style")}>
-            <span style={{fontSize: "15px"}}>🎨 AIスタイル・口調設定</span>
-            <span className="settings-val" id="styleOverviewText" style={{fontSize: "12px"}}>かわいい・カスタム・清楚</span>
+        <div className="settings-stack">
+          <div className="card settings-card settings-card-main" data-original-click={"openStyleModal()"} onClick={() => setActiveModal("style")}>
+            <div className="setting-card-title">🎨 AIスタイル・口調設定</div>
+            <div className="setting-card-desc">文章の雰囲気を、あなたらしく整えます</div>
+            <span className="settings-val" id="styleOverviewText">かわいい・カスタム・清楚</span>
           </div>
-          <div className="setting-item" style={{borderBottom: "1px solid var(--border-color)", paddingBottom: "20px", marginBottom: "14px"}}>
-            <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px"}}>
-              <h3 className="section-title" style={{margin: "0"}}>🎨 アイコンテーマ</h3>
+
+          <div className="settings-pair-grid">
+            <div className="card settings-card settings-card-select">
+              <div className="setting-card-title">💎 アイコンテーマ</div>
+              <select id="icon-theme-select" className="input-field" value={iconTheme} onChange={(event) => setSelectedIconTheme(event.target.value as IconTheme)} style={{width: "100%", padding: "12px", fontWeight: "700"}}>
+                <option value="glass">🥂 グラス</option>
+                <option value="jewel">💎 ジュエル</option>
+                <option value="perfume">🧴 パフューム</option>
+                <option value="moon_star">🌙 ムーン＆スター</option>
+                <option value="flower">🌹 フラワー</option>
+                <option value="teacup">☕ ティーカップ</option>
+                <option value="symbol">♠️ カラーサークル</option>
+              </select>
             </div>
-            <select id="icon-theme-select" className="input-field" value={iconTheme} onChange={(event) => setSelectedIconTheme(event.target.value as IconTheme)} style={{width: "100%", padding: "12px", fontWeight: "700"}}>
-              <option value="glass">🥂 グラス</option>
-              <option value="jewel">💎 ジュエル</option>
-              <option value="perfume">🧴 パフューム</option>
-              <option value="moon_star">🌙 ムーン＆スター</option>
-              <option value="flower">🌹 フラワー</option>
-              <option value="teacup">☕ ティーカップ</option>
-              <option value="symbol">♠️ カラーサークル</option>
-            </select>
+            <div className="card settings-card settings-card-select">
+              <div className="setting-card-title">🏢 お店のジャンル</div>
+              <select className="input-field" id="businessType" data-original-change={"updateChipsAndSave()"} value={selectedBusinessType} onChange={(event) => setBusinessType(event.target.value as BusinessType)} style={{width: "100%", padding: "12px", fontSize: "13px", fontWeight: "700", marginBottom: 0}}>
+                <option value="cabaret">キャバクラ</option>
+                <option value="fuzoku">風俗・メンエス</option>
+                <option value="garuba">ガルバ</option>
+              </select>
+            </div>
           </div>
-          <div className="setting-item" style={{paddingTop: "2px", fontSize: "12px", minHeight: "auto"}}>
-            <span style={{color: "var(--text-sub)", fontWeight: "700"}}>🏢 業態設定</span>
-            <select className="input-field" id="businessType" data-original-change={"updateChipsAndSave()"} value={selectedBusinessType} onChange={(event) => setBusinessType(event.target.value as BusinessType)} style={{width: "130px", padding: "4px", fontSize: "12px", fontWeight: "700", textAlign: "right", border: "none", background: "transparent", marginBottom: 0}}>
-              <option value="cabaret">キャバクラ</option>
-              <option value="fuzoku">風俗・メンエス</option>
-              <option value="garuba">ガルバ</option>
-            </select>
+
+          <div className="card settings-card">
+            <div className="setting-card-title">🌈 テーマカラー</div>
+            <div className="settings-option-grid">
+              {APP_THEME_OPTIONS.map((option) => (
+                <button type="button" key={option.value} className={`settings-choice ${appTheme === option.value ? "active" : ""}`} onClick={() => setSelectedAppTheme(option.value)}>
+                  <b>{option.label}</b>
+                  <span>{option.description}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="card settings-card">
+            <div className="setting-card-title">🔤 フォント</div>
+            <div className="settings-option-grid">
+              {APP_FONT_OPTIONS.map((option) => (
+                <button type="button" key={option.value} className={`settings-choice ${appFont === option.value ? "active" : ""}`} onClick={() => setSelectedAppFont(option.value)}>
+                  <b>{option.label}</b>
+                  <span>{option.description}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="card" style={{padding: "16px 20px"}}>
-          <div style={{color: "var(--alert-text)", fontWeight: "700", fontSize: "13px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "6px"}}>🚨 放置アラート設定（日数）</div>
+        <div className="card settings-alert-card">
+          <div style={{color: "var(--alert-text)", fontWeight: "700", fontSize: "13px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px"}}>💌 そろそろ連絡？お知らせ設定</div>
           <div style={{display: "flex", gap: "12px"}}>
             <div style={{flex: "1", textAlign: "center"}}>
               <div style={{fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}>🔰 新規</div>

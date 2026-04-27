@@ -3,6 +3,7 @@
   --bg-color: #F8F7F5; 
   --card-bg: #FFFFFF;
   --input-bg: #F4F3F0;
+  --header-bg: rgba(255, 255, 255, 0.85);
   
   /* 💎 Text Colors */
   --text-main: #433E3C;
@@ -32,6 +33,58 @@
   --font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial, sans-serif;
   --bottom-nav-height: 66px;
   --cta-gap-from-nav: 10px;
+}
+
+body[data-app-theme="noir"] {
+  --bg-color: #161217;
+  --card-bg: #211a22;
+  --input-bg: #2d2430;
+  --header-bg: rgba(22, 18, 23, 0.86);
+  --text-main: #fff4f8;
+  --text-sub: #c8aeb9;
+  --text-muted: #836c77;
+  --primary: #ff6fa8;
+  --primary-light: rgba(255, 111, 168, 0.16);
+  --primary-gradient: linear-gradient(135deg, #ff8fbe, #ff4f9b);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --alert-bg: rgba(255, 107, 107, 0.18);
+  --alert-text: #ff8f9a;
+  --vip-bg: rgba(255, 214, 107, 0.14);
+  --vip-border: #d7a84f;
+  --sales-bg: rgba(106, 150, 210, 0.16);
+  --sales-text: #9fc5ff;
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.22);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-float: 0 10px 28px rgba(255, 79, 155, 0.24);
+}
+
+body[data-app-theme="chic"] {
+  --bg-color: #f5f1e9;
+  --card-bg: #fffdf8;
+  --input-bg: #eee8dc;
+  --header-bg: rgba(255, 253, 248, 0.88);
+  --text-main: #27231f;
+  --text-sub: #746b5f;
+  --text-muted: #aaa092;
+  --primary: #a9823f;
+  --primary-light: #f3ead9;
+  --primary-gradient: linear-gradient(135deg, #d5b16a, #6e604d);
+  --border-color: #e4d8c4;
+  --alert-bg: #fff0eb;
+  --alert-text: #b45a44;
+  --vip-bg: #fff8e7;
+  --vip-border: #c8a04f;
+  --sales-bg: #eef2f3;
+  --sales-text: #667b86;
+  --shadow-float: 0 8px 24px rgba(169, 130, 63, 0.24);
+}
+
+body[data-app-font="maru"] {
+  --font-family: var(--font-maru), -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+}
+
+body[data-app-font="mincho"] {
+  --font-family: var(--font-mincho), "Hiragino Mincho ProN", "Yu Mincho", serif;
 }
 
 /* =========================================
@@ -104,7 +157,7 @@ input[type="radio"].ui-state { display: none; }
 
 .header-area {
   padding: env(safe-area-inset-top, 20px) 16px 12px;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--header-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   z-index: 100;
@@ -387,6 +440,19 @@ input[type="radio"].ui-state { display: none; }
   height: fit-content;
   position: relative;
   box-shadow: var(--shadow-sm);
+}
+
+body[data-app-theme="noir"] .input-field,
+body[data-app-theme="chic"] .input-field {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-main) !important;
+}
+
+body[data-app-theme="noir"] select.input-field option,
+body[data-app-theme="chic"] select.input-field option {
+  background: var(--card-bg);
+  color: var(--text-main);
 }
 
 .filter-btn:active {
@@ -1442,8 +1508,108 @@ textarea.input-field {
   min-height: 80px;
 }
 
+.settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.settings-card {
+  padding: 16px;
+  margin-bottom: 0;
+}
+
+.settings-card-main {
+  padding: 22px;
+  cursor: pointer;
+}
+
+.settings-card-select {
+  min-height: 118px;
+}
+
+.settings-pair-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.setting-card-title {
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+
+.settings-card-main .setting-card-title {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.setting-card-desc {
+  color: var(--text-sub);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.settings-option-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-choice {
+  min-height: 70px;
+  padding: 10px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: var(--input-bg);
+  color: var(--text-main);
+  font-family: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.settings-choice b {
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 3px;
+}
+
+.settings-choice span {
+  display: block;
+  color: var(--text-sub);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.settings-choice.active {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.settings-choice.active span {
+  color: var(--primary);
+}
+
+.settings-choice:active {
+  transform: scale(0.98);
+}
+
+.settings-alert-card {
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+
 .settings-list {
-  background: #FFF;
+  background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 16px;
   overflow: hidden;

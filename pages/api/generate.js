@@ -36,8 +36,9 @@ export default async function handler(req, res) {
     const customerTags = normalizeTags(data?.customerTags);
     const favoriteTexts = Array.isArray(data?.favoriteTexts) ? data.favoriteTexts.map(text => typeof text === 'string' ? text.trim() : '').filter(Boolean).slice(0, 5).join('\n') : (typeof data?.favoriteTexts === 'string' ? data.favoriteTexts : '');
     const favoriteTextCount = favoriteTexts ? favoriteTexts.split('\n').filter(Boolean).length : 0;
-    const customerId = await findCustomerIdByName({ supabase, userId, customerId: data?.customerId, name: data?.name });
-    const difyInputs = { businessType: data?.businessType || 'cabaret', customerRank: data?.customerRank || '新規', visitStatus, isAlert: String(data?.isAlert || 'false'), episodeText, pastMemo: data?.pastMemo || '', customerTags: customerTags.join(', '), factTags: factTags.join(', '), moodTags: moodTags.join(', '), style: data?.style || 'cute', tension: data?.tension || '3', emoji: data?.emoji || '4', customText: trimText(data?.customText), favoriteTexts, messageMode: mode, imageFile: data?.imageFile || null };
+    const customerName = trimText(data?.customerName);
+    const customerId = await findCustomerIdByName({ supabase, userId, customerId: data?.customerId, name: customerName });
+    const difyInputs = { customerName, businessType: data?.businessType || 'cabaret', customerRank: data?.customerRank || '新規', visitStatus, isAlert: String(data?.isAlert || 'false'), episodeText, pastMemo: data?.pastMemo || '', customerTags: customerTags.join(', '), factTags: factTags.join(', '), moodTags: moodTags.join(', '), style: data?.style || 'cute', tension: data?.tension || '3', emoji: data?.emoji || '4', customText: trimText(data?.customText), favoriteTexts, messageMode: mode, imageFile: data?.imageFile || null };
     const difyRes = await fetch(difyApiUrl, { method: 'POST', headers: { Authorization: `Bearer ${difyApiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ inputs: difyInputs, response_mode: 'blocking', user: userId }) });
     if (!difyRes.ok) throw new Error(`Dify生成エラー: ${difyRes.status} ${await difyRes.text().catch(() => '')}`);
     const difyData = await difyRes.json();

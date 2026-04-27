@@ -562,6 +562,7 @@ export default function Page() {
       const payload = {
         userId,
         customerId: targetCustomer?.id || selectedCustomerId,
+        customerName: targetCustomer ? targetCustomer.name : name,
         businessType: selectedBusinessType,
         customerRank,
         visitStatus: visitStatus === "yes" ? "visit" : "sales",

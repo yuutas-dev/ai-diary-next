@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
 type ActiveTab = "create" | "data" | "settings";
@@ -265,6 +265,14 @@ export default function Page() {
   const [currentEntryId, setCurrentEntryId] = useState("");
   const [isInlineResultVisible, setIsInlineResultVisible] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [actionToastText, setActionToastText] = useState("完了しました");
+  const [isActionToastVisible, setIsActionToastVisible] = useState(false);
+  const [cuteToastIcon, setCuteToastIcon] = useState("🐰");
+  const [cuteToastText, setCuteToastText] = useState("執筆中だよ...");
+  const [isCuteToastVisible, setIsCuteToastVisible] = useState(false);
+  const [isCuteToastIconAnimating, setIsCuteToastIconAnimating] = useState(false);
+  const actionToastTimerRef = useRef<number | null>(null);
+  const cuteToastTimerRef = useRef<number | null>(null);
 
   const fetchCustomers = useCallback(async (targetUserId: string) => {
     setIsCustomersLoading(true);
@@ -346,6 +354,13 @@ export default function Page() {
     setIsCompactMode(localStorage.getItem("isCompactMode") === "true");
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (actionToastTimerRef.current) window.clearTimeout(actionToastTimerRef.current);
+      if (cuteToastTimerRef.current) window.clearTimeout(cuteToastTimerRef.current);
+    };
+  }, []);
+
   const targetDummyTag = getTargetDummyTag(selectedBusinessType);
   const baseVisibleCustomers = customerData.filter((customer) => {
     if (customer.tagsArray.includes("非表示")) return false;
@@ -412,6 +427,46 @@ export default function Page() {
 
   function showNotice(message: string) {
     window.alert(message);
+  }
+
+  function showActionToast(message: string) {
+    if (actionToastTimerRef.current) window.clearTimeout(actionToastTimerRef.current);
+    setActionToastText(message);
+    setIsActionToastVisible(true);
+    actionToastTimerRef.current = window.setTimeout(() => {
+      setIsActionToastVisible(false);
+    }, 2500);
+  }
+
+  function showCuteToast(isComplete: boolean) {
+    if (cuteToastTimerRef.current) window.clearTimeout(cuteToastTimerRef.current);
+
+    if (!isComplete) {
+      setCuteToastIcon("🐰");
+      setCuteToastText("執筆中だよ...");
+      setIsCuteToastIconAnimating(true);
+      setIsCuteToastVisible(true);
+      return;
+    }
+
+    setCuteToastIcon("✨");
+    setCuteToastText("できたよ！");
+    setIsCuteToastIconAnimating(false);
+    setIsCuteToastVisible(true);
+    cuteToastTimerRef.current = window.setTimeout(() => {
+      setIsCuteToastVisible(false);
+    }, 3000);
+  }
+
+  function showCuteErrorToast() {
+    if (cuteToastTimerRef.current) window.clearTimeout(cuteToastTimerRef.current);
+    setCuteToastIcon("💦");
+    setCuteToastText("❌ エラー発生");
+    setIsCuteToastIconAnimating(false);
+    setIsCuteToastVisible(true);
+    cuteToastTimerRef.current = window.setTimeout(() => {
+      setIsCuteToastVisible(false);
+    }, 3000);
   }
 
   function selectCustomer(customer: Customer) {
@@ -522,6 +577,50 @@ export default function Page() {
     )));
   }
 
+  function saveMoodPreset() {
+    if (selectedMoodTags.length === 0) {
+      showActionToast("保存するムードタグがありません");
+      return;
+    }
+    localStorage.setItem("savedMoodTagsPreset", JSON.stringify(selectedMoodTags));
+    showActionToast("プリセットを保存しました");
+  }
+
+  function loadMoodPreset() {
+    const saved = JSON.parse(localStorage.getItem("savedMoodTagsPreset") || "[]");
+    if (!Array.isArray(saved) || saved.length === 0) {
+      showActionToast("保存されたプリセットがありません");
+      return;
+    }
+    setSelectedMoodTags(saved.map((tag) => String(tag)).filter(Boolean));
+    showActionToast("プリセットを読み込みました");
+  }
+
+  function sendCompletionStatus(status: string) {
+    if (!currentEntryId || !inlineResultText) return;
+    fetch("/api/entries/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, entryId: currentEntryId, finalSentText: inlineResultText, deliveryStatus: status }),
+    }).catch((error) => console.error("sendCompletionStatus Error:", error));
+  }
+
+  function copyInlineResult() {
+    navigator.clipboard.writeText(inlineResultText).then(() => {
+      showActionToast("📋 コピーしました！");
+      sendCompletionStatus("copied");
+    }).catch((error) => {
+      showActionToast(`コピーに失敗しました: ${error}`);
+    });
+  }
+
+  function sendInlineToLine() {
+    sendCompletionStatus("line_sent");
+    const url = `https://line.me/R/msg/text/?${encodeURIComponent(inlineResultText)}`;
+    window.open(url, "_blank");
+    showActionToast("💬 LINEに送信しました！");
+  }
+
   async function generateDiary() {
     if (isCreateDetailsOpen) setIsCreateDetailsOpen(false);
 
@@ -537,6 +636,7 @@ export default function Page() {
     setInlineResultText("");
     setCurrentEntryId("");
     setIsGenerating(true);
+    showCuteToast(false);
 
     try {
       let customerRank = "新規";
@@ -592,6 +692,7 @@ export default function Page() {
         throw new Error(data.error || "不明なエラー");
       }
 
+      showCuteToast(true);
       if (!isPhoto && name) {
         await fetchCustomers(userId);
       }
@@ -606,6 +707,7 @@ export default function Page() {
       }, 100);
     } catch (error) {
       console.error("generateDiary Error:", error);
+      showCuteErrorToast();
       showNotice(`エラーが発生しました: ${error instanceof Error ? error.message : "不明なエラー"}`);
     } finally {
       setIsGenerating(false);
@@ -670,11 +772,11 @@ export default function Page() {
 
   return (
     <>
-<div id="actionToast" data-current-user-id={userId}>完了しました</div>
+<div id="actionToast" data-current-user-id={userId} style={{top: isActionToastVisible ? "0" : "-150px", whiteSpace: "pre-line"}}>{actionToastText}</div>
 
-  <div id="cuteToast">
-    <span id="cuteToastIcon" style={{fontSize: "16px", display: "inline-block"}}>🐰</span>
-    <span id="cuteToastText">執筆中だよ...</span>
+  <div id="cuteToast" style={{right: isCuteToastVisible ? "0px" : "-250px"}}>
+    <span id="cuteToastIcon" style={{fontSize: "16px", display: "inline-block", animation: isCuteToastIconAnimating ? "bounce-icon 1s infinite" : "none"}}>{cuteToastIcon}</span>
+    <span id="cuteToastText">{cuteToastText}</span>
   </div>
 
       <input type="radio" name="nav" id="nav-create" className="ui-state" checked={activeTab === "create"} onChange={() => setActiveTab("create")} />
@@ -718,8 +820,8 @@ export default function Page() {
       <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px"}}>
         <span className="label" style={{margin: "0"}}>🎭 感情・ムード</span>
         <div style={{display: "flex", gap: "6px"}}>
-          <button type="button" data-original-click={"loadMoodPreset()"} style={{background: "var(--input-bg)", border: "none", color: "var(--text-sub)", fontSize: "10px", padding: "4px 8px", borderRadius: "8px", fontWeight: "700", cursor: "pointer"}}>プリセット読込</button>
-          <button type="button" data-original-click={"saveMoodPreset()"} style={{background: "var(--primary-light)", border: "none", color: "var(--primary)", fontSize: "10px", padding: "4px 8px", borderRadius: "8px", fontWeight: "700", cursor: "pointer"}}>保存</button>
+          <button type="button" data-original-click={"loadMoodPreset()"} onClick={loadMoodPreset} style={{background: "var(--input-bg)", border: "none", color: "var(--text-sub)", fontSize: "10px", padding: "4px 8px", borderRadius: "8px", fontWeight: "700", cursor: "pointer"}}>プリセット読込</button>
+          <button type="button" data-original-click={"saveMoodPreset()"} onClick={saveMoodPreset} style={{background: "var(--primary-light)", border: "none", color: "var(--primary)", fontSize: "10px", padding: "4px 8px", borderRadius: "8px", fontWeight: "700", cursor: "pointer"}}>保存</button>
         </div>
       </div>
       <div className="tags-scroll-container create-details-tags-grid overflow-x-auto no-scrollbar" id="moodTagsArea" style={{marginBottom: "16px"}}>
@@ -1053,10 +1155,10 @@ export default function Page() {
             💡 自由に手直しOK！送信・コピー時に履歴に上書き保存されるよ✨
           </div>
           <div style={{display: "flex", gap: "10px"}}>
-            <button data-original-click={"copyInlineResult()"} style={{flex: "1", background: "#FFF", color: "var(--primary)", border: "2px solid var(--primary)", padding: "12px", borderRadius: "24px", fontWeight: "700"}}>
+            <button data-original-click={"copyInlineResult()"} onClick={copyInlineResult} style={{flex: "1", background: "#FFF", color: "var(--primary)", border: "2px solid var(--primary)", padding: "12px", borderRadius: "24px", fontWeight: "700"}}>
               📋 コピー
             </button>
-            <button data-original-click={"sendInlineToLine()"} style={{flex: "1", background: "var(--primary)", color: "#FFF", border: "none", padding: "12px", borderRadius: "24px", fontWeight: "700"}}>
+            <button data-original-click={"sendInlineToLine()"} onClick={sendInlineToLine} style={{flex: "1", background: "var(--primary)", color: "#FFF", border: "none", padding: "12px", borderRadius: "24px", fontWeight: "700"}}>
               💬 LINE送信
             </button>
           </div>

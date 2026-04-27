@@ -1022,7 +1022,7 @@ input[type="radio"].ui-state { display: none; }
   border-top: 1px solid var(--border-color);
   pointer-events: auto;
   position: fixed;
-  bottom: 0 !important;
+  bottom: 0;
   left: 0;
   width: 100%;
   z-index: 1000;
@@ -1030,10 +1030,10 @@ input[type="radio"].ui-state { display: none; }
 }
 
 .fixed-footer {
-  position: fixed !important;
+  position: fixed;
   left: 0;
   right: 0;
-  bottom: 0 !important;
+  bottom: 0;
   z-index: 800;
   pointer-events: none;
 }
@@ -1097,6 +1097,24 @@ input[type="radio"].ui-state { display: none; }
   overflow: hidden;
 }
 
+/* 旧 index.html 準拠：顧客編集（全画面＋余白 20px・下端の延長補正なし） */
+#editCustomerModal.modal-overlay {
+  top: 0 !important;
+  right: 0 !important;
+  left: 0 !important;
+  bottom: 0 !important;
+  min-height: 100dvh;
+  min-height: 100svh;
+  min-height: 100vh;
+  width: 100%;
+  padding: 20px;
+  overflow: auto;
+}
+
+#editCustomerModal.modal-overlay::after {
+  display: none;
+}
+
 .modal-overlay::after,
 .half-modal-backdrop::after {
   content: "";
@@ -1128,7 +1146,8 @@ input[type="radio"].ui-state { display: none; }
   flex-direction: column;
   padding: 0;
   overflow: hidden;
-  max-height: min(85dvh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px));
+  /* 旧 .modal-content と同じ上限（90vh） */
+  max-height: 90vh;
 }
 
 .modal-content--customer-edit .modal-content__body {

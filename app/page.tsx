@@ -122,6 +122,12 @@ const STYLE_PLACEHOLDERS: Record<BusinessType, string> = {
   garuba: "（例）今日はお店来てくれてありがとな🍾✨\n最近会えてなかったから、〇〇の顔見れて普通にテンション上がったわ😎",
 };
 
+const STYLE_DEFAULTS: Record<BusinessType, { tension: string; emoji: string }> = {
+  cabaret: { tension: "4", emoji: "5" },
+  fuzoku: { tension: "3", emoji: "4" },
+  garuba: { tension: "3", emoji: "2" },
+};
+
 function parseMemoToJSON(memoStr?: string) {
   if (!memoStr) return [];
   try {
@@ -300,6 +306,9 @@ export default function Page() {
   const [customerSearchText, setCustomerSearchText] = useState("");
   const [selectedMoodTags, setSelectedMoodTags] = useState<string[]>([]);
   const [selectedFactTags, setSelectedFactTags] = useState<string[]>([]);
+  const [styleTension, setStyleTension] = useState("3");
+  const [styleEmoji, setStyleEmoji] = useState("4");
+  const [customStyleText, setCustomStyleText] = useState("");
   const [editAttributeTags, setEditAttributeTags] = useState<string[]>([]);
   const [customAttrInput, setCustomAttrInput] = useState("");
   const [memoBlocks, setMemoBlocks] = useState<MemoBlock[]>([]);
@@ -421,8 +430,19 @@ export default function Page() {
     if (savedIconTheme && ["glass", "jewel", "perfume", "moon_star", "flower", "teacup", "symbol"].includes(savedIconTheme)) {
       setIconTheme(savedIconTheme);
     }
+    const savedStyle = localStorage.getItem("selectedStyle") as StyleTab | null;
+    if (savedStyle && ["cute", "custom", "neat"].includes(savedStyle)) {
+      setStyleTab(savedStyle);
+    }
+    setCustomStyleText(localStorage.getItem("customStyleText") || "");
     setIsCompactMode(localStorage.getItem("isCompactMode") === "true");
   }, []);
+
+  useEffect(() => {
+    const defaults = STYLE_DEFAULTS[selectedBusinessType] || STYLE_DEFAULTS.cabaret;
+    setStyleTension(localStorage.getItem("tensionSlider") || defaults.tension);
+    setStyleEmoji(localStorage.getItem("emojiSlider") || defaults.emoji);
+  }, [selectedBusinessType]);
 
   useEffect(() => {
     return () => {
@@ -632,6 +652,11 @@ export default function Page() {
   function setBusinessType(value: BusinessType) {
     setSelectedBusinessType(value);
     localStorage.setItem("businessType", value);
+  }
+
+  function setSelectedStyle(value: StyleTab) {
+    setStyleTab(value);
+    localStorage.setItem("selectedStyle", value);
   }
 
   function setSelectedIconTheme(value: IconTheme) {
@@ -903,9 +928,9 @@ export default function Page() {
         factTags: selectedFactTags.filter((tag) => factTags.includes(tag)).join(","),
         moodTags: selectedMoodTags.join(","),
         style: styleTab,
-        tension: "3",
-        emoji: "4",
-        customText: "",
+        tension: styleTension,
+        emoji: styleEmoji,
+        customText: customStyleText,
         favoriteTexts: currentFavoriteTexts.slice(0, 5).join("\n"),
         messageMode,
         imageFile: null,
@@ -1023,9 +1048,9 @@ export default function Page() {
       <input type="radio" name="visit" id="visit-yes" className="ui-state" checked={visitStatus === "yes"} onChange={() => setVisitStatus("yes")} />
       <input type="radio" name="visit" id="visit-no" className="ui-state" checked={visitStatus === "no"} onChange={() => setVisitStatus("no")} />
   
-      <input type="radio" name="style" id="style-cute" className="ui-state" checked={styleTab === "cute"} onChange={() => setStyleTab("cute")} />
-      <input type="radio" name="style" id="style-custom" className="ui-state" checked={styleTab === "custom"} onChange={() => setStyleTab("custom")} />
-      <input type="radio" name="style" id="style-neat" className="ui-state" checked={styleTab === "neat"} onChange={() => setStyleTab("neat")} />
+      <input type="radio" name="style" id="style-cute" className="ui-state" checked={styleTab === "cute"} onChange={() => setSelectedStyle("cute")} />
+      <input type="radio" name="style" id="style-custom" className="ui-state" checked={styleTab === "custom"} onChange={() => setSelectedStyle("custom")} />
+      <input type="radio" name="style" id="style-neat" className="ui-state" checked={styleTab === "neat"} onChange={() => setSelectedStyle("neat")} />
 
   <div id="photoModal" className="modal-overlay" style={{zIndex: "10008", display: activeModal === "photo" ? "flex" : "none"}} data-original-click={"closePhotoModal(event)"} onClick={closeModal}>
     <div style={{position: "relative", maxWidth: "90%", maxHeight: "90%", margin: "auto", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center"}} data-original-click={"event.stopPropagation()"} onClick={(event) => event.stopPropagation()}>
@@ -1131,11 +1156,11 @@ export default function Page() {
         </div>
         <div className="style-desc-custom">
           <div id="text-style-custom" className="style-desc-box">{STYLE_MODAL_TEXTS.custom}</div>
-          <textarea id="customStyleText" className="input-field" placeholder={stylePlaceholder} style={{height: "100px", marginBottom: "16px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}} data-original-change={"saveStyleSettings()"}></textarea>
+          <textarea id="customStyleText" className="input-field" placeholder={stylePlaceholder} value={customStyleText} onChange={(event) => { setCustomStyleText(event.target.value); localStorage.setItem("customStyleText", event.target.value); }} style={{height: "100px", marginBottom: "16px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}} data-original-change={"saveStyleSettings()"}></textarea>
           <div style={{display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}><span>テンション（低）</span><span>（高）</span></div>
-          <input type="range" id="tensionSlider" min="1" max="5" value="3" style={{width: "100%", marginBottom: "16px"}} data-original-change={"saveStyleSettings()"} />
+          <input type="range" id="tensionSlider" min="1" max="5" value={styleTension} onChange={(event) => { setStyleTension(event.target.value); localStorage.setItem("tensionSlider", event.target.value); }} style={{width: "100%", marginBottom: "16px"}} data-original-change={"saveStyleSettings()"} />
           <div style={{display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}><span>絵文字の量（少）</span><span>（多）</span></div>
-          <input type="range" id="emojiSlider" min="1" max="5" value="4" style={{width: "100%", marginBottom: "10px"}} data-original-change={"saveStyleSettings()"} />
+          <input type="range" id="emojiSlider" min="1" max="5" value={styleEmoji} onChange={(event) => { setStyleEmoji(event.target.value); localStorage.setItem("emojiSlider", event.target.value); }} style={{width: "100%", marginBottom: "10px"}} data-original-change={"saveStyleSettings()"} />
         </div>
         <div className="style-desc-neat">
           <div id="text-style-neat" className="style-desc-box">{STYLE_MODAL_TEXTS.neat}</div>

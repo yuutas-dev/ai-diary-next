@@ -297,7 +297,7 @@ export default function Page() {
   const [nameInputValue, setNameInputValue] = useState("");
   const [isCreateDetailsOpen, setIsCreateDetailsOpen] = useState(false);
   const [isTagAccordionOpen, setIsTagAccordionOpen] = useState(false);
-  const [activeModal, setActiveModal] = useState<null | "style" | "help" | "hidden" | "photo" | "edit">(null);
+  const [activeModal, setActiveModal] = useState<null | "style" | "help" | "hidden" | "photo" | "edit" | "delete">(null);
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState("");
   const [selectedBusinessType, setSelectedBusinessType] = useState<BusinessType>("cabaret");
   const [iconTheme, setIconTheme] = useState<IconTheme>("glass");
@@ -333,6 +333,8 @@ export default function Page() {
   const [activeCustomerMenuId, setActiveCustomerMenuId] = useState<string | null>(null);
   const [hidingCustomerIds, setHidingCustomerIds] = useState<string[]>([]);
   const [vipBounceCustomerIds, setVipBounceCustomerIds] = useState<string[]>([]);
+  const [isEditingHiddenCustomer, setIsEditingHiddenCustomer] = useState(false);
+  const [deleteTargetCustomer, setDeleteTargetCustomer] = useState<Customer | null>(null);
   const actionToastTimerRef = useRef<number | null>(null);
   const cuteToastTimerRef = useRef<number | null>(null);
   const inlineResultRef = useRef<HTMLDivElement | null>(null);
@@ -549,8 +551,22 @@ export default function Page() {
     });
 
   function closeModal() {
+    if (activeModal === "edit") {
+      closeEditModal();
+      return;
+    }
+    if (activeModal === "delete") {
+      setActiveModal("edit");
+      return;
+    }
     setActiveModal(null);
     setExpandedPhotoUrl("");
+  }
+
+  function closeEditModal() {
+    setActiveModal(isEditingHiddenCustomer ? "hidden" : null);
+    setIsEditingHiddenCustomer(false);
+    setDeleteTargetCustomer(null);
   }
 
   function showNotice(message: string) {
@@ -696,6 +712,37 @@ export default function Page() {
     void persistCustomerTags(customer, nextTags, previousTags);
   }
 
+  function openHiddenDeleteConfirm() {
+    if (!selectedCustomer) return;
+    setDeleteTargetCustomer(selectedCustomer);
+    setActiveModal("delete");
+  }
+
+  async function executeDeleteCustomer() {
+    const target = deleteTargetCustomer;
+    if (!target?.id) return;
+    const previousCustomers = customerData;
+    setCustomerData((current) => current.filter((customer) => customer.id !== target.id));
+    setActiveModal("hidden");
+    setIsEditingHiddenCustomer(false);
+    setDeleteTargetCustomer(null);
+    showActionToast("🗑️ 完全に削除しました");
+
+    try {
+      const res = await fetch("/api/customers/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, customerId: target.id }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "削除に失敗しました");
+    } catch (error) {
+      console.error("executeDeleteCustomer Error:", error);
+      setCustomerData(previousCustomers);
+      showActionToast("通信エラーのため元に戻しました");
+    }
+  }
+
   function getPastMemos(customer: Customer | null) {
     if (!customer) return [];
     return parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
@@ -709,9 +756,11 @@ export default function Page() {
     toggleStringValue(tag, setSelectedFactTags);
   }
 
-  function openEditCustomer(customer: Customer) {
+  function openEditCustomer(customer: Customer, fromHiddenList = false) {
     const memos = getPastMemos(customer);
     setIsCreateCustomerMode(false);
+    setIsEditingHiddenCustomer(fromHiddenList);
+    setDeleteTargetCustomer(null);
     setSelectedCustomerId(customer.id);
     setNameInputValue(customer.name);
     setEditCustomerName(customer.name);
@@ -723,6 +772,8 @@ export default function Page() {
 
   function openCreateCustomerModal() {
     setIsCreateCustomerMode(true);
+    setIsEditingHiddenCustomer(false);
+    setDeleteTargetCustomer(null);
     setSelectedCustomerId(null);
     setNameInputValue("");
     setEditCustomerName("");
@@ -1114,7 +1165,7 @@ export default function Page() {
       }
 
       await fetchCustomers(userId);
-      closeModal();
+      closeEditModal();
     } catch (error) {
       console.error("saveCustomerEdit Error:", error);
       showNotice(error instanceof Error ? error.message : "保存に失敗しました");
@@ -1217,7 +1268,7 @@ export default function Page() {
           const previewMemo = lastMemo?.text ? `${String(lastMemo.text).substring(0, 30)}...` : "メモなし";
           const visibleTags = customer.tagsArray.filter((tag) => tag !== "ダミー" && tag !== "非表示" && tag !== "一軍固定");
           return (
-            <div className="card compact-view" key={customer.id || customer.name} onClick={() => openEditCustomer(customer)} style={{padding: "12px 14px", marginBottom: "10px", boxShadow: "var(--shadow-sm)", cursor: "pointer"}}>
+            <div className="card compact-view" key={customer.id || customer.name} onClick={() => openEditCustomer(customer, true)} style={{padding: "12px 14px", marginBottom: "10px", boxShadow: "var(--shadow-sm)", cursor: "pointer"}}>
               <div style={{display: "flex", flexDirection: "column"}}>
                 <div style={{display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "center", marginBottom: "4px"}}>
                   <b style={{fontSize: "15px", color: "var(--text-main)"}}>{customer.name}</b>
@@ -1326,20 +1377,24 @@ export default function Page() {
     </div>
   </div>
 
-  <div id="deleteConfirmModal" className="modal-overlay" style={{zIndex: "10007"}}>
-    <div className="modal-content" style={{maxWidth: "320px", textAlign: "center"}}>
-      <h3 style={{margin: "0 0 10px", fontWeight: "700"}}>顧客を完全に削除しますか？</h3>
-      <p style={{margin: "0 0 8px", fontSize: "12px", color: "var(--text-sub)", fontWeight: "700"}}>この操作は元に戻せません。</p>
-      <p style={{margin: "0 0 20px", fontSize: "14px", color: "var(--alert-text)", fontWeight: "700"}} id="deleteTargetName"></p>
+  <div id="deleteConfirmModal" className="modal-overlay" style={{zIndex: "10007", display: activeModal === "delete" ? "flex" : "none"}} onClick={() => setActiveModal("edit")}>
+    <div className="modal-content cute-delete-confirm" onClick={(event) => event.stopPropagation()}>
+      <div className="cute-delete-icon">🗑️</div>
+      <h3 style={{margin: "0 0 8px", fontWeight: "900"}}>本当に削除する？</h3>
+      <p style={{margin: "0 0 8px", fontSize: "12px", color: "var(--text-sub)", fontWeight: "700", lineHeight: 1.6}}>このお客様のカルテを完全に削除します。<br />この操作は元に戻せません。</p>
+      <p style={{margin: "0 0 18px", fontSize: "14px", color: "var(--alert-text)", fontWeight: "900"}} id="deleteTargetName">{deleteTargetCustomer?.name ? `${deleteTargetCustomer.name} 様` : ""}</p>
       <div style={{display: "flex", gap: "10px"}}>
-        <button data-original-click={"closeDeleteConfirmModal()"} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "12px", borderRadius: "16px", fontWeight: "700"}}>キャンセル</button>
-        <button id="executeDeleteBtn" data-original-click={"executeDeleteCustomer()"} style={{flex: "1", background: "var(--alert-bg)", color: "var(--alert-text)", border: "none", padding: "12px", borderRadius: "16px", fontWeight: "700"}}>削除する</button>
+        <button type="button" data-original-click={"closeDeleteConfirmModal()"} onClick={() => setActiveModal("edit")} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "12px", borderRadius: "16px", fontWeight: "700"}}>やめる</button>
+        <button type="button" id="executeDeleteBtn" data-original-click={"executeDeleteCustomer()"} onClick={executeDeleteCustomer} style={{flex: "1", background: "var(--alert-bg)", color: "var(--alert-text)", border: "none", padding: "12px", borderRadius: "16px", fontWeight: "900"}}>削除する</button>
       </div>
     </div>
   </div>
 
-  <div id="editCustomerModal" className="modal-overlay" style={{zIndex: "10006", display: activeModal === "edit" ? "flex" : "none"}} onClick={closeModal}>
-    <div className="modal-content" style={{maxHeight: "85vh", overflowY: "auto"}} onClick={(event) => event.stopPropagation()}>
+  <div id="editCustomerModal" className="modal-overlay" style={{zIndex: "10006", display: activeModal === "edit" ? "flex" : "none"}} onClick={closeEditModal}>
+    <div className="modal-content" style={{maxHeight: "85vh", overflowY: "auto", position: "relative"}} onClick={(event) => event.stopPropagation()}>
+      {isEditingHiddenCustomer ? (
+        <button type="button" aria-label="完全に削除" onClick={openHiddenDeleteConfirm} style={{position: "absolute", top: "14px", right: "14px", width: "34px", height: "34px", borderRadius: "50%", border: "none", background: "var(--alert-bg)", color: "var(--alert-text)", fontSize: "16px", boxShadow: "var(--shadow-sm)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer"}}>🗑️</button>
+      ) : null}
       <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}} id="modalTitle">{isCreateCustomerMode ? "新規顧客の登録" : "顧客情報の編集"}</h2>
       <input type="hidden" id="editCustomerIndex" />
       <input type="hidden" id="isCreateMode" value={isCreateCustomerMode ? "true" : "false"} />
@@ -1435,7 +1490,7 @@ export default function Page() {
       <div className="add-memo-btn" id="addMemoBtn" data-original-click={"addNewMemoBlock()"} onClick={addNewMemoBlock}>＋ 日付とエピソードを追加</div>
 
       <div id="editActionArea" style={{display: "flex", gap: "10px"}}>
-        <button data-original-click={"closeEditModal()"} onClick={closeModal} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px"}} id="cancelBtn">閉じる</button>
+        <button data-original-click={"closeEditModal()"} onClick={closeEditModal} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px"}} id="cancelBtn">閉じる</button>
         <button data-original-click={"saveCustomerEdit()"} id="saveCustomerBtn" onClick={saveCustomerEdit} style={{flex: "1", background: "var(--primary)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px", boxShadow: "var(--shadow-float)"}}>保存する</button>
       </div>
 

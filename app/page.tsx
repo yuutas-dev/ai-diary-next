@@ -23,6 +23,7 @@ interface MemoBlock {
   status: string;
   isExpanded: boolean;
   isReadOnly: boolean;
+  isDropdownOpen: boolean;
 }
 
 const LIFF_ID = "2009902106-W8zW5hJA";
@@ -113,6 +114,7 @@ function createMemoBlock(entry?: Partial<CustomerEntry>, isExpanded = false): Me
     status: entry?.status || "legacy",
     isExpanded,
     isReadOnly: entry?.type === "sales",
+    isDropdownOpen: false,
   };
 }
 
@@ -241,6 +243,9 @@ export default function Page() {
   const [editAttributeTags, setEditAttributeTags] = useState<string[]>([]);
   const [customAttrInput, setCustomAttrInput] = useState("");
   const [memoBlocks, setMemoBlocks] = useState<MemoBlock[]>([]);
+  const [isCreateCustomerMode, setIsCreateCustomerMode] = useState(false);
+  const [editCustomerName, setEditCustomerName] = useState("");
+  const [memoCustomTagInputs, setMemoCustomTagInputs] = useState<Record<string, string>>({});
 
   const fetchCustomers = useCallback(async (targetUserId: string) => {
     setIsCustomersLoading(true);
@@ -418,11 +423,26 @@ export default function Page() {
 
   function openEditCustomer(customer: Customer) {
     const memos = getPastMemos(customer);
+    setIsCreateCustomerMode(false);
     setSelectedCustomerId(customer.id);
     setNameInputValue(customer.name);
+    setEditCustomerName(customer.name);
     setEditAttributeTags(customer.tagsArray.filter((tag) => tag !== "非表示" && tag !== "一軍固定" && tag !== "ダミー"));
     setMemoBlocks(memos.length > 0 ? memos.map((memo) => createMemoBlock(memo, false)) : [createMemoBlock({}, true)]);
     setIsTagAccordionOpen(true);
+    setActiveModal("edit");
+  }
+
+  function openCreateCustomerModal() {
+    setIsCreateCustomerMode(true);
+    setSelectedCustomerId(null);
+    setNameInputValue("");
+    setEditCustomerName("");
+    setEditAttributeTags([]);
+    setCustomAttrInput("");
+    setMemoBlocks([createMemoBlock({}, true)]);
+    setMemoCustomTagInputs({});
+    setIsTagAccordionOpen(false);
     setActiveModal("edit");
   }
 
@@ -472,6 +492,76 @@ export default function Page() {
 
   function deleteMemoBlock(id: string) {
     setMemoBlocks((current) => current.filter((block) => block.id !== id));
+  }
+
+  function setMemoCustomTagInput(blockId: string, value: string) {
+    setMemoCustomTagInputs((current) => ({ ...current, [blockId]: value }));
+  }
+
+  function addCustomMemoTag(blockId: string) {
+    const newTag = (memoCustomTagInputs[blockId] || "").trim();
+    if (!newTag) return;
+    setMemoBlocks((current) => current.map((block) => {
+      if (block.id !== blockId) return block;
+      return { ...block, tags: block.tags.includes(newTag) ? block.tags : [...block.tags, newTag] };
+    }));
+    setMemoCustomTagInput(blockId, "");
+  }
+
+  async function saveCustomerEdit() {
+    const newName = editCustomerName.trim();
+    if (!newName) {
+      showNotice("名前を入力してください");
+      return;
+    }
+
+    try {
+      let customerId = selectedCustomerId;
+      if (isCreateCustomerMode) {
+        const res = await fetch("/api/customers/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, newName, newTags: editAttributeTags }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || "顧客作成に失敗しました");
+        customerId = data.customer?.id || null;
+      } else {
+        const res = await fetch("/api/customers/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, customerId: selectedCustomerId, newName, newTags: editAttributeTags }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || "顧客更新に失敗しました");
+      }
+
+      if (customerId) {
+        await fetch("/api/entries/upsert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId,
+            customerId,
+            entries: memoBlocks.map((block) => ({
+              id: block.entryId || null,
+              date: block.date,
+              text: block.text,
+              tags: block.tags,
+              photoUrl: block.photoUrl || null,
+              type: block.type,
+            })),
+            deletedEntryIds: [],
+          }),
+        });
+      }
+
+      await fetchCustomers(userId);
+      closeModal();
+    } catch (error) {
+      console.error("saveCustomerEdit Error:", error);
+      showNotice(error instanceof Error ? error.message : "保存に失敗しました");
+    }
   }
 
   return (
@@ -641,13 +731,13 @@ export default function Page() {
 
   <div id="editCustomerModal" className="modal-overlay" style={{zIndex: "10006", display: activeModal === "edit" ? "flex" : "none"}} onClick={closeModal}>
     <div className="modal-content" style={{maxHeight: "85vh", overflowY: "auto"}} onClick={(event) => event.stopPropagation()}>
-      <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}} id="modalTitle">顧客情報の編集</h2>
+      <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}} id="modalTitle">{isCreateCustomerMode ? "新規顧客の登録" : "顧客情報の編集"}</h2>
       <input type="hidden" id="editCustomerIndex" />
-      <input type="hidden" id="isCreateMode" value="false" />
-      <input type="hidden" id="editCustomerId" />
+      <input type="hidden" id="isCreateMode" value={isCreateCustomerMode ? "true" : "false"} />
+      <input type="hidden" id="editCustomerId" value={selectedCustomerId || ""} />
 
       <span className="label">名前</span>
-      <input type="text" id="editCustomerName" className="input-field" value={selectedCustomer?.name || ""} readOnly style={{marginBottom: "16px", background: "#FFF", border: "1px solid var(--border-color)"}} />
+      <input type="text" id="editCustomerName" className="input-field" value={editCustomerName} onChange={(event) => setEditCustomerName(event.target.value)} style={{marginBottom: "16px", background: "#FFF", border: "1px solid var(--border-color)"}} />
 
       <div className="accordion-header" data-original-click={"toggleTagAccordion()"} onClick={() => setIsTagAccordionOpen((isOpen) => !isOpen)}>
         <span>🏷️ 属性タグ</span><span id="tagAccordionIcon">{isTagAccordionOpen ? "▲" : "▼"}</span>
@@ -702,11 +792,22 @@ export default function Page() {
                   <div className="memo-selected-tags" style={{display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "6px"}}>
                     {block.tags.map((tag) => <span key={`${block.id}-${tag}`} style={{background: "var(--primary-light)", color: "var(--primary)", fontSize: "10px", padding: "3px 8px", borderRadius: "12px", fontWeight: "700"}}>{tag}</span>)}
                   </div>
-                  <div className="memo-tag-dropdown-content overflow-y-auto" style={{display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "120px", overflowY: "auto"}}>
-                    {factTags.map((tag) => {
-                      const isSelected = block.tags.includes(tag);
-                      return <div key={`${block.id}-${tag}`} className={`chip${isSelected ? " selected-fact-chip active" : ""}`} onClick={() => updateMemoBlock(block.id, { tags: isSelected ? block.tags.filter((currentTag) => currentTag !== tag) : [...block.tags, tag] })}>{tag}</div>;
-                    })}
+                  {!block.isReadOnly ? <button type="button" className="memo-add-tag-btn" onClick={() => updateMemoBlock(block.id, { isDropdownOpen: !block.isDropdownOpen })} style={{background: "var(--primary-light)", border: "none", color: "var(--primary)", fontSize: "11px", padding: "6px 12px", borderRadius: "14px", fontWeight: "700", cursor: "pointer", transition: "0.2s"}}>＋ エピソードタグを追加</button> : null}
+                  <div className="memo-tag-dropdown" style={{display: block.isDropdownOpen ? "block" : "none", background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)", border: "1px solid var(--border-color)", borderRadius: "16px", padding: "12px", marginTop: "10px", boxShadow: "var(--shadow-md)", position: "absolute", zIndex: 20, width: "100%"}}>
+                    <div style={{position: "absolute", top: "-6px", left: "20px", width: "10px", height: "10px", background: "#FFF", borderTop: "1px solid var(--border-color)", borderLeft: "1px solid var(--border-color)", transform: "rotate(45deg)"}}></div>
+                    <div className="memo-tag-dropdown-content" style={{display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "120px", overflowY: "auto"}}>
+                      {factTags.map((tag) => {
+                        const isSelected = block.tags.includes(tag);
+                        return <div key={`${block.id}-${tag}`} className={`chip${isSelected ? " selected-fact-chip active" : ""}`} onClick={() => updateMemoBlock(block.id, { tags: isSelected ? block.tags.filter((currentTag) => currentTag !== tag) : [...block.tags, tag] })}>{tag}</div>;
+                      })}
+                    </div>
+                    <div style={{display: "flex", gap: "8px", marginTop: "12px", borderTop: "1px dashed var(--border-color)", paddingTop: "12px"}}>
+                      <input type="text" id={`customMemoTagInput-${block.id}`} className="input-field" placeholder="オリジナルタグ追加..." value={memoCustomTagInputs[block.id] || ""} onChange={(event) => setMemoCustomTagInput(block.id, event.target.value)} style={{padding: "8px", fontSize: "12px", background: "#FFF", border: "1px solid var(--border-color)", flex: 1}} />
+                      <button type="button" onClick={() => addCustomMemoTag(block.id)} style={{background: "var(--text-sub)", color: "#FFF", border: "none", borderRadius: "8px", padding: "0 12px", fontWeight: "700", fontSize: "12px", whiteSpace: "nowrap"}}>追加</button>
+                    </div>
+                    <div style={{textAlign: "right", marginTop: "8px"}}>
+                      <button type="button" onClick={() => updateMemoBlock(block.id, { isDropdownOpen: false })} style={{background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "6px 12px", borderRadius: "10px", fontSize: "11px", fontWeight: "700", cursor: "pointer"}}>閉じる</button>
+                    </div>
                   </div>
                 </div>
                 {!block.isReadOnly ? (
@@ -725,7 +826,7 @@ export default function Page() {
 
       <div id="editActionArea" style={{display: "flex", gap: "10px"}}>
         <button data-original-click={"closeEditModal()"} onClick={closeModal} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px"}} id="cancelBtn">閉じる</button>
-        <button data-original-click={"saveCustomerEdit()"} id="saveCustomerBtn" style={{flex: "1", background: "var(--primary)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px", boxShadow: "var(--shadow-float)"}}>保存する</button>
+        <button data-original-click={"saveCustomerEdit()"} id="saveCustomerBtn" onClick={saveCustomerEdit} style={{flex: "1", background: "var(--primary)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px", boxShadow: "var(--shadow-float)"}}>保存する</button>
       </div>
 
       <div id="readOnlyActionArea" style={{display: "none", gap: "10px", marginTop: "16px", flexDirection: "column"}}>
@@ -969,7 +1070,7 @@ export default function Page() {
           )}
         </div>
         <div id="historyListArea" style={{display: "none", marginTop: "12px", position: "relative", zIndex: "1"}}></div>
-        <div className="fab" role="button" tabIndex={0} data-original-click={"openCreateModal()"} onClick={() => { setActiveTab("create"); setNameInputValue(""); setSelectedCustomerId(null); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setActiveTab("create"); setNameInputValue(""); setSelectedCustomerId(null); } }} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); openCreateModal(); }"}>＋</div>
+        <div className="fab" role="button" tabIndex={0} data-original-click={"openCreateModal()"} onClick={openCreateCustomerModal} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCreateCustomerModal(); } }} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); openCreateModal(); }"}>＋</div>
       </div>
 
       <div className="page page-settings" style={{position: "relative"}}>

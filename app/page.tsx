@@ -87,6 +87,12 @@ export default function Page() {
   const [userId, setUserId] = useState(DEFAULT_USER_ID);
   const [customerData, setCustomerData] = useState<Customer[]>([]);
   const [isCustomersLoading, setIsCustomersLoading] = useState(true);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [nameInputValue, setNameInputValue] = useState("");
+  const [isCreateDetailsOpen, setIsCreateDetailsOpen] = useState(false);
+  const [isTagAccordionOpen, setIsTagAccordionOpen] = useState(false);
+  const [activeModal, setActiveModal] = useState<null | "style" | "help" | "hidden" | "photo" | "edit">(null);
+  const [expandedPhotoUrl, setExpandedPhotoUrl] = useState("");
 
   const fetchCustomers = useCallback(async (targetUserId: string) => {
     setIsCustomersLoading(true);
@@ -168,6 +174,40 @@ export default function Page() {
     .slice(0, 15);
 
   const visibleCustomers = customerData.filter((customer) => !customer.tagsArray.includes("非表示"));
+  const selectedCustomer = selectedCustomerId
+    ? customerData.find((customer) => customer.id === selectedCustomerId) || null
+    : null;
+
+  function closeModal() {
+    setActiveModal(null);
+    setExpandedPhotoUrl("");
+  }
+
+  function showNotice(message: string) {
+    window.alert(message);
+  }
+
+  function selectCustomer(customer: Customer) {
+    const isSameCustomer = selectedCustomerId === customer.id && nameInputValue === customer.name;
+
+    if (isSameCustomer) {
+      setSelectedCustomerId(null);
+      setNameInputValue("");
+      setVisitStatus("yes");
+      return;
+    }
+
+    setSelectedCustomerId(customer.id);
+    setNameInputValue(customer.name);
+    setCreateMode("text");
+    setVisitStatus("yes");
+    setActiveTab("create");
+  }
+
+  function getPastMemos(customer: Customer | null) {
+    if (!customer) return [];
+    return parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
+  }
 
   return (
     <>
@@ -192,10 +232,10 @@ export default function Page() {
       <input type="radio" name="style" id="style-custom" className="ui-state" checked={styleTab === "custom"} onChange={() => setStyleTab("custom")} />
       <input type="radio" name="style" id="style-neat" className="ui-state" checked={styleTab === "neat"} onChange={() => setStyleTab("neat")} />
 
-  <div id="photoModal" className="modal-overlay" style={{zIndex: "10008"}} data-original-click={"closePhotoModal(event)"}>
-    <div style={{position: "relative", maxWidth: "90%", maxHeight: "90%", margin: "auto", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center"}} data-original-click={"event.stopPropagation()"}>
-      <img id="expandedPhoto" src="" style={{width: "100%", height: "auto", maxHeight: "80vh", objectFit: "contain", borderRadius: "16px", boxShadow: "0 10px 40px rgba(0,0,0,0.3)"}} />
-      <div data-original-click={"closePhotoModal(event)"} style={{position: "absolute", top: "-12px", right: "-12px", background: "#FFF", width: "32px", height: "32px", borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center", fontWeight: "700", fontSize: "16px", color: "var(--text-main)", cursor: "pointer", boxShadow: "var(--shadow-sm)"}}>×</div>
+  <div id="photoModal" className="modal-overlay" style={{zIndex: "10008", display: activeModal === "photo" ? "flex" : "none"}} data-original-click={"closePhotoModal(event)"} onClick={closeModal}>
+    <div style={{position: "relative", maxWidth: "90%", maxHeight: "90%", margin: "auto", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center"}} data-original-click={"event.stopPropagation()"} onClick={(event) => event.stopPropagation()}>
+      <img id="expandedPhoto" src={expandedPhotoUrl} style={{width: "100%", height: "auto", maxHeight: "80vh", objectFit: "contain", borderRadius: "16px", boxShadow: "0 10px 40px rgba(0,0,0,0.3)"}} />
+      <div data-original-click={"closePhotoModal(event)"} onClick={closeModal} style={{position: "absolute", top: "-12px", right: "-12px", background: "#FFF", width: "32px", height: "32px", borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center", fontWeight: "700", fontSize: "16px", color: "var(--text-main)", cursor: "pointer", boxShadow: "var(--shadow-sm)"}}>×</div>
     </div>
   </div>
 
@@ -207,12 +247,12 @@ export default function Page() {
     <button data-original-click={"setHidden()"} style={{width: "100%", background: "var(--alert-bg)", color: "var(--alert-text)", border: "1px solid transparent", padding: "14px", borderRadius: "12px", fontWeight: "700", fontSize: "14px", marginBottom: "10px", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px"}}>💤 非表示にする</button>
   </div>
 
-  <div id="createDetailsBackdrop" className="half-modal-backdrop" data-original-click={"closeCreateDetailsModal()"}></div>
-  <div id="createDetailsHalfModal" className="half-modal create-details-half-modal">
-    <div className="half-modal-handle" data-original-click={"closeCreateDetailsModal()"} role="button" tabIndex={0} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); closeCreateDetailsModal(); }"}></div>
+  <div id="createDetailsBackdrop" className="half-modal-backdrop" data-original-click={"closeCreateDetailsModal()"} onClick={() => setIsCreateDetailsOpen(false)}></div>
+  <div id="createDetailsHalfModal" className={`half-modal create-details-half-modal ${isCreateDetailsOpen ? "open" : ""}`} style={{height: isCreateDetailsOpen ? "320px" : undefined}}>
+    <div className="half-modal-handle" data-original-click={"closeCreateDetailsModal()"} role="button" tabIndex={0} onClick={() => setIsCreateDetailsOpen(false)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setIsCreateDetailsOpen(false); } }} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); closeCreateDetailsModal(); }"}></div>
     <div className="create-details-modal-header">
       <span className="label" style={{margin: "0"}}>📝 詳細を追加</span>
-      <button type="button" className="create-details-modal-close" data-original-click={"closeCreateDetailsModal()"} aria-label="閉じる">×</button>
+      <button type="button" className="create-details-modal-close" data-original-click={"closeCreateDetailsModal()"} onClick={() => setIsCreateDetailsOpen(false)} aria-label="閉じる">×</button>
     </div>
     <div id="createDetailsContent" className="create-details-modal-scroll">
       {/* 感情タグ */}
@@ -242,12 +282,12 @@ export default function Page() {
     </div>
   </div>
 
-  <div id="hiddenListModal" className="modal-overlay" style={{zIndex: "10005"}}>
-    <div className="modal-content" style={{maxHeight: "85vh", display: "flex", flexDirection: "column"}}>
+  <div id="hiddenListModal" className="modal-overlay" style={{zIndex: "10005", display: activeModal === "hidden" ? "flex" : "none"}} onClick={closeModal}>
+    <div className="modal-content" style={{maxHeight: "85vh", display: "flex", flexDirection: "column"}} onClick={(event) => event.stopPropagation()}>
       <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}}>💤 非表示にした顧客</h2>
       <p style={{textAlign: "center", fontSize: "11px", color: "var(--text-sub)", marginTop: "-10px", marginBottom: "16px", fontWeight: "700"}}>カードを長押しして記録を確認</p>
       <div id="hiddenCustomersArea" style={{overflowY: "auto", flex: "1", paddingBottom: "20px", margin: "-10px"}}></div>
-      <button data-original-click={"closeHiddenListModal()"} style={{width: "100%", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", marginTop: "20px"}}>閉じる</button>
+      <button data-original-click={"closeHiddenListModal()"} onClick={closeModal} style={{width: "100%", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", marginTop: "20px"}}>閉じる</button>
     </div>
   </div>
 
@@ -264,8 +304,8 @@ export default function Page() {
     </div>
   </div>
 
-  <div id="styleModal" className="modal-overlay">
-    <div className="modal-content style-modal-content">
+  <div id="styleModal" className="modal-overlay" style={{display: activeModal === "style" ? "flex" : "none"}} onClick={closeModal}>
+    <div className="modal-content style-modal-content" onClick={(event) => event.stopPropagation()}>
       <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}}>🎨 AI口調・スタイル設定</h2>
       <div className="style-selector">
         <label htmlFor="style-cute" className="style-btn btn-cute">かわいい</label>
@@ -288,15 +328,15 @@ export default function Page() {
           <div id="text-style-neat" className="style-desc-box"></div>
         </div>
       </div>
-      <button data-original-click={"closeStyleModal()"} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", marginTop: "8px"}}>設定を保存して閉じる</button>
+      <button data-original-click={"closeStyleModal()"} onClick={closeModal} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", marginTop: "8px"}}>設定を保存して閉じる</button>
     </div>
   </div>
 
-  <div id="helpModal" className="modal-overlay">
-    <div className="modal-content help-modal-content">
+  <div id="helpModal" className="modal-overlay" style={{display: activeModal === "help" ? "flex" : "none"}} onClick={closeModal}>
+    <div className="modal-content help-modal-content" onClick={(event) => event.stopPropagation()}>
       <h2 id="helpModalTitle" style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}}></h2>
       <div id="helpModalBody" className="help-body"></div>
-      <button data-original-click={"closeHelpModal()"} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700"}}>閉じる</button>
+      <button data-original-click={"closeHelpModal()"} onClick={closeModal} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700"}}>閉じる</button>
     </div>
   </div>
 
@@ -312,20 +352,20 @@ export default function Page() {
     </div>
   </div>
 
-  <div id="editCustomerModal" className="modal-overlay" style={{zIndex: "10006"}}>
-    <div className="modal-content">
+  <div id="editCustomerModal" className="modal-overlay" style={{zIndex: "10006", display: activeModal === "edit" ? "flex" : "none"}} onClick={closeModal}>
+    <div className="modal-content" onClick={(event) => event.stopPropagation()}>
       <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}} id="modalTitle">顧客情報の編集</h2>
       <input type="hidden" id="editCustomerIndex" />
       <input type="hidden" id="isCreateMode" value="false" />
       <input type="hidden" id="editCustomerId" />
 
       <span className="label">名前</span>
-      <input type="text" id="editCustomerName" className="input-field" style={{marginBottom: "16px", background: "#FFF", border: "1px solid var(--border-color)"}} />
+      <input type="text" id="editCustomerName" className="input-field" value={selectedCustomer?.name || ""} readOnly style={{marginBottom: "16px", background: "#FFF", border: "1px solid var(--border-color)"}} />
 
-      <div className="accordion-header" data-original-click={"toggleTagAccordion()"}>
-        <span>🏷️ 属性タグ</span><span id="tagAccordionIcon">▼</span>
+      <div className="accordion-header" data-original-click={"toggleTagAccordion()"} onClick={() => setIsTagAccordionOpen((isOpen) => !isOpen)}>
+        <span>🏷️ 属性タグ</span><span id="tagAccordionIcon">{isTagAccordionOpen ? "▲" : "▼"}</span>
       </div>
-      <div className="accordion-content" id="tagAccordionContent">
+      <div className={`accordion-content ${isTagAccordionOpen ? "open" : ""}`} id="tagAccordionContent">
         <div id="editAttributeTagsArea" style={{display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px"}}></div>
         <div style={{display: "flex", gap: "8px"}}>
           <input type="text" id="customAttrInput" className="input-field" placeholder="オリジナルタグ..." style={{padding: "10px", fontSize: "12px", background: "#FFF", border: "1px solid var(--border-color)"}} />
@@ -338,7 +378,7 @@ export default function Page() {
       <div className="add-memo-btn" id="addMemoBtn" data-original-click={"addNewMemoBlock()"}>＋ 日付とエピソードを追加</div>
 
       <div id="editActionArea" style={{display: "flex", gap: "10px"}}>
-        <button data-original-click={"closeEditModal()"} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px"}} id="cancelBtn">閉じる</button>
+        <button data-original-click={"closeEditModal()"} onClick={closeModal} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px"}} id="cancelBtn">閉じる</button>
         <button data-original-click={"saveCustomerEdit()"} id="saveCustomerBtn" style={{flex: "1", background: "var(--primary)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px", boxShadow: "var(--shadow-float)"}}>保存する</button>
       </div>
 
@@ -391,7 +431,7 @@ export default function Page() {
                   const ringClass = stats.isVip ? "story-ring story-ring-vip" : "story-ring";
 
                   return (
-                    <div className="story-item" key={customer.id || customer.name}>
+                    <div className="story-item" key={customer.id || customer.name} onClick={() => selectCustomer(customer)}>
                       <div className={ringClass}>
                         {topBadge}
                         <div className="story-inner">{getCustomerInitial(customer.name)}</div>
@@ -404,11 +444,26 @@ export default function Page() {
             </div>
           </div>
           <div style={{position: "relative", flexShrink: "0"}}>
-            <input type="text" id="nameInput" className="input-field" placeholder="名前を入力..." data-original-input={"suggestCustomer()"} />
+            <input type="text" id="nameInput" className="input-field" placeholder="名前を入力..." data-original-input={"suggestCustomer()"} value={nameInputValue} onChange={(event) => { setNameInputValue(event.target.value); if (selectedCustomer && event.target.value !== selectedCustomer.name) setSelectedCustomerId(null); }} />
             <div id="resultArea" className="result-box"></div>
           </div>
           <div className="past-memo-box" style={{marginTop: "12px", marginBottom: "0"}}>
-            <div id="pastMemoDisplay"><span className="past-memo-label">📖 過去のメモ</span><div style={{color: "var(--text-muted)", textAlign: "center", padding: "10px 0", fontSize: "12px"}}>(顧客を選択するか、過去の記録がありません)</div></div>
+            <div id="pastMemoDisplay"><span className="past-memo-label">📖 過去のメモ</span>{selectedCustomer ? (
+              getPastMemos(selectedCustomer).length === 0 ? (
+                <div style={{color: "var(--text-muted)", textAlign: "center", padding: "10px 0", fontSize: "12px"}}>(過去の記録はありません)</div>
+              ) : (
+                getPastMemos(selectedCustomer).map((memo, index) => (
+                  <div key={`${memo.date || "memo"}-${index}`} style={{marginBottom: "12px", paddingBottom: "10px", borderBottom: "1px dashed var(--border-color)", display: "flex", gap: "10px", alignItems: "flex-start"}}>
+                    <div style={{flex: "1"}}>
+                      <div style={{fontSize: "11px", color: "var(--text-sub)", fontWeight: "700", marginBottom: "4px"}}>{memo.date}</div>
+                      <div style={{fontSize: "13px", color: "var(--text-main)"}}>{memo.text}</div>
+                    </div>
+                  </div>
+                ))
+              )
+            ) : (
+              <div style={{color: "var(--text-muted)", textAlign: "center", padding: "10px 0", fontSize: "12px"}}>(顧客を選択するか、過去の記録がありません)</div>
+            )}</div>
           </div>
         </div>
 
@@ -437,8 +492,8 @@ export default function Page() {
 
         {/* 📝 詳細を追加 */}
         <div style={{textAlign: "center", margin: "12px 0"}}>
-          <div className="accordion-header" data-original-click={"toggleCreateDetails()"} id="createDetailsHeader" style={{display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "8px 24px", background: "#FFF", border: "1px solid var(--border-color)", borderRadius: "24px", fontSize: "13px", fontWeight: "700", color: "var(--text-main)", boxShadow: "var(--shadow-sm)", cursor: "pointer", transform: "translateY(-20px)"}}>
-            📝 詳細を追加 <span style={{color: "var(--text-sub)", fontSize: "11px", fontWeight: "normal"}}>(任意)</span> <span id="createDetailsIcon">▼</span>
+          <div className="accordion-header" data-original-click={"toggleCreateDetails()"} id="createDetailsHeader" onClick={() => setIsCreateDetailsOpen((isOpen) => !isOpen)} style={{display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "8px 24px", background: "#FFF", border: "1px solid var(--border-color)", borderRadius: "24px", fontSize: "13px", fontWeight: "700", color: "var(--text-main)", boxShadow: "var(--shadow-sm)", cursor: "pointer", transform: "translateY(-20px)"}}>
+            📝 詳細を追加 <span style={{color: "var(--text-sub)", fontSize: "11px", fontWeight: "normal"}}>(任意)</span> <span id="createDetailsIcon">{isCreateDetailsOpen ? "▲" : "▼"}</span>
           </div>
         </div>
 
@@ -557,8 +612,8 @@ export default function Page() {
                       </div>
                     </div>
                     <div className="card-actions" style={{display: "flex", flexDirection: "column", gap: "6px", flexShrink: "0", position: "relative", zIndex: "10"}}>
-                      <button type="button" className="action-btn" style={{background: "var(--primary-light)", color: "var(--primary)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>✏️</span><span className="action-text">日記作成</span></button>
-                      <button type="button" className="action-btn" style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>⚙️</span><span className="action-text">編集</span></button>
+                      <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); selectCustomer(customer); }} style={{background: "var(--primary-light)", color: "var(--primary)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>✏️</span><span className="action-text">日記作成</span></button>
+                      <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); setSelectedCustomerId(customer.id); setNameInputValue(customer.name); setActiveModal("edit"); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>⚙️</span><span className="action-text">編集</span></button>
                     </div>
                   </div>
                 </div>
@@ -567,14 +622,14 @@ export default function Page() {
           )}
         </div>
         <div id="historyListArea" style={{display: "none", marginTop: "12px", position: "relative", zIndex: "1"}}></div>
-        <div className="fab" role="button" tabIndex={0} data-original-click={"openCreateModal()"} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); openCreateModal(); }"}>＋</div>
+        <div className="fab" role="button" tabIndex={0} data-original-click={"openCreateModal()"} onClick={() => { setActiveTab("create"); setNameInputValue(""); setSelectedCustomerId(null); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setActiveTab("create"); setNameInputValue(""); setSelectedCustomerId(null); } }} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); openCreateModal(); }"}>＋</div>
       </div>
 
       <div className="page page-settings" style={{position: "relative"}}>
         <h2 style={{margin: "0 0 16px", fontWeight: "700", fontSize: "18px"}}>設定・情報</h2>
 
         <div className="card" style={{marginBottom: "24px"}}>
-          <div className="setting-item" style={{borderBottom: "1px solid var(--border-color)", paddingBottom: "16px", marginBottom: "16px"}} data-original-click={"openStyleModal()"}>
+          <div className="setting-item" style={{borderBottom: "1px solid var(--border-color)", paddingBottom: "16px", marginBottom: "16px"}} data-original-click={"openStyleModal()"} onClick={() => setActiveModal("style")}>
             <span>🎨 AIスタイル・口調設定</span>
             <span className="settings-val" id="styleOverviewText">かわいい・清楚・カスタム</span>
           </div>
@@ -621,24 +676,24 @@ export default function Page() {
         </div>
 
         <div className="settings-list">
-          <div className="settings-item" data-original-click={"openHiddenListModal()"}><span>💤 非表示にした顧客</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
-          <div className="settings-item" data-original-click={"openHelpModal()"}><span>📖 アプリの使い方と仕様（必読）</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
+          <div className="settings-item" data-original-click={"openHiddenListModal()"} onClick={() => setActiveModal("hidden")}><span>💤 非表示にした顧客</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
+          <div className="settings-item" data-original-click={"openHelpModal()"} onClick={() => setActiveModal("help")}><span>📖 アプリの使い方と仕様（必読）</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
         </div>
         <div className="settings-list" style={{marginBottom: "40px"}}>
-          <div className="settings-item" data-original-click={"alert('利用規約のページが開きます')"}><span>📄 利用規約</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
-          <div className="settings-item" data-original-click={"alert('プライバシーポリシーのページが開きます')"}><span>🛡 プライバシーポリシー</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
+          <div className="settings-item" data-original-click={"alert('利用規約のページが開きます')"} onClick={() => showNotice("利用規約のページが開きます")}><span>📄 利用規約</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
+          <div className="settings-item" data-original-click={"alert('プライバシーポリシーのページが開きます')"} onClick={() => showNotice("プライバシーポリシーのページが開きます")}><span>🛡 プライバシーポリシー</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
           <div className="settings-item"><span>ℹ️ バージョン</span><span className="settings-val">11.0.0 (Stable)</span></div>
         </div>
 
-        <div data-original-click={"promptDevMode()"} style={{position: "absolute", bottom: "10px", right: "10px", fontSize: "11px", color: "var(--text-muted)", cursor: "pointer", userSelect: "none"}}>dev</div>
+        <div data-original-click={"promptDevMode()"} onClick={() => showNotice("開発者モード")} style={{position: "absolute", bottom: "10px", right: "10px", fontSize: "11px", color: "var(--text-muted)", cursor: "pointer", userSelect: "none"}}>dev</div>
       </div>
     </main>
 
     <footer className="fixed-footer">
       <nav className="bottom-nav">
-        <label htmlFor="nav-create" className="nav-item tab-create"><span style={{fontSize: "18px"}}>📝</span>作成</label>
-        <label htmlFor="nav-data" className="nav-item tab-data"><span style={{fontSize: "18px"}}>📖</span>顧客</label>
-        <label htmlFor="nav-settings" className="nav-item tab-settings"><span style={{fontSize: "18px"}}>⚙️</span>設定</label>
+        <label htmlFor="nav-create" className="nav-item tab-create" onClick={() => setActiveTab("create")}><span style={{fontSize: "18px"}}>📝</span>作成</label>
+        <label htmlFor="nav-data" className="nav-item tab-data" onClick={() => { setActiveTab("data"); setIsCreateDetailsOpen(false); }}><span style={{fontSize: "18px"}}>📖</span>顧客</label>
+        <label htmlFor="nav-settings" className="nav-item tab-settings" onClick={() => { setActiveTab("settings"); setIsCreateDetailsOpen(false); }}><span style={{fontSize: "18px"}}>⚙️</span>設定</label>
       </nav>
     </footer>
   </div>

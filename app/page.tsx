@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type ActiveTab = "create" | "data" | "settings";
 type CreateMode = "text" | "photo";
@@ -8,16 +8,164 @@ type VisitStatus = "yes" | "no";
 type StyleTab = "cute" | "custom" | "neat";
 type DataView = "customer" | "history";
 
+const LIFF_ID = "2009902106-W8zW5hJA";
+const DEFAULT_USER_ID = "test-user";
+
+interface CustomerEntry {
+  id?: string | null;
+  date?: string;
+  text?: string;
+  tags?: string[];
+  type?: string;
+  status?: string;
+}
+
+interface Customer {
+  id: string | null;
+  name: string;
+  memo?: string;
+  tags?: string;
+  entries: CustomerEntry[];
+  tagsArray: string[];
+}
+
+function parseMemoToJSON(memoStr?: string) {
+  if (!memoStr) return [];
+  try {
+    const parsed = JSON.parse(memoStr);
+    if (Array.isArray(parsed)) return parsed;
+    return [];
+  } catch {
+    return memoStr
+      .split(/\n?---\n?/)
+      .map((block) => {
+        const match = block.trim().match(/^(\d{4}\/\d{2}\/\d{2}):\s*([\s\S]*)$/);
+        if (match) return { date: match[1].replace(/\//g, "-"), text: match[2].trim(), tags: [] };
+        return { date: "", text: block.trim(), tags: [] };
+      })
+      .filter((block) => block.text || block.date);
+  }
+}
+
+function getCustomerStats(customer: Customer) {
+  const allMemos = parseMemoToJSON(customer.memo);
+  const visitMemos = allMemos.filter((memo) => !memo.type || memo.type === "visit" || memo.status === "legacy");
+  const count = visitMemos.length === 0 ? 1 : visitMemos.length;
+  const vipKeywords = ["太客", "エース", "一軍", "VIP", "金持ち", "良客", "常連", "一軍固定"];
+  const isVip = customer.tagsArray.some((tag) => vipKeywords.includes(tag));
+  return { count, isVip };
+}
+
+function getCustomerInitial(name: string) {
+  return name.trim().slice(0, 1) || "?";
+}
+
+function normalizeCustomer(customer: {
+  id?: string | null;
+  name?: string;
+  memo?: string;
+  tags?: string;
+  entries?: CustomerEntry[];
+}): Customer {
+  return {
+    ...customer,
+    id: customer.id || null,
+    name: customer.name || "",
+    memo: customer.memo || "",
+    tags: customer.tags || "",
+    entries: Array.isArray(customer.entries) ? customer.entries : [],
+    tagsArray: customer.tags ? customer.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : [],
+  };
+}
+
 export default function Page() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("create");
   const [createMode, setCreateMode] = useState<CreateMode>("text");
   const [visitStatus, setVisitStatus] = useState<VisitStatus>("yes");
   const [styleTab, setStyleTab] = useState<StyleTab>("cute");
   const [dataView, setDataView] = useState<DataView>("customer");
+  const [userId, setUserId] = useState(DEFAULT_USER_ID);
+  const [customerData, setCustomerData] = useState<Customer[]>([]);
+  const [isCustomersLoading, setIsCustomersLoading] = useState(true);
+
+  const fetchCustomers = useCallback(async (targetUserId: string) => {
+    setIsCustomersLoading(true);
+    try {
+      const res = await fetch("/api/customers/list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: targetUserId }),
+      });
+      const data = await res.json();
+      const customers = data.success && Array.isArray(data.customers)
+        ? data.customers.map(normalizeCustomer)
+        : [];
+      setCustomerData(customers);
+    } catch (error) {
+      console.error("fetchCustomers Error:", error);
+      setCustomerData([]);
+    } finally {
+      setIsCustomersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initAndFetchCustomers() {
+      const params = new URLSearchParams(window.location.search);
+      const devUser = params.get("dev_user");
+
+      if (devUser) {
+        if (!cancelled) {
+          setUserId(devUser);
+          await fetchCustomers(devUser);
+        }
+        return;
+      }
+
+      try {
+        const liff = (await import("@line/liff")).default;
+        await liff.init({ liffId: LIFF_ID });
+        const resolvedUserId = liff.isLoggedIn()
+          ? (await liff.getProfile()).userId
+          : DEFAULT_USER_ID;
+        if (!cancelled) {
+          setUserId(resolvedUserId);
+          await fetchCustomers(resolvedUserId);
+        }
+      } catch (error) {
+        console.error("LIFF init Error:", error);
+        if (!cancelled) {
+          setUserId(DEFAULT_USER_ID);
+          await fetchCustomers(DEFAULT_USER_ID);
+        }
+      }
+    }
+
+    initAndFetchCustomers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchCustomers]);
+
+  const quickAccessCustomers = customerData
+    .filter((customer) => !customer.tagsArray.includes("非表示"))
+    .sort((a, b) => {
+      const statsA = getCustomerStats(a);
+      const statsB = getCustomerStats(b);
+      if (statsA.isVip && !statsB.isVip) return -1;
+      if (!statsA.isVip && statsB.isVip) return 1;
+      return statsB.count - statsA.count;
+    })
+    .slice(0, 15);
+
+  const visibleCustomers = customerData.filter((customer) => !customer.tagsArray.includes("非表示"));
 
   return (
     <>
-<div id="actionToast">完了しました</div>
+<div id="actionToast" data-current-user-id={userId}>完了しました</div>
 
   <div id="cuteToast">
     <span id="cuteToastIcon" style={{fontSize: "16px", display: "inline-block"}}>🐰</span>
@@ -213,10 +361,40 @@ export default function Page() {
           <span className="label">👤 誰に送る？ <span style={{fontSize: "11px", fontWeight: "normal", color: "var(--text-muted)"}}>(任意)</span></span>
           <div className="fade-scroll-wrapper">
             <div className="stories-scroll" id="quickAccessArea">
-              <div className="story-item">
-                <div className="skeleton" style={{width: "58px", height: "58px", borderRadius: "50%", flexShrink: "0"}}></div>
-                <div className="skeleton" style={{width: "40px", height: "8px", borderRadius: "4px", marginTop: "4px"}}></div>
-              </div>
+              {isCustomersLoading ? (
+                <div className="story-item">
+                  <div className="skeleton" style={{width: "58px", height: "58px", borderRadius: "50%", flexShrink: "0"}}></div>
+                  <div className="skeleton" style={{width: "40px", height: "8px", borderRadius: "4px", marginTop: "4px"}}></div>
+                </div>
+              ) : quickAccessCustomers.length === 0 ? (
+                <>
+                  <div className="story-item" style={{cursor: "default"}}>
+                    <div className="skeleton" style={{width: "58px", height: "58px", borderRadius: "50%", flexShrink: "0"}}></div>
+                    <div className="skeleton" style={{width: "40px", height: "8px", borderRadius: "4px", marginTop: "4px"}}></div>
+                  </div>
+                  <div style={{color: "var(--text-muted)", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "62px"}}>見つかりません</div>
+                </>
+              ) : (
+                quickAccessCustomers.map((customer) => {
+                  const stats = getCustomerStats(customer);
+                  const topBadge = stats.isVip
+                    ? <div className="story-badge" style={{background: "var(--vip-border)", borderColor: "#FFF", color: "#A48624"}}>👑VIP</div>
+                    : customer.tagsArray.length > 0
+                      ? <div className="story-badge">{customer.tagsArray[0]}</div>
+                      : null;
+                  const ringClass = stats.isVip ? "story-ring story-ring-vip" : "story-ring";
+
+                  return (
+                    <div className="story-item" key={customer.id || customer.name}>
+                      <div className={ringClass}>
+                        {topBadge}
+                        <div className="story-inner">{getCustomerInitial(customer.name)}</div>
+                      </div>
+                      <span className="story-name">{customer.name}</span>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
           <div style={{position: "relative", flexShrink: "0"}}>
@@ -321,8 +499,66 @@ export default function Page() {
         </div>
 
         <div id="customerListArea" style={{marginTop: "12px", position: "relative", zIndex: "1"}}>
-          <div className="card skeleton" style={{height: "80px", marginBottom: "12px"}}></div>
-          <div className="card skeleton" style={{height: "80px", marginBottom: "12px"}}></div>
+          {isCustomersLoading ? (
+            <>
+              <div className="card skeleton" style={{height: "80px", marginBottom: "12px"}}></div>
+              <div className="card skeleton" style={{height: "80px", marginBottom: "12px"}}></div>
+            </>
+          ) : visibleCustomers.length === 0 ? (
+            <div className="card" style={{textAlign: "center", padding: "28px 18px", color: "var(--text-sub)"}}>
+              <div style={{fontSize: "28px", marginBottom: "8px"}}>🗂️</div>
+              <div style={{fontWeight: "700", marginBottom: "6px"}}>顧客データがありません</div>
+              <div style={{fontSize: "13px", lineHeight: "1.6"}}>顧客を追加するか、検索条件を見直してください。</div>
+            </div>
+          ) : (
+            visibleCustomers.map((customer) => {
+              const stats = getCustomerStats(customer);
+              let sysBadge = "";
+              if (stats.count === 1) sysBadge = "🔰 新規";
+              else if (stats.count === 2) sysBadge = "✌️ 2回目";
+              else if (stats.count >= 3) sysBadge = "👑 常連";
+              if (customer.tagsArray.includes("一軍固定")) sysBadge = "💎 固定一軍";
+
+              const visibleTags = customer.tagsArray.filter((tag) => tag !== "ダミー" && tag !== "非表示" && tag !== "一軍固定");
+              const memos = parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
+              const lastMemo = memos[memos.length - 1];
+              const previewMemo = lastMemo
+                ? lastMemo.text
+                  ? `${String(lastMemo.text).substring(0, 40)}...`
+                  : Array.isArray(lastMemo.tags) && lastMemo.tags.length > 0
+                    ? lastMemo.tags.join(", ")
+                    : "メモなし"
+                : "メモなし";
+              const cardClass = stats.isVip ? "card card-vip" : "card";
+
+              return (
+                <div className={cardClass} key={customer.id || customer.name}>
+                  <div className="card-inner" style={{display: "flex", justifyContent: "space-between", alignItems: "flex-start"}}>
+                    <div style={{flex: "1", marginRight: "10px", overflow: "hidden", position: "relative"}}>
+                      <div style={{display: "flex", alignItems: "flex-start"}}>
+                        {sysBadge ? <span style={{background: "var(--input-bg)", color: "var(--text-sub)", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", fontWeight: "700", border: "1px solid transparent", marginRight: "6px", display: "inline-block", flexShrink: "0", whiteSpace: "nowrap", height: "fit-content"}}>{sysBadge}</span> : null}
+                        <b style={{fontSize: "15px", lineHeight: "1.4", wordBreak: "break-word", color: "var(--text-main)"}}>{customer.name}</b>
+                      </div>
+                      <small className="card-memo" style={{color: "var(--text-sub)", display: "block", marginTop: "4px", lineHeight: "1.4"}}>{previewMemo}</small>
+                      <div className="card-tags" style={{marginTop: "6px"}}>
+                        {visibleTags.length > 0 ? (
+                          <div style={{display: "flex", gap: "4px", flexWrap: "wrap"}}>
+                            {visibleTags.map((tag) => (
+                              <span key={tag} style={{background: "var(--primary-light)", color: "var(--primary)", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", fontWeight: "700"}}>#{tag}</span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="card-actions" style={{display: "flex", flexDirection: "column", gap: "6px", flexShrink: "0", position: "relative", zIndex: "10"}}>
+                      <button type="button" className="action-btn" style={{background: "var(--primary-light)", color: "var(--primary)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>✏️</span><span className="action-text">日記作成</span></button>
+                      <button type="button" className="action-btn" style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>⚙️</span><span className="action-text">編集</span></button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
         <div id="historyListArea" style={{display: "none", marginTop: "12px", position: "relative", zIndex: "1"}}></div>
         <div className="fab" role="button" tabIndex={0} data-original-click={"openCreateModal()"} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); openCreateModal(); }"}>＋</div>

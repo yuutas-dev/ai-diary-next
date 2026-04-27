@@ -557,27 +557,27 @@ export default function Page() {
         return `${memo.date}: ${memo.text} ${tagsStr}`.trim();
       }).join("\n---\n");
       const isAlertStatus = targetCustomer ? isAlertCustomer(targetCustomer) : false;
+      const currentFavoriteTexts: string[] = [];
 
       const payload = {
         userId,
         customerId: targetCustomer?.id || selectedCustomerId,
-        name,
+        businessType: selectedBusinessType,
+        customerRank,
+        visitStatus: visitStatus === "yes" ? "visit" : "sales",
+        isAlert: String(isAlertStatus),
         episodeText: todayEpisodeText,
+        pastMemo: filteredMemosStr,
+        customerTags: cleanedCustomerTags.join(","),
         factTags: selectedFactTags.join(","),
         moodTags: selectedMoodTags.join(","),
-        visitStatus: visitStatus === "yes" ? "visit" : "sales",
-        pastMemo: filteredMemosStr,
         style: styleTab,
         tension: "3",
         emoji: "4",
         customText: "",
-        businessType: selectedBusinessType,
-        industryPrompt: "",
-        customerTags: cleanedCustomerTags.join(","),
-        customerRank,
-        isAlert: String(isAlertStatus),
-        image: null,
-        mode: isPhoto ? "photo" : "text",
+        favoriteTexts: currentFavoriteTexts.slice(0, 5).join("\n"),
+        messageMode: isPhoto ? "photo" : "text",
+        imageFile: null,
       };
 
       const res = await fetch("/api/generate", {

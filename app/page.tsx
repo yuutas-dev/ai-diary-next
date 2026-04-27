@@ -1495,6 +1495,9 @@ export default function Page() {
               const isExpanded = expandedHistoryIds.includes(viewId);
               const isEditing = editingHistoryId === itemId;
               const isFavorite = currentFavoriteIds.includes(itemId);
+              const editText = historyEditTexts[itemId] ?? item.displayText;
+              const editLineCount = editText.split("\n").reduce((total, line) => total + Math.max(1, Math.ceil(Array.from(line).length / 22)), 0);
+              const editHeight = Math.max(120, (editLineCount * 21) + 24);
               return (
                 <div className="history-card" key={item.id || `${item.customerName}-${item.displayDate}`}>
                   <div className="history-header">
@@ -1510,7 +1513,7 @@ export default function Page() {
                     <div className={`favorite-btn ${isFavorite ? "active" : ""}`} onClick={() => toggleFavoriteHistory(item)}>{isFavorite ? "♥" : "☆"}</div>
                   </div>
                   <div id={`history-view-${viewId}`} className={`history-text ${isExpanded ? "" : "collapsed"}`} onClick={() => toggleHistoryText(viewId)} style={{display: isEditing ? "none" : undefined}}>{item.displayText}</div>
-                  <textarea id={`history-edit-${itemId}`} className="input-field" value={historyEditTexts[itemId] ?? item.displayText} onChange={(event) => setHistoryEditTexts((current) => ({ ...current, [itemId]: event.target.value }))} style={{display: isEditing ? "block" : "none", height: "120px", minHeight: "120px", boxSizing: "border-box", overflowY: "auto", marginTop: "8px", fontSize: "13px", lineHeight: "1.6", background: "#FFF", border: "1px solid var(--primary)", padding: "12px"}} />
+                  <textarea id={`history-edit-${itemId}`} className="input-field" value={editText} onChange={(event) => setHistoryEditTexts((current) => ({ ...current, [itemId]: event.target.value }))} style={{display: isEditing ? "block" : "none", height: `${editHeight}px`, minHeight: `${editHeight}px`, boxSizing: "border-box", overflowY: "hidden", marginTop: "8px", fontSize: "13px", lineHeight: "1.6", background: "#FFF", border: "1px solid var(--primary)", padding: "12px"}} />
                   <div style={{display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "12px", borderTop: "1px dashed var(--border-color)", paddingTop: "8px"}}>
                     <button type="button" id={`history-save-btn-${itemId}`} onClick={() => saveAndCopyHistory(item)} style={{display: isEditing ? "block" : "none", background: "var(--primary)", color: "#FFF", border: "none", padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "0.2s"}}>📋 コピーして保存</button>
                     <button type="button" id={`history-edit-btn-${itemId}`} onClick={() => isEditing ? cancelEditHistory(itemId) : enableEditHistory(item)} style={{background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "0.2s"}}>{isEditing ? "✖ キャンセル" : "✏️ 編集"}</button>

@@ -283,6 +283,11 @@ export default function Page() {
   const [cuteToastText, setCuteToastText] = useState("執筆中だよ...");
   const [isCuteToastVisible, setIsCuteToastVisible] = useState(false);
   const [isCuteToastIconAnimating, setIsCuteToastIconAnimating] = useState(false);
+  const [currentFavoriteIds, setCurrentFavoriteIds] = useState<string[]>([]);
+  const [currentFavoriteTexts, setCurrentFavoriteTexts] = useState<string[]>([]);
+  const [expandedHistoryIds, setExpandedHistoryIds] = useState<string[]>([]);
+  const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null);
+  const [historyEditTexts, setHistoryEditTexts] = useState<Record<string, string>>({});
   const actionToastTimerRef = useRef<number | null>(null);
   const cuteToastTimerRef = useRef<number | null>(null);
   const filterContainerRef = useRef<HTMLDivElement | null>(null);
@@ -308,9 +313,13 @@ export default function Page() {
         ? data.customers.map(normalizeCustomer)
         : [];
       setCustomerData(customers);
+      setCurrentFavoriteIds(Array.isArray(data.favoriteIds) ? data.favoriteIds.map((id: unknown) => String(id)).filter(Boolean) : []);
+      setCurrentFavoriteTexts(Array.isArray(data.favoriteTexts) ? data.favoriteTexts.map((text: unknown) => String(text)).filter(Boolean) : []);
     } catch (error) {
       console.error("fetchCustomers Error:", error);
       setCustomerData([]);
+      setCurrentFavoriteIds([]);
+      setCurrentFavoriteTexts([]);
     } finally {
       setIsCustomersLoading(false);
     }
@@ -464,7 +473,12 @@ export default function Page() {
       };
     }))
     .filter((entry) => entry.displayText)
-    .sort((a, b) => new Date(b.displayDate || 0).getTime() - new Date(a.displayDate || 0).getTime());
+    .sort((a, b) => {
+      const aFav = currentFavoriteIds.includes(String(a.id || "")) ? 1 : 0;
+      const bFav = currentFavoriteIds.includes(String(b.id || "")) ? 1 : 0;
+      if (aFav !== bFav) return bFav - aFav;
+      return new Date(b.displayDate || 0).getTime() - new Date(a.displayDate || 0).getTime();
+    });
 
   function closeModal() {
     setActiveModal(null);
@@ -667,15 +681,123 @@ export default function Page() {
     showActionToast("💬 LINEに送信しました！");
   }
 
-  function restoreHistoryItem(item: (typeof historyItems)[number]) {
-    setSelectedCustomerId(item.customerId || null);
-    setNameInputValue(item.customerName || "");
-    setTodayEpisodeText(item.inputText || "");
-    setInlineResultText(item.displayText || "");
-    setCurrentEntryId(item.id || "");
-    setIsInlineResultVisible(Boolean(item.displayText));
-    setActiveTab("create");
-    setDataView("customer");
+  function toggleHistoryText(entryId: string) {
+    if (!entryId || editingHistoryId === entryId) return;
+    setExpandedHistoryIds((current) => (
+      current.includes(entryId) ? current.filter((id) => id !== entryId) : [...current, entryId]
+    ));
+  }
+
+  async function toggleFavoriteHistory(item: (typeof historyItems)[number]) {
+    const targetId = String(item.id || "");
+    if (!targetId) return;
+
+    const isCurrentlyFavorited = currentFavoriteIds.includes(targetId);
+    const targetText = String(item.displayText || "").trim();
+    const previousFavoriteIds = currentFavoriteIds;
+    const previousFavoriteTexts = currentFavoriteTexts;
+
+    if (isCurrentlyFavorited) {
+      setCurrentFavoriteIds((current) => current.filter((id) => id !== targetId));
+      setCurrentFavoriteTexts((current) => current.filter((text) => text !== targetText));
+    } else {
+      if (currentFavoriteIds.length >= 5) {
+        showActionToast("お気に入りは最大5件までです。どれかを外してください。");
+        return;
+      }
+      setCurrentFavoriteIds((current) => [targetId, ...current.filter((id) => id !== targetId)]);
+      if (targetText) setCurrentFavoriteTexts((current) => [targetText, ...current.filter((text) => text !== targetText)]);
+    }
+
+    showActionToast(isCurrentlyFavorited ? "お気に入りを解除しました" : "💖 お気に入り登録しました！\nAIがこの文章を学習します！");
+
+    try {
+      const res = await fetch("/api/favorites/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          entryId: targetId,
+          customerId: item.customerId || null,
+          customerName: item.customerName,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success || data.limitReached) {
+        setCurrentFavoriteIds(previousFavoriteIds);
+        setCurrentFavoriteTexts(previousFavoriteTexts);
+        showActionToast(data.limitReached ? "お気に入りは最大5件までです。" : "通信エラーが発生しました。元に戻します。");
+      }
+    } catch (error) {
+      console.error("Toggle Error:", error);
+      setCurrentFavoriteIds(previousFavoriteIds);
+      setCurrentFavoriteTexts(previousFavoriteTexts);
+      showActionToast("通信エラーが発生しました。元に戻します。");
+    }
+  }
+
+  function enableEditHistory(item: (typeof historyItems)[number]) {
+    const targetId = String(item.id || "");
+    if (!targetId) return;
+    setHistoryEditTexts((current) => ({ ...current, [targetId]: item.displayText || "" }));
+    setEditingHistoryId(targetId);
+    setExpandedHistoryIds((current) => current.includes(targetId) ? current : [...current, targetId]);
+    window.setTimeout(() => {
+      const editEl = document.getElementById(`history-edit-${targetId}`) as HTMLTextAreaElement | null;
+      editEl?.focus();
+      editEl?.setSelectionRange(editEl.value.length, editEl.value.length);
+    }, 0);
+  }
+
+  function cancelEditHistory(entryId: string) {
+    setEditingHistoryId((current) => current === entryId ? null : current);
+  }
+
+  async function saveAndCopyHistory(item: (typeof historyItems)[number]) {
+    const targetId = String(item.id || "");
+    if (!targetId) return;
+
+    const newText = (historyEditTexts[targetId] || "").trim();
+    if (!newText) {
+      showActionToast("本文が空のため保存できません");
+      return;
+    }
+
+    setCustomerData((current) => current.map((customer) => ({
+      ...customer,
+      entries: customer.entries.map((entry) => (
+        String(entry.id || "") === targetId
+          ? { ...entry, finalSentText: newText, final_sent_text: newText }
+          : entry
+      )),
+    })));
+
+    setCurrentFavoriteTexts((current) => (
+      currentFavoriteIds.includes(targetId)
+        ? [newText, ...current.filter((text) => text !== item.displayText && text !== newText)].slice(0, 5)
+        : current
+    ));
+
+    try {
+      await navigator.clipboard.writeText(newText);
+      showActionToast("📋 コピー＆上書き保存しました");
+    } catch (error) {
+      console.error("Clipboard copy failed:", error);
+      showActionToast("保存しました（コピーに失敗しました）");
+    }
+
+    fetch("/api/entries/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        entryId: targetId,
+        finalSentText: newText,
+        deliveryStatus: "copied",
+      }),
+    }).catch((error) => console.error("History save API Error:", error));
+
+    cancelEditHistory(targetId);
   }
 
   async function generateDiary() {
@@ -716,7 +838,6 @@ export default function Page() {
         return `${memo.date}: ${memo.text} ${tagsStr}`.trim();
       }).join("\n---\n");
       const isAlertStatus = targetCustomer ? isAlertCustomer(targetCustomer) : false;
-      const currentFavoriteTexts: string[] = [];
       const now = new Date();
       const currentHour = now.getHours();
       const currentDay = now.getDay();
@@ -1343,23 +1464,35 @@ export default function Page() {
           {historyItems.length === 0 ? (
             <div style={{textAlign: "center", padding: "40px 20px", color: "var(--text-muted)", fontWeight: "700", fontSize: "13px"}}>生成履歴がありません<br /><span style={{fontSize: "11px", fontWeight: "normal", marginTop: "8px", display: "inline-block"}}>AIでメッセージを作成するとここに保存されます</span></div>
           ) : (
-            historyItems.map((item) => (
-              <div className="history-card" key={item.id || `${item.customerName}-${item.displayDate}`} onClick={() => restoreHistoryItem(item)} style={{cursor: "pointer"}}>
-                <div className="history-header">
-                  <div>
-                    <div style={{fontWeight: "700", fontSize: "14px", color: "var(--text-main)", marginBottom: "4px"}}>{item.customerName} 様宛</div>
-                    <div style={{fontSize: "11px", color: "var(--text-sub)"}}>{item.displayDate}</div>
-                    <div style={{marginTop: "4px"}}>
-                      {item.customerTags.slice(0, 3).map((tag) => (
-                        <span key={`${item.id}-${tag}`} style={{background: "var(--primary-light)", color: "var(--primary)", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", fontWeight: "700", marginRight: "4px"}}>#{tag}</span>
-                      ))}
+            historyItems.map((item, index) => {
+              const itemId = String(item.id || "");
+              const viewId = itemId || `history-${index}`;
+              const isExpanded = expandedHistoryIds.includes(viewId);
+              const isEditing = editingHistoryId === itemId;
+              const isFavorite = currentFavoriteIds.includes(itemId);
+              return (
+                <div className="history-card" key={item.id || `${item.customerName}-${item.displayDate}`}>
+                  <div className="history-header">
+                    <div>
+                      <div style={{fontWeight: "700", fontSize: "14px", color: "var(--text-main)", marginBottom: "4px"}}>{item.customerName} 様宛</div>
+                      <div style={{fontSize: "11px", color: "var(--text-sub)"}}>{item.displayDate}</div>
+                      <div style={{marginTop: "4px"}}>
+                        {item.customerTags.slice(0, 3).map((tag) => (
+                          <span key={`${item.id}-${tag}`} style={{background: "var(--primary-light)", color: "var(--primary)", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", fontWeight: "700", marginRight: "4px"}}>#{tag}</span>
+                        ))}
+                      </div>
                     </div>
+                    <div className={`favorite-btn ${isFavorite ? "active" : ""}`} onClick={() => toggleFavoriteHistory(item)}>{isFavorite ? "♥" : "☆"}</div>
                   </div>
-                  <div className="favorite-btn">☆</div>
+                  <div id={`history-view-${viewId}`} className={`history-text ${isExpanded ? "" : "collapsed"}`} onClick={() => toggleHistoryText(viewId)} style={{display: isEditing ? "none" : undefined}}>{item.displayText}</div>
+                  <textarea id={`history-edit-${itemId}`} className="input-field" value={historyEditTexts[itemId] ?? item.displayText} onChange={(event) => setHistoryEditTexts((current) => ({ ...current, [itemId]: event.target.value }))} style={{display: isEditing ? "block" : "none", height: "120px", marginTop: "8px", fontSize: "13px", lineHeight: "1.6", background: "#FFF", border: "1px solid var(--primary)", padding: "12px"}} />
+                  <div style={{display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "12px", borderTop: "1px dashed var(--border-color)", paddingTop: "8px"}}>
+                    <button type="button" id={`history-save-btn-${itemId}`} onClick={() => saveAndCopyHistory(item)} style={{display: isEditing ? "block" : "none", background: "var(--primary)", color: "#FFF", border: "none", padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "0.2s"}}>📋 コピーして保存</button>
+                    <button type="button" id={`history-edit-btn-${itemId}`} onClick={() => isEditing ? cancelEditHistory(itemId) : enableEditHistory(item)} style={{background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "0.2s"}}>{isEditing ? "✖ キャンセル" : "✏️ 編集"}</button>
+                  </div>
                 </div>
-                <div className="history-text collapsed">{item.displayText}</div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
         <div className="fab" role="button" tabIndex={0} data-original-click={"openCreateModal()"} onClick={openCreateCustomerModal} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCreateCustomerModal(); } }} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); openCreateModal(); }"} style={{display: dataView === "customer" ? "flex" : "none"}}>＋</div>

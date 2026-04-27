@@ -364,6 +364,94 @@ export default function Page() {
     regular: null,
   });
 
+  /** お客様ノート：下スクロールで検索バーを隠す / 上で再表示（state は方向転換時のみ） */
+  const [isCustomerSearchBarVisible, setIsCustomerSearchBarVisible] = useState(true);
+  const mainScrollAreaRef = useRef<HTMLElement | null>(null);
+  const lastScrollTopRef = useRef(0);
+  const customerSearchBarVisibleRef = useRef(true);
+  const customerSearchInputFocusedRef = useRef(false);
+  const dataTabScrollRafRef = useRef<number | null>(null);
+  const activeTabRef = useRef<ActiveTab>(activeTab);
+  const dataViewRef = useRef<DataView>(dataView);
+  activeTabRef.current = activeTab;
+  dataViewRef.current = dataView;
+
+  useEffect(() => {
+    customerSearchBarVisibleRef.current = isCustomerSearchBarVisible;
+  }, [isCustomerSearchBarVisible]);
+
+  useEffect(() => {
+    if (activeTab !== "data" || dataView !== "customer") {
+      setIsCustomerSearchBarVisible(true);
+      customerSearchBarVisibleRef.current = true;
+    } else {
+      const root = mainScrollAreaRef.current;
+      if (root) lastScrollTopRef.current = root.scrollTop;
+    }
+  }, [activeTab, dataView]);
+
+  useEffect(() => {
+    const root = mainScrollAreaRef.current;
+    if (!root) return;
+
+    const flushScroll = () => {
+      dataTabScrollRafRef.current = null;
+      if (activeTabRef.current !== "data" || dataViewRef.current !== "customer") {
+        lastScrollTopRef.current = root.scrollTop;
+        return;
+      }
+
+      if (customerSearchInputFocusedRef.current) {
+        if (!customerSearchBarVisibleRef.current) {
+          customerSearchBarVisibleRef.current = true;
+          setIsCustomerSearchBarVisible(true);
+        }
+        lastScrollTopRef.current = root.scrollTop;
+        return;
+      }
+
+      const st = root.scrollTop;
+      const prev = lastScrollTopRef.current;
+
+      if (st < 6) {
+        if (!customerSearchBarVisibleRef.current) {
+          customerSearchBarVisibleRef.current = true;
+          setIsCustomerSearchBarVisible(true);
+        }
+        lastScrollTopRef.current = st;
+        return;
+      }
+
+      if (st > prev) {
+        if (st > 12 && customerSearchBarVisibleRef.current) {
+          customerSearchBarVisibleRef.current = false;
+          setIsCustomerSearchBarVisible(false);
+        }
+      } else if (st < prev) {
+        if (!customerSearchBarVisibleRef.current) {
+          customerSearchBarVisibleRef.current = true;
+          setIsCustomerSearchBarVisible(true);
+        }
+      }
+
+      lastScrollTopRef.current = st;
+    };
+
+    const onScroll = () => {
+      if (dataTabScrollRafRef.current != null) return;
+      dataTabScrollRafRef.current = window.requestAnimationFrame(flushScroll);
+    };
+
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      if (dataTabScrollRafRef.current != null) {
+        window.cancelAnimationFrame(dataTabScrollRafRef.current);
+        dataTabScrollRafRef.current = null;
+      }
+    };
+  }, []);
+
   const fetchCustomers = useCallback(async (targetUserId: string, options: { showLoading?: boolean } = {}) => {
     const showLoading = options.showLoading !== false;
     if (showLoading) setIsCustomersLoading(true);
@@ -1556,7 +1644,7 @@ export default function Page() {
       </div>
     </header>
 
-    <main className="scroll-area">
+    <main ref={mainScrollAreaRef} className="scroll-area">
       <div className="page page-create">
         {/* 👤 誰に送る？ */}
         <div className="card card-customer-select">
@@ -1697,9 +1785,56 @@ export default function Page() {
             </div>
           </div>
 
-          <div id="searchContainer" style={{display: dataView === "customer" ? "block" : "none"}}>
-            <input type="text" id="customerSearch" className="input-field" placeholder="名前、タグ、メモで検索..." data-original-input={"filterCustomerList()"} value={customerSearchText} onChange={(event) => setCustomerSearchText(event.target.value)} style={{paddingRight: "36px", background: "#FFF", border: "1px solid var(--border-color)"}} />
-            <div id="clearSearchBtn" style={{position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.05)", color: "var(--text-sub)", width: "22px", height: "22px", borderRadius: "50%", display: customerSearchText ? "flex" : "none", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "bold", cursor: "pointer"}} data-original-click={"clearSearch()"} onClick={() => setCustomerSearchText("")}>×</div>
+          <div
+            className={`data-customer-search-clip${dataView === "customer" && !isCustomerSearchBarVisible ? " data-customer-search-clip--hidden" : ""}`}
+            style={{ display: dataView === "customer" ? "block" : "none" }}
+          >
+            <div className="data-customer-search-inner">
+              <div id="searchContainer" style={{ position: "relative", marginBottom: "8px" }}>
+                <input
+                  type="text"
+                  id="customerSearch"
+                  className="input-field"
+                  placeholder="名前、タグ、メモで検索..."
+                  data-original-input={"filterCustomerList()"}
+                  value={customerSearchText}
+                  onChange={(event) => setCustomerSearchText(event.target.value)}
+                  onFocus={() => {
+                    customerSearchInputFocusedRef.current = true;
+                    customerSearchBarVisibleRef.current = true;
+                    setIsCustomerSearchBarVisible(true);
+                  }}
+                  onBlur={() => {
+                    customerSearchInputFocusedRef.current = false;
+                  }}
+                  style={{ paddingRight: "36px", background: "#FFF", border: "1px solid var(--border-color)" }}
+                />
+                <div
+                  id="clearSearchBtn"
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "rgba(0,0,0,0.05)",
+                    color: "var(--text-sub)",
+                    width: "22px",
+                    height: "22px",
+                    borderRadius: "50%",
+                    display: customerSearchText ? "flex" : "none",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                  data-original-click={"clearSearch()"}
+                  onClick={() => setCustomerSearchText("")}
+                >
+                  ×
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="filter-container" ref={filterContainerRef} style={{paddingBottom: "10px", marginBottom: "0", display: dataView === "customer" ? "flex" : "none"}}>

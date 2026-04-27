@@ -119,6 +119,27 @@ input[type="radio"].ui-state { display: none; }
 #nav-settings:checked ~ .app-container .tab-settings { color: var(--primary); }
 #nav-create:not(:checked) ~ .app-container .header-toggle { display: none; }
 
+/* お客様ノート：検索バー スクロール連動（高さ潰し + translate、イベントは rAF） */
+.data-customer-search-clip {
+  overflow: hidden;
+  max-height: 88px;
+  margin-bottom: 0;
+  opacity: 1;
+  transition: max-height 0.3s ease-in-out, opacity 0.25s ease;
+}
+.data-customer-search-clip--hidden {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.data-customer-search-inner {
+  transition: transform 0.3s ease-in-out;
+  will-change: transform;
+}
+.data-customer-search-clip--hidden .data-customer-search-inner {
+  transform: translateY(-100%);
+}
+
 .app-container {
   display: flex;
   flex-direction: column;

@@ -37,6 +37,13 @@ interface CustomerEntry {
   photoUrl?: string;
   type?: string;
   status?: string;
+  aiGeneratedText?: string;
+  ai_generated_text?: string;
+  finalSentText?: string;
+  final_sent_text?: string;
+  inputMemo?: string;
+  input_memo?: string;
+  entry_date?: string;
 }
 
 interface Customer {
@@ -273,6 +280,15 @@ export default function Page() {
   const [isCuteToastIconAnimating, setIsCuteToastIconAnimating] = useState(false);
   const actionToastTimerRef = useRef<number | null>(null);
   const cuteToastTimerRef = useRef<number | null>(null);
+  const filterContainerRef = useRef<HTMLDivElement | null>(null);
+  const filterButtonRefs = useRef<Record<ListFilter, HTMLDivElement | null>>({
+    alert: null,
+    all: null,
+    vip: null,
+    new: null,
+    second: null,
+    regular: null,
+  });
 
   const fetchCustomers = useCallback(async (targetUserId: string) => {
     setIsCustomersLoading(true);
@@ -361,6 +377,13 @@ export default function Page() {
     };
   }, []);
 
+  useEffect(() => {
+    if (activeTab !== "data" || dataView !== "customer") return;
+    window.setTimeout(() => {
+      filterButtonRefs.current[currentListFilter]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    }, 80);
+  }, [activeTab, dataView, currentListFilter]);
+
   const targetDummyTag = getTargetDummyTag(selectedBusinessType);
   const baseVisibleCustomers = customerData.filter((customer) => {
     if (customer.tagsArray.includes("非表示")) return false;
@@ -419,6 +442,21 @@ export default function Page() {
     ...(selectedCustomer?.tagsArray || []),
     ...editAttributeTags,
   ])).filter((tag) => tag !== "ダミー" && tag !== "非表示" && tag !== "一軍固定");
+  const historyItems = customerData
+    .flatMap((customer) => (Array.isArray(customer.entries) ? customer.entries : []).map((entry) => {
+      const generatedText = entry.finalSentText || entry.final_sent_text || entry.aiGeneratedText || entry.ai_generated_text || "";
+      return {
+        ...entry,
+        customerId: customer.id,
+        customerName: customer.name,
+        customerTags: customer.tagsArray || [],
+        displayText: generatedText,
+        displayDate: entry.date || entry.entry_date || "",
+        inputText: entry.inputMemo || entry.input_memo || entry.text || "",
+      };
+    }))
+    .filter((entry) => entry.displayText)
+    .sort((a, b) => new Date(b.displayDate || 0).getTime() - new Date(a.displayDate || 0).getTime());
 
   function closeModal() {
     setActiveModal(null);
@@ -522,7 +560,9 @@ export default function Page() {
   }
 
   function setListFilter(filterType: ListFilter) {
-    setCurrentListFilter((current) => current === filterType && filterType !== "all" ? "all" : filterType);
+    const nextFilter = currentListFilter === filterType && filterType !== "all" ? "all" : filterType;
+    setCurrentListFilter(nextFilter);
+    filterButtonRefs.current[nextFilter]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   }
 
   function setBusinessType(value: BusinessType) {
@@ -617,6 +657,17 @@ export default function Page() {
     const url = `https://line.me/R/msg/text/?${encodeURIComponent(inlineResultText)}`;
     window.open(url, "_blank");
     showActionToast("💬 LINEに送信しました！");
+  }
+
+  function restoreHistoryItem(item: (typeof historyItems)[number]) {
+    setSelectedCustomerId(item.customerId || null);
+    setNameInputValue(item.customerName || "");
+    setTodayEpisodeText(item.inputText || "");
+    setInlineResultText(item.displayText || "");
+    setCurrentEntryId(item.id || "");
+    setIsInlineResultVisible(Boolean(item.displayText));
+    setActiveTab("create");
+    setDataView("customer");
   }
 
   async function generateDiary() {
@@ -816,8 +867,8 @@ export default function Page() {
     <button data-original-click={"setHidden()"} style={{width: "100%", background: "var(--alert-bg)", color: "var(--alert-text)", border: "1px solid transparent", padding: "14px", borderRadius: "12px", fontWeight: "700", fontSize: "14px", marginBottom: "10px", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px"}}>💤 非表示にする</button>
   </div>
 
-  <div id="createDetailsBackdrop" className="half-modal-backdrop" data-original-click={"closeCreateDetailsModal()"} onClick={() => setIsCreateDetailsOpen(false)}></div>
-  <div id="createDetailsHalfModal" className={`half-modal create-details-half-modal ${isCreateDetailsOpen ? "open" : ""}`} style={{height: isCreateDetailsOpen ? "320px" : undefined}}>
+  <div id="createDetailsBackdrop" className={`half-modal-backdrop ${isCreateDetailsOpen ? "show" : ""}`} data-original-click={"closeCreateDetailsModal()"} onClick={() => setIsCreateDetailsOpen(false)} style={{zIndex: 899}}></div>
+  <div id="createDetailsHalfModal" className={`half-modal create-details-half-modal ${isCreateDetailsOpen ? "open" : ""}`} onClick={(event) => event.stopPropagation()} style={{height: isCreateDetailsOpen ? "320px" : undefined}}>
     <div className="half-modal-handle" data-original-click={"closeCreateDetailsModal()"} role="button" tabIndex={0} onClick={() => setIsCreateDetailsOpen(false)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setIsCreateDetailsOpen(false); } }} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); closeCreateDetailsModal(); }"}></div>
     <div className="create-details-modal-header">
       <span className="label" style={{margin: "0"}}>📝 詳細を追加</span>
@@ -863,7 +914,7 @@ export default function Page() {
       {/* 本文 */}
       <span className="label">📝 今日の出来事・接客メモ</span>
       <div className="textarea-wrapper">
-        <textarea id="todayEpisodeInput" className="input-field" placeholder="（例）こけてみんなで爆笑した！ウザ絡みされたけどシャンパン入れてくれた笑&#10;※AIが空気を読んで綺麗なメッセージにします✨" data-original-input={"autoScrollTextarea()"} value={todayEpisodeText} onChange={(event) => setTodayEpisodeText(event.target.value)} style={{background: "var(--input-bg)", border: "1px solid transparent"}}></textarea>
+        <textarea id="todayEpisodeInput" className="input-field" rows={4} placeholder="（例）こけてみんなで爆笑した！ウザ絡みされたけどシャンパン入れてくれた笑&#10;※AIが空気を読んで綺麗なメッセージにします✨" data-original-input={"autoScrollTextarea()"} value={todayEpisodeText} onChange={(event) => setTodayEpisodeText(event.target.value)} style={{background: "var(--input-bg)", border: "1px solid transparent", minHeight: "100px"}}></textarea>
         <div className="clear-btn" data-original-click={"clearEpisodeInput()"} onClick={() => { if (!todayEpisodeText && selectedFactTags.length === 0 && selectedMoodTags.length === 0) return; if (window.confirm("入力をクリアしますか？")) { setTodayEpisodeText(""); setSelectedFactTags([]); setSelectedMoodTags([]); } }}>🧹 クリア</div>
       </div>
     </div>
@@ -1199,25 +1250,25 @@ export default function Page() {
             </div>
           </div>
 
-          <div id="searchContainer">
+          <div id="searchContainer" style={{display: dataView === "customer" ? "block" : "none"}}>
             <input type="text" id="customerSearch" className="input-field" placeholder="名前、タグ、メモで検索..." data-original-input={"filterCustomerList()"} value={customerSearchText} onChange={(event) => setCustomerSearchText(event.target.value)} style={{paddingRight: "36px", background: "#FFF", border: "1px solid var(--border-color)"}} />
             <div id="clearSearchBtn" style={{position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.05)", color: "var(--text-sub)", width: "22px", height: "22px", borderRadius: "50%", display: customerSearchText ? "flex" : "none", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "bold", cursor: "pointer"}} data-original-click={"clearSearch()"} onClick={() => setCustomerSearchText("")}>×</div>
           </div>
 
-          <div className="filter-container" style={{paddingBottom: "10px", marginBottom: "0"}}>
-            <div className={`filter-btn ${currentListFilter === "alert" ? "active-filter" : ""}`} id="filter-btn-alert" data-original-click={"setListFilter('alert')"} onClick={() => setListFilter("alert")}>
+          <div className="filter-container" ref={filterContainerRef} style={{paddingBottom: "10px", marginBottom: "0", display: dataView === "customer" ? "flex" : "none"}}>
+            <div ref={(element) => { filterButtonRefs.current.alert = element; }} className={`filter-btn ${currentListFilter === "alert" ? "active-filter" : ""}`} id="filter-btn-alert" data-original-click={"setListFilter('alert')"} onClick={() => setListFilter("alert")}>
               ⚠️ 要連絡
               <div id="alertBadge" style={{display: alertCount > 0 ? "flex" : "none", position: "absolute", top: "-6px", right: "-6px", background: "var(--alert-text)", color: "#FFF", fontSize: "9px", fontWeight: "700", minWidth: "16px", height: "16px", borderRadius: "8px", padding: "0 4px", alignItems: "center", justifyContent: "center"}}>{alertCount}</div>
             </div>
-            <div className={`filter-btn ${currentListFilter === "all" ? "active-filter" : ""}`} id="filter-btn-all" data-original-click={"setListFilter('all')"} onClick={() => setListFilter("all")}>すべて</div>
-            <div className={`filter-btn ${currentListFilter === "vip" ? "active-filter" : ""}`} id="filter-btn-vip" data-original-click={"setListFilter('vip')"} onClick={() => setListFilter("vip")}>💎 一軍</div>
-            <div className={`filter-btn ${currentListFilter === "new" ? "active-filter" : ""}`} id="filter-btn-new" data-original-click={"setListFilter('new')"} onClick={() => setListFilter("new")}>🔰 新規</div>
-            <div className={`filter-btn ${currentListFilter === "second" ? "active-filter" : ""}`} id="filter-btn-second" data-original-click={"setListFilter('second')"} onClick={() => setListFilter("second")}>✌️ 2回目</div>
-            <div className={`filter-btn ${currentListFilter === "regular" ? "active-filter" : ""}`} id="filter-btn-regular" data-original-click={"setListFilter('regular')"} onClick={() => setListFilter("regular")}>👑 常連</div>
+            <div ref={(element) => { filterButtonRefs.current.all = element; }} className={`filter-btn ${currentListFilter === "all" ? "active-filter" : ""}`} id="filter-btn-all" data-original-click={"setListFilter('all')"} onClick={() => setListFilter("all")}>すべて</div>
+            <div ref={(element) => { filterButtonRefs.current.vip = element; }} className={`filter-btn ${currentListFilter === "vip" ? "active-filter" : ""}`} id="filter-btn-vip" data-original-click={"setListFilter('vip')"} onClick={() => setListFilter("vip")}>💎 一軍</div>
+            <div ref={(element) => { filterButtonRefs.current.new = element; }} className={`filter-btn ${currentListFilter === "new" ? "active-filter" : ""}`} id="filter-btn-new" data-original-click={"setListFilter('new')"} onClick={() => setListFilter("new")}>🔰 新規</div>
+            <div ref={(element) => { filterButtonRefs.current.second = element; }} className={`filter-btn ${currentListFilter === "second" ? "active-filter" : ""}`} id="filter-btn-second" data-original-click={"setListFilter('second')"} onClick={() => setListFilter("second")}>✌️ 2回目</div>
+            <div ref={(element) => { filterButtonRefs.current.regular = element; }} className={`filter-btn ${currentListFilter === "regular" ? "active-filter" : ""}`} id="filter-btn-regular" data-original-click={"setListFilter('regular')"} onClick={() => setListFilter("regular")}>👑 常連</div>
           </div>
         </div>
 
-        <div id="customerListArea" className={isCompactMode ? "compact-view" : ""} style={{marginTop: "12px", position: "relative", zIndex: "1"}}>
+        <div id="customerListArea" className={isCompactMode ? "compact-view" : ""} style={{marginTop: "12px", position: "relative", zIndex: "1", display: dataView === "customer" ? "block" : "none"}}>
           {isCustomersLoading ? (
             <>
               <div className="card skeleton" style={{height: "80px", marginBottom: "12px"}}></div>
@@ -1280,8 +1331,30 @@ export default function Page() {
             })
           )}
         </div>
-        <div id="historyListArea" style={{display: "none", marginTop: "12px", position: "relative", zIndex: "1"}}></div>
-        <div className="fab" role="button" tabIndex={0} data-original-click={"openCreateModal()"} onClick={openCreateCustomerModal} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCreateCustomerModal(); } }} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); openCreateModal(); }"}>＋</div>
+        <div id="historyListArea" style={{display: dataView === "history" ? "block" : "none", marginTop: "12px", position: "relative", zIndex: "1"}}>
+          {historyItems.length === 0 ? (
+            <div style={{textAlign: "center", padding: "40px 20px", color: "var(--text-muted)", fontWeight: "700", fontSize: "13px"}}>生成履歴がありません<br /><span style={{fontSize: "11px", fontWeight: "normal", marginTop: "8px", display: "inline-block"}}>AIでメッセージを作成するとここに保存されます</span></div>
+          ) : (
+            historyItems.map((item) => (
+              <div className="history-card" key={item.id || `${item.customerName}-${item.displayDate}`} onClick={() => restoreHistoryItem(item)} style={{cursor: "pointer"}}>
+                <div className="history-header">
+                  <div>
+                    <div style={{fontWeight: "700", fontSize: "14px", color: "var(--text-main)", marginBottom: "4px"}}>{item.customerName} 様宛</div>
+                    <div style={{fontSize: "11px", color: "var(--text-sub)"}}>{item.displayDate}</div>
+                    <div style={{marginTop: "4px"}}>
+                      {item.customerTags.slice(0, 3).map((tag) => (
+                        <span key={`${item.id}-${tag}`} style={{background: "var(--primary-light)", color: "var(--primary)", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", fontWeight: "700", marginRight: "4px"}}>#{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="favorite-btn">☆</div>
+                </div>
+                <div className="history-text collapsed">{item.displayText}</div>
+              </div>
+            ))
+          )}
+        </div>
+        <div className="fab" role="button" tabIndex={0} data-original-click={"openCreateModal()"} onClick={openCreateCustomerModal} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openCreateCustomerModal(); } }} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); openCreateModal(); }"} style={{display: dataView === "customer" ? "flex" : "none"}}>＋</div>
       </div>
 
       <div className="page page-settings" style={{position: "relative"}}>

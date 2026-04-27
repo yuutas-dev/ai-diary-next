@@ -13,7 +13,7 @@ async function findCustomerIdByName({ supabase, userId, customerId, name }) {
   return data?.[0]?.id || null;
 }
 async function createDraftEntry({ supabase, userId, customerId, visitStatus, episodeText, factTags, moodTags, aiText, mode }) {
-  if (mode === 'photo' || !customerId) return null;
+  if (mode === 'diary' || mode === 'photo' || !customerId) return null;
   const { data, error } = await supabase.from('customer_entries').insert({ user_id: userId, customer_id: customerId, entry_type: visitStatus === 'visit' ? 'visit' : 'sales', entry_date: getTodayFormatted(), input_memo: episodeText, input_tags: [...factTags, ...moodTags], photo_url: null, ai_generated_text: aiText, final_sent_text: null, delivery_status: 'draft' }).select('id').single();
   if (error) { console.error('Customer entries insert error:', error); return null; }
   return data?.id || null;
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     const difyApiKey = (process.env.DIFY_API_KEY || '').trim();
     if (!difyApiKey) throw new Error('Difyの環境変数が読み込めていません');
     const supabase = getSupabase();
-    const mode = data?.messageMode === 'photo' ? 'photo' : 'text';
+    const mode = data?.messageMode === 'diary' || data?.messageMode === 'photo' ? 'diary' : 'line';
     const visitStatus = data?.visitStatus === 'visit' ? 'visit' : 'sales';
     const episodeText = typeof data?.episodeText === 'string' ? data.episodeText : (typeof data?.episode === 'string' ? data.episode : '');
     const factTags = normalizeTags(data?.factTags || data?.episodeTags);
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     const favoriteTextCount = favoriteTexts ? favoriteTexts.split('\n').filter(Boolean).length : 0;
     const customerName = trimText(data?.customerName);
     const customerId = await findCustomerIdByName({ supabase, userId, customerId: data?.customerId, name: customerName });
-    const difyInputs = { customerName, businessType: data?.businessType || 'cabaret', customerRank: data?.customerRank || '新規', visitCount: String(data?.visitCount || '1'), visitStatus: data?.visitStatus || visitStatus, isAlert: String(data?.isAlert || 'false'), timeContext: data?.timeContext || '', dayContext: data?.dayContext || '', episodeText: data?.episodeText || episodeText, pastMemo: data?.pastMemo || '', customerTags: data?.customerTags || '', factTags: data?.factTags || '', moodTags: data?.moodTags || '', style: data?.style || 'cute', tension: data?.tension || '3', emoji: data?.emoji || '4', customText: data?.customText || '', favoriteTexts, messageMode: data?.messageMode || mode, imageFile: data?.imageFile || null };
+    const difyInputs = { customerName, businessType: data?.businessType || 'cabaret', customerRank: data?.customerRank || '新規', visitCount: String(data?.visitCount || '1'), visitStatus: data?.visitStatus || visitStatus, isAlert: String(data?.isAlert || 'false'), timeContext: data?.timeContext || '', dayContext: data?.dayContext || '', episodeText: data?.episodeText || episodeText, pastMemo: data?.pastMemo || '', customerTags: data?.customerTags || '', factTags: data?.factTags || '', moodTags: data?.moodTags || '', style: data?.style || 'cute', tension: data?.tension || '3', emoji: data?.emoji || '4', customText: data?.customText || '', favoriteTexts, messageMode: mode, imageFile: data?.imageFile || null };
     const difyRes = await fetch('https://api.dify.ai/v1/workflows/run', { method: 'POST', headers: { Authorization: `Bearer ${difyApiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ inputs: difyInputs, response_mode: 'blocking', user: userId }) });
     if (!difyRes.ok) throw new Error(`Dify生成エラー: ${difyRes.status} ${await difyRes.text().catch(() => '')}`);
     const difyData = await difyRes.json();

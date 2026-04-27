@@ -89,6 +89,21 @@ const INDUSTRY_FACT_CONFIGS: Record<BusinessType, string[]> = {
   ]
 };
 
+const DIARY_FACT_CONFIGS: Record<BusinessType, string[]> = {
+  cabaret: [
+    "👗 新ドレス", "🍾 お祝い感謝", "🎉 満員御礼", "🥺 暇アピ", "📸 盛れた",
+    "🍰 差し入れ感謝", "💇‍♀️ ヘアメ完了", "💤 営業後・余韻"
+  ],
+  fuzoku: [
+    "✨ 枠空き", "🏩 ロング歓迎", "🏃‍♂️ 突撃歓迎", "👗 新衣装・コス", "🛁 癒やし",
+    "🤫 秘密の共有", "💄 準備完了", "💤 退勤・感謝"
+  ],
+  garuba: [
+    "🍻 乾杯しよ", "🥃 テキーラ", "🎮 フルメン", "🍜 締めラー", "🥺 暇アピ",
+    "📸 チェキ感謝", "👕 私服デー", "💤 朝まで・始発"
+  ],
+};
+
 const MODE_LABELS: Record<BusinessType, { main: string; thanks: string }> = {
   fuzoku: { main: "写メ日記", thanks: "お礼日記" },
   cabaret: { main: "ブログ・SNS", thanks: "お礼LINE" },
@@ -458,9 +473,12 @@ export default function Page() {
   const selectedCustomer = selectedCustomerId
     ? customerData.find((customer) => customer.id === selectedCustomerId) || null
     : null;
+  const messageMode = createMode === "photo" ? "diary" : "line";
   const modeLabels = MODE_LABELS[selectedBusinessType] || MODE_LABELS.cabaret;
   const moodTags = INDUSTRY_MOOD_CONFIGS[selectedBusinessType] || INDUSTRY_MOOD_CONFIGS.cabaret;
-  const factTags = INDUSTRY_FACT_CONFIGS[selectedBusinessType] || INDUSTRY_FACT_CONFIGS.cabaret;
+  const lineFactTags = INDUSTRY_FACT_CONFIGS[selectedBusinessType] || INDUSTRY_FACT_CONFIGS.cabaret;
+  const diaryFactTags = DIARY_FACT_CONFIGS[selectedBusinessType] || DIARY_FACT_CONFIGS.cabaret;
+  const factTags = messageMode === "diary" ? diaryFactTags : lineFactTags;
   const editAttributeOptions = Array.from(new Set([
     ...(INDUSTRY_ATTRIBUTE_TAGS[selectedBusinessType] || INDUSTRY_ATTRIBUTE_TAGS.cabaret),
     ...(selectedCustomer?.tagsArray || []),
@@ -865,14 +883,14 @@ export default function Page() {
         episodeText: todayEpisodeText,
         pastMemo: filteredMemosStr,
         customerTags: cleanedCustomerTags.join(","),
-        factTags: selectedFactTags.join(","),
+        factTags: selectedFactTags.filter((tag) => factTags.includes(tag)).join(","),
         moodTags: selectedMoodTags.join(","),
         style: styleTab,
         tension: "3",
         emoji: "4",
         customText: "",
         favoriteTexts: currentFavoriteTexts.slice(0, 5).join("\n"),
-        messageMode: isPhoto ? "photo" : "text",
+        messageMode,
         imageFile: null,
       };
 
@@ -1198,7 +1216,7 @@ export default function Page() {
                   <div className="memo-tag-dropdown" style={{display: block.isDropdownOpen ? "block" : "none", background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)", border: "1px solid var(--border-color)", borderRadius: "16px", padding: "12px", marginTop: "10px", boxShadow: "var(--shadow-md)", position: "absolute", zIndex: 20, width: "100%"}}>
                     <div style={{position: "absolute", top: "-6px", left: "20px", width: "10px", height: "10px", background: "#FFF", borderTop: "1px solid var(--border-color)", borderLeft: "1px solid var(--border-color)", transform: "rotate(45deg)"}}></div>
                     <div className="memo-tag-dropdown-content" style={{display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "120px", overflowY: "auto"}}>
-                      {factTags.map((tag) => {
+                      {lineFactTags.map((tag) => {
                         const isSelected = block.tags.includes(tag);
                         return <div key={`${block.id}-${tag}`} className={`chip${isSelected ? " selected-fact-chip active" : ""}`} onClick={() => toggleMemoTag(block.id, tag)}>{tag}</div>;
                       })}

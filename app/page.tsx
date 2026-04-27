@@ -58,8 +58,6 @@ interface ToastState {
   visible: boolean;
 }
 
-const FACT_TAGS = ["同伴", "シャンパン", "延長", "指名", "場内", "イベント", "久しぶり", "初来店"];
-const MOOD_TAGS = ["嬉しい", "楽しい", "感謝", "癒し", "特別感", "応援", "甘め", "大人っぽい"];
 const CUSTOMER_TAGS = ["VIP", "要フォロー", "新規", "常連", "ダミー"];
 const STORAGE_KEY = "ai-diary-next-settings";
 const DEFAULT_USER_ID = "test-user";
@@ -158,7 +156,7 @@ function AppRadios({
   );
 }
 
-export default function Home() {
+export default function Page() {
   const [activeTab, setActiveTab] = useState<TabKey>("create");
   const [createMode, setCreateMode] = useState<CreateMode>("text");
   const [visitStatus, setVisitStatus] = useState<VisitStatus>("visit");

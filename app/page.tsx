@@ -241,46 +241,42 @@ function isEmotionTag(tag: string) {
 
 function getAvatarSvgMarkup(name: string, iconTheme: IconTheme) {
   const hash = getStringHash(name || "ゲスト");
+  const hue = hash % 360;
+  const liquidColor = `hsla(${hue}, 75%, 65%, 0.85)`;
+  const strokeColor = "#C6A682";
   const themePaths: Record<IconTheme, string[]> = {
     glass: [
-      `<path d="M8 4h8l-1 11a3 3 0 0 1-6 0L8 4Z" fill="currentColor" fill-opacity=".18"/><path d="M8 4h8l-1 11a3 3 0 0 1-6 0L8 4ZM12 18v3M9 21h6" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 8h6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity=".5"/>`,
-      `<path d="M7 7h10l-.7 11.5A2.5 2.5 0 0 1 13.8 21H10.2a2.5 2.5 0 0 1-2.5-2.5L7 7Z" fill="currentColor" fill-opacity=".18"/><path d="M7 7h10l-.7 11.5A2.5 2.5 0 0 1 13.8 21H10.2a2.5 2.5 0 0 1-2.5-2.5L7 7ZM8 3h8" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>`,
-      `<path d="M5 5h14l-7 7-7-7Z" fill="currentColor" fill-opacity=".18"/><path d="M5 5h14l-7 7v7M9 21h6" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>`
+      `<path d="M10.5 7h3l-.6 8c0 .5-.4 1-.9 1s-.9-.5-.9-1z" fill="${liquidColor}"/><path d="M10 2h4l-1 13c0 1-1 2-1 2v4h3v1H9v-1h3v-4c0 0-1-1-1-2Z" stroke="${strokeColor}" stroke-width="1.2" stroke-linejoin="round"/>`,
+      `<path d="M6.5 12h11l-.6 8h-9.8z" fill="${liquidColor}"/><path d="M6 4h12l-1 17H7z" stroke="${strokeColor}" stroke-width="1.2" stroke-linejoin="round"/>`,
+      `<path d="M6 7h12L12 11.5z" fill="${liquidColor}"/><path d="M3 4h18L12 13v7h3v1H9v-1h3v-7z" stroke="${strokeColor}" stroke-width="1.2" stroke-linejoin="round"/>`
     ],
     jewel: [
-      `<path d="M12 21 3 9l4-5h10l4 5-9 12Z" fill="currentColor" fill-opacity=".18"/><path d="M12 21 3 9l4-5h10l4 5-9 12ZM3 9h18M8 4l4 17 4-17" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>`,
-      `<path d="M12 3 20 8v8l-8 5-8-5V8l8-5Z" fill="currentColor" fill-opacity=".18"/><path d="M12 3 20 8v8l-8 5-8-5V8l8-5ZM4 8l8 5 8-5M12 13v8" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>`,
-      `<path d="M7 4h10l4 4-9 12L3 8l4-4Z" fill="currentColor" fill-opacity=".18"/><path d="M7 4h10l4 4-9 12L3 8l4-4ZM7 4l5 16 5-16" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>`
+      `<path d="M12 21L2 9h20L12 21z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/><path d="M2 9l5-6h10l5 6" stroke="${strokeColor}" stroke-width="1.2"/>`,
+      `<path d="M12 22c5.5 0 10-4.5 10-10S12 2 12 2 2 6.5 2 12s4.5 10 10 10z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`,
+      `<path d="M7 2h10l5 5v10l-5 5H7l-5-5V7l5-5z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`
     ],
     perfume: [
-      `<path d="M8 11h8v9H8v-9Z" fill="currentColor" fill-opacity=".18"/><path d="M10 3h4v4h-4zM8 11h8v9H8v-9ZM9 11l2-4h2l2 4M10 15h4" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>`,
-      `<path d="M7 12a5 5 0 0 1 10 0v8H7v-8Z" fill="currentColor" fill-opacity=".18"/><path d="M10 3h4v4h-4zM7 12a5 5 0 0 1 10 0v8H7v-8ZM10 16h4" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>`,
-      `<path d="M6 10h12v10H6V10Z" fill="currentColor" fill-opacity=".18"/><path d="M9 5h6v5H9zM6 10h12v10H6V10ZM9 14h6" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>`
+      `<path d="M7 12c0-2.8 2.2-5 5-5s5 2.2 5 5v8H7v-8z" fill="${liquidColor}"/><path d="M10 2h4v5h-4zM7 12c0-2.8 2.2-5 5-5s5 2.2 5 5v8H7v-8z" stroke="${strokeColor}" stroke-width="1.2"/>`,
+      `<path d="M6 10h12v11H6z" fill="${liquidColor}"/><path d="M10 3h4v4h-4zM6 10h12v11H6z" stroke="${strokeColor}" stroke-width="1.2"/>`
     ],
     moon_star: [
-      `<path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a7.2 7.2 0 1 0 10.2 10.2Z" fill="currentColor" fill-opacity=".18"/><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a7.2 7.2 0 1 0 10.2 10.2Z" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/><path d="M17 3v4M15 5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>`,
-      `<path d="m12 3 2.4 5 5.5.8-4 3.9.9 5.5-4.8-2.6-4.8 2.6.9-5.5-4-3.9 5.5-.8L12 3Z" fill="currentColor" fill-opacity=".18"/><path d="m12 3 2.4 5 5.5.8-4 3.9.9 5.5-4.8-2.6-4.8 2.6.9-5.5-4-3.9 5.5-.8L12 3Z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>`,
-      `<path d="M6 17c5.5-.6 9-4.1 10-10 .4 4.4 1.8 7.1 4 8.5-4.8.4-8.1 2.5-10 6-.5-2-1.8-3.5-4-4.5Z" fill="currentColor" fill-opacity=".18"/><path d="M6 17c5.5-.6 9-4.1 10-10 .4 4.4 1.8 7.1 4 8.5-4.8.4-8.1 2.5-10 6-.5-2-1.8-3.5-4-4.5Z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>`
+      `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`,
+      `<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`
     ],
     flower: [
-      `<path d="M12 13c3-2 5-4 4-7-3-1-5 1-7 4-2-3-4-5-7-4-1 3 1 5 4 7-3 2-5 4-4 7 3 1 5-1 7-4 2 3 4 5 7 4 1-3-1-5-4-7Z" fill="currentColor" fill-opacity=".16"/><circle cx="12" cy="13" r="2.5" fill="currentColor" fill-opacity=".28"/><path d="M12 13c3-2 5-4 4-7-3-1-5 1-7 4-2-3-4-5-7-4-1 3 1 5 4 7-3 2-5 4-4 7 3 1 5-1 7-4 2 3 4 5 7 4 1-3-1-5-4-7Z" stroke="currentColor" stroke-width="1.15" stroke-linejoin="round"/>`,
-      `<path d="M12 21V12M12 12c-4 0-6-4-6-8 4 0 6 4 6 8Zm0 0c4 0 6-4 6-8-4 0-6 4-6 8Z" fill="currentColor" fill-opacity=".18"/><path d="M12 21V12M12 12c-4 0-6-4-6-8 4 0 6 4 6 8Zm0 0c4 0 6-4 6-8-4 0-6 4-6 8Z" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>`,
-      `<path d="M12 21s-7-4.3-7-11a7 7 0 0 1 14 0c0 6.7-7 11-7 11Z" fill="currentColor" fill-opacity=".18"/><path d="M12 21s-7-4.3-7-11a7 7 0 0 1 14 0c0 6.7-7 11-7 11ZM9 10h6" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>`
+      `<path d="M12 22V12M12 12c-4 0-6-4-6-8 4 0 6 4 6 8zm0 0c4 0 6-4 6-8-4 0-6 4-6 8z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`,
+      `<path d="M12 22s-8-4.5-8-12c0-4 4-6 8-8 4 2 8 4 8 8 0 7.5-8 12-8 12z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`
     ],
     teacup: [
-      `<path d="M4 8h12v6a6 6 0 0 1-12 0V8Z" fill="currentColor" fill-opacity=".18"/><path d="M4 8h12v6a6 6 0 0 1-12 0V8ZM16 10h2a2 2 0 0 1 0 4h-2M3 21h15" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>`,
-      `<path d="M5 9h11v5.5a5.5 5.5 0 0 1-11 0V9Z" fill="currentColor" fill-opacity=".18"/><path d="M5 9h11v5.5a5.5 5.5 0 0 1-11 0V9ZM8 5c0 1-1 1-1 2M12 5c0 1-1 1-1 2M16 11h2.5a1.8 1.8 0 0 1 0 3.6H16M3 21h16" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>`,
-      `<path d="M6 10h10v8H6v-8Z" fill="currentColor" fill-opacity=".18"/><path d="M6 10h10v8H6v-8ZM16 12h2a2 2 0 0 1 0 4h-2M5 21h13M8 6h6" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>`
+      `<path d="M4 8h12v6c0 3.3-2.7 6-6 6s-6-2.7-6-6V8z" fill="${liquidColor}"/><path d="M4 8h12v6c0 3.3-2.7 6-6 6s-6-2.7-6-6V8zM16 10h2c1.1 0 2 .9 2 2s-.9 2-2 2h-2M2 21h16" stroke="${strokeColor}" stroke-width="1.2"/>`
     ],
     symbol: [
-      `<path d="M20 8.5c0 5-8 10.5-8 10.5S4 13.5 4 8.5A4.5 4.5 0 0 1 12 5a4.5 4.5 0 0 1 8 3.5Z" fill="currentColor" fill-opacity=".18"/><path d="M20 8.5c0 5-8 10.5-8 10.5S4 13.5 4 8.5A4.5 4.5 0 0 1 12 5a4.5 4.5 0 0 1 8 3.5Z" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/>`,
-      `<path d="M12 3 20 12l-8 9-8-9 8-9Z" fill="currentColor" fill-opacity=".18"/><path d="M12 3 20 12l-8 9-8-9 8-9Z" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/>`,
-      `<path d="M12 4c2 3.2 4.3 5.5 7.5 7.5-3.2 2-5.5 4.3-7.5 7.5-2-3.2-4.3-5.5-7.5-7.5C7.7 9.5 10 7.2 12 4Z" fill="currentColor" fill-opacity=".18"/><path d="M12 4c2 3.2 4.3 5.5 7.5 7.5-3.2 2-5.5 4.3-7.5 7.5-2-3.2-4.3-5.5-7.5-7.5C7.7 9.5 10 7.2 12 4Z" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/>`
+      `<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`
     ]
   };
   const currentPaths = themePaths[iconTheme] || themePaths.glass;
   const selectedPath = currentPaths[hash % currentPaths.length];
-  return `<div style="width: 100%; height: 100%; border-radius: 50%; background-color: var(--card-bg); border: 1px solid var(--border-color); box-shadow: 0 2px 6px rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: center; color: var(--primary);"><svg viewBox="0 0 24 24" fill="none" style="width: 58%; height: 58%; color: currentColor;">${selectedPath}</svg></div>`;
+  return `<div style="width: 100%; height: 100%; border-radius: 50%; background-color: #ffffff; border: 1px solid #f0e6e6; box-shadow: 0 2px 6px rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" fill="none" style="width: 55%; height: 55%;">${selectedPath}</svg></div>`;
 }
 
 function normalizeCustomer(customer: {
@@ -319,7 +315,7 @@ export default function Page() {
   const [selectedBusinessType, setSelectedBusinessType] = useState<BusinessType>("cabaret");
   const [iconTheme, setIconTheme] = useState<IconTheme>("glass");
   const [appTheme, setAppTheme] = useState<AppTheme>("pink");
-  const [appFont, setAppFont] = useState<AppFont>("maru");
+  const [appFont, setAppFont] = useState<AppFont>("standard");
   const [currentListFilter, setCurrentListFilter] = useState<ListFilter>("all");
   const [isCompactMode, setIsCompactMode] = useState(false);
   const [customerSearchText, setCustomerSearchText] = useState("");
@@ -465,8 +461,6 @@ export default function Page() {
     const savedAppFont = localStorage.getItem("appFont") as AppFont | null;
     if (savedAppFont && ["standard", "maru", "mincho"].includes(savedAppFont)) {
       setAppFont(savedAppFont);
-    } else {
-      localStorage.setItem("appFont", "maru");
     }
     const savedStyle = localStorage.getItem("selectedStyle") as StyleTab | null;
     if (savedStyle && ["cute", "custom", "neat"].includes(savedStyle)) {
@@ -1338,7 +1332,7 @@ export default function Page() {
   </div>
 
   <div id="setupModal" className="modal-overlay">
-    <div className="modal-content" style={{textAlign: "center", fontFamily: "var(--font-maru), var(--font-family)"}}>
+    <div className="modal-content" style={{textAlign: "center"}}>
       <h2 id="setup-title" style={{margin: "0 0 10px", fontWeight: "900", fontSize: "20px"}}>おしごとの種類をえらんでね🎀</h2>
       <p id="setup-desc" style={{color: "var(--text-sub)", fontSize: "13px", fontWeight: "700", marginBottom: "24px"}}>あとからマイページでも変えられます</p>
       <select id="initialBusinessType" className="input-field" style={{marginBottom: "24px", fontWeight: "700", textAlign: "center", background: "#FFF", border: "1px solid var(--border-color)"}}>
@@ -1648,7 +1642,7 @@ export default function Page() {
 
         {/* 📝 今日のメモを追加 */}
         <div style={{textAlign: "center", margin: "12px 0"}}>
-          <div className="accordion-header" data-original-click={"toggleCreateDetails()"} id="createDetailsHeader" onClick={() => setIsCreateDetailsOpen((isOpen) => !isOpen)} style={{display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "8px 24px", background: "#FFF", border: "1px solid var(--border-color)", borderRadius: "24px", fontSize: "13px", fontWeight: "700", color: "var(--text-main)", boxShadow: "var(--shadow-sm)", cursor: "pointer", transform: "translateY(-20px)"}}>
+          <div className="accordion-header" data-original-click={"toggleCreateDetails()"} id="createDetailsHeader" onClick={() => setIsCreateDetailsOpen((isOpen) => !isOpen)} style={{display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "8px 24px", background: "#FFF", border: "1px solid var(--border-color)", borderRadius: "24px", fontSize: "12px", fontWeight: "700", color: "var(--text-main)", boxShadow: "var(--shadow-sm)", cursor: "pointer", transform: "translateY(-20px)"}}>
             📝 今日のメモを追加 <span style={{color: "var(--text-sub)", fontSize: "11px", fontWeight: "normal"}}>(任意)</span> <span id="createDetailsIcon">{isCreateDetailsOpen ? "▲" : "▼"}</span>
           </div>
         </div>

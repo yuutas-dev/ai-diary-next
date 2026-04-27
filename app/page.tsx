@@ -7,6 +7,9 @@ type CreateMode = "text" | "photo";
 type VisitStatus = "yes" | "no";
 type StyleTab = "cute" | "custom" | "neat";
 type DataView = "customer" | "history";
+type BusinessType = "cabaret" | "fuzoku" | "host";
+type ListFilter = "alert" | "all" | "vip" | "new" | "second" | "regular";
+type IconTheme = "glass" | "jewel" | "perfume" | "moon_star" | "flower" | "teacup" | "symbol";
 
 const LIFF_ID = "2009902106-W8zW5hJA";
 const DEFAULT_USER_ID = "test-user";
@@ -16,6 +19,7 @@ interface CustomerEntry {
   date?: string;
   text?: string;
   tags?: string[];
+  photoUrl?: string;
   type?: string;
   status?: string;
 }
@@ -60,6 +64,86 @@ function getCustomerInitial(name: string) {
   return name.trim().slice(0, 1) || "?";
 }
 
+function getStringHash(str: string) {
+  let hash = 0;
+  if (!str) return hash;
+  for (let i = 0; i < str.length; i += 1) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash &= hash;
+  }
+  return Math.abs(hash);
+}
+
+function getTargetDummyTag(businessType: BusinessType) {
+  if (businessType === "fuzoku") return "風俗客";
+  if (businessType === "host") return "ホスト客";
+  return "キャバ客";
+}
+
+function getDaysSinceLastVisit(memoStr?: string) {
+  const allMemos = parseMemoToJSON(memoStr);
+  const visitMemos = allMemos.filter((memo) => !memo.type || memo.type === "visit" || memo.status === "legacy");
+  if (visitMemos.length === 0) return null;
+  const lastMemo = visitMemos[visitMemos.length - 1];
+  if (!lastMemo?.date) return null;
+  const normalizedDate = String(lastMemo.date).replace(/\//g, "-");
+  const date = new Date(`${normalizedDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  const today = new Date();
+  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diffTime = todayDate.getTime() - date.getTime();
+  return diffTime < 0 ? 0 : Math.floor(diffTime / (1000 * 60 * 60 * 24));
+}
+
+function isAlertCustomer(customer: Customer) {
+  const stats = getCustomerStats(customer);
+  const days = getDaysSinceLastVisit(customer.memo);
+  if (days === null) return false;
+  if (stats.isVip) return days >= 14;
+  if (stats.count <= 2) return days >= 7;
+  return days >= 30;
+}
+
+function getAvatarSvgMarkup(name: string, iconTheme: IconTheme) {
+  const hash = getStringHash(name || "ゲスト");
+  const hue = hash % 360;
+  const liquidColor = `hsla(${hue}, 75%, 65%, 0.85)`;
+  const strokeColor = "#C6A682";
+  const themePaths: Record<IconTheme, string[]> = {
+    glass: [
+      `<path d="M10.5 7h3l-.6 8c0 .5-.4 1-.9 1s-.9-.5-.9-1z" fill="${liquidColor}"/><path d="M10 2h4l-1 13c0 1-1 2-1 2v4h3v1H9v-1h3v-4c0 0-1-1-1-2Z" stroke="${strokeColor}" stroke-width="1.2" stroke-linejoin="round"/>`,
+      `<path d="M6.5 12h11l-.6 8h-9.8z" fill="${liquidColor}"/><path d="M6 4h12l-1 17H7z" stroke="${strokeColor}" stroke-width="1.2" stroke-linejoin="round"/>`,
+      `<path d="M6 7h12L12 11.5z" fill="${liquidColor}"/><path d="M3 4h18L12 13v7h3v1H9v-1h3v-7z" stroke="${strokeColor}" stroke-width="1.2" stroke-linejoin="round"/>`
+    ],
+    jewel: [
+      `<path d="M12 21L2 9h20L12 21z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/><path d="M2 9l5-6h10l5 6" stroke="${strokeColor}" stroke-width="1.2"/>`,
+      `<path d="M12 22c5.5 0 10-4.5 10-10S12 2 12 2 2 6.5 2 12s4.5 10 10 10z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`,
+      `<path d="M7 2h10l5 5v10l-5 5H7l-5-5V7l5-5z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`
+    ],
+    perfume: [
+      `<path d="M7 12c0-2.8 2.2-5 5-5s5 2.2 5 5v8H7v-8z" fill="${liquidColor}"/><path d="M10 2h4v5h-4zM7 12c0-2.8 2.2-5 5-5s5 2.2 5 5v8H7v-8z" stroke="${strokeColor}" stroke-width="1.2"/>`,
+      `<path d="M6 10h12v11H6z" fill="${liquidColor}"/><path d="M10 3h4v4h-4zM6 10h12v11H6z" stroke="${strokeColor}" stroke-width="1.2"/>`
+    ],
+    moon_star: [
+      `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`,
+      `<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`
+    ],
+    flower: [
+      `<path d="M12 22V12M12 12c-4 0-6-4-6-8 4 0 6 4 6 8zm0 0c4 0 6-4 6-8-4 0-6 4-6 8z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`,
+      `<path d="M12 22s-8-4.5-8-12c0-4 4-6 8-8 4 2 8 4 8 8 0 7.5-8 12-8 12z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`
+    ],
+    teacup: [
+      `<path d="M4 8h12v6c0 3.3-2.7 6-6 6s-6-2.7-6-6V8z" fill="${liquidColor}"/><path d="M4 8h12v6c0 3.3-2.7 6-6 6s-6-2.7-6-6V8zM16 10h2c1.1 0 2 .9 2 2s-.9 2-2 2h-2M2 21h16" stroke="${strokeColor}" stroke-width="1.2"/>`
+    ],
+    symbol: [
+      `<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" fill="${liquidColor}" stroke="${strokeColor}" stroke-width="1.2"/>`
+    ]
+  };
+  const currentPaths = themePaths[iconTheme] || themePaths.glass;
+  const selectedPath = currentPaths[hash % currentPaths.length];
+  return `<div style="width: 100%; height: 100%; border-radius: 50%; background-color: #ffffff; border: 1px solid #f0e6e6; box-shadow: 0 2px 6px rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" fill="none" style="width: 55%; height: 55%;">${selectedPath}</svg></div>`;
+}
+
 function normalizeCustomer(customer: {
   id?: string | null;
   name?: string;
@@ -93,6 +177,11 @@ export default function Page() {
   const [isTagAccordionOpen, setIsTagAccordionOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<null | "style" | "help" | "hidden" | "photo" | "edit">(null);
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState("");
+  const [selectedBusinessType, setSelectedBusinessType] = useState<BusinessType>("cabaret");
+  const [iconTheme, setIconTheme] = useState<IconTheme>("glass");
+  const [currentListFilter, setCurrentListFilter] = useState<ListFilter>("all");
+  const [isCompactMode, setIsCompactMode] = useState(false);
+  const [customerSearchText, setCustomerSearchText] = useState("");
 
   const fetchCustomers = useCallback(async (targetUserId: string) => {
     setIsCustomersLoading(true);
@@ -162,8 +251,25 @@ export default function Page() {
     };
   }, [fetchCustomers]);
 
-  const quickAccessCustomers = customerData
-    .filter((customer) => !customer.tagsArray.includes("非表示"))
+  useEffect(() => {
+    const savedBusinessType = localStorage.getItem("businessType") as BusinessType | null;
+    const savedIconTheme = localStorage.getItem("iconTheme") as IconTheme | null;
+    if (savedBusinessType && ["cabaret", "fuzoku", "host"].includes(savedBusinessType)) {
+      setSelectedBusinessType(savedBusinessType);
+    }
+    if (savedIconTheme && ["glass", "jewel", "perfume", "moon_star", "flower", "teacup", "symbol"].includes(savedIconTheme)) {
+      setIconTheme(savedIconTheme);
+    }
+    setIsCompactMode(localStorage.getItem("isCompactMode") === "true");
+  }, []);
+
+  const targetDummyTag = getTargetDummyTag(selectedBusinessType);
+  const baseVisibleCustomers = customerData.filter((customer) => {
+    if (customer.tagsArray.includes("非表示")) return false;
+    if (customer.tagsArray.includes("ダミー") && !customer.tagsArray.includes(targetDummyTag)) return false;
+    return true;
+  });
+  const quickAccessCustomers = baseVisibleCustomers
     .sort((a, b) => {
       const statsA = getCustomerStats(a);
       const statsB = getCustomerStats(b);
@@ -173,7 +279,38 @@ export default function Page() {
     })
     .slice(0, 15);
 
-  const visibleCustomers = customerData.filter((customer) => !customer.tagsArray.includes("非表示"));
+  const filteredCustomers = baseVisibleCustomers
+    .filter((customer) => {
+      const normalizedSearchText = customerSearchText.trim().toLowerCase();
+      if (normalizedSearchText) {
+        const memos = parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
+        const matchName = customer.name.toLowerCase().includes(normalizedSearchText);
+        const matchMemo = memos.some((memo) => String(memo.text || "").toLowerCase().includes(normalizedSearchText) || (memo.tags || []).some((tag: string) => tag.toLowerCase().includes(normalizedSearchText)));
+        const matchTags = customer.tagsArray.some((tag) => tag.toLowerCase().includes(normalizedSearchText));
+        return matchName || matchMemo || matchTags;
+      }
+
+      const stats = getCustomerStats(customer);
+      if (currentListFilter === "alert") return isAlertCustomer(customer);
+      if (currentListFilter === "vip") return stats.isVip;
+      if (currentListFilter === "new") return stats.count === 1;
+      if (currentListFilter === "second") return stats.count === 2;
+      if (currentListFilter === "regular") return stats.count >= 3;
+      return true;
+    })
+    .sort((a, b) => {
+      const statsA = getCustomerStats(a);
+      const statsB = getCustomerStats(b);
+      if (currentListFilter === "alert") {
+        if (statsA.isVip && !statsB.isVip) return -1;
+        if (!statsA.isVip && statsB.isVip) return 1;
+        return (getDaysSinceLastVisit(b.memo) || 0) - (getDaysSinceLastVisit(a.memo) || 0);
+      }
+      if (statsA.isVip && !statsB.isVip) return -1;
+      if (!statsA.isVip && statsB.isVip) return 1;
+      return statsB.count - statsA.count;
+    });
+  const alertCount = baseVisibleCustomers.filter(isAlertCustomer).length;
   const selectedCustomer = selectedCustomerId
     ? customerData.find((customer) => customer.id === selectedCustomerId) || null
     : null;
@@ -207,6 +344,27 @@ export default function Page() {
   function getPastMemos(customer: Customer | null) {
     if (!customer) return [];
     return parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
+  }
+
+  function setListFilter(filterType: ListFilter) {
+    setCurrentListFilter((current) => current === filterType && filterType !== "all" ? "all" : filterType);
+  }
+
+  function setBusinessType(value: BusinessType) {
+    setSelectedBusinessType(value);
+    localStorage.setItem("businessType", value);
+  }
+
+  function setSelectedIconTheme(value: IconTheme) {
+    setIconTheme(value);
+    localStorage.setItem("iconTheme", value);
+  }
+
+  function toggleCompactMode() {
+    setIsCompactMode((current) => {
+      localStorage.setItem("isCompactMode", String(!current));
+      return !current;
+    });
   }
 
   return (
@@ -353,7 +511,7 @@ export default function Page() {
   </div>
 
   <div id="editCustomerModal" className="modal-overlay" style={{zIndex: "10006", display: activeModal === "edit" ? "flex" : "none"}} onClick={closeModal}>
-    <div className="modal-content" onClick={(event) => event.stopPropagation()}>
+    <div className="modal-content" style={{maxHeight: "85vh", overflowY: "auto"}} onClick={(event) => event.stopPropagation()}>
       <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}} id="modalTitle">顧客情報の編集</h2>
       <input type="hidden" id="editCustomerIndex" />
       <input type="hidden" id="isCreateMode" value="false" />
@@ -366,7 +524,13 @@ export default function Page() {
         <span>🏷️ 属性タグ</span><span id="tagAccordionIcon">{isTagAccordionOpen ? "▲" : "▼"}</span>
       </div>
       <div className={`accordion-content ${isTagAccordionOpen ? "open" : ""}`} id="tagAccordionContent">
-        <div id="editAttributeTagsArea" style={{display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px"}}></div>
+        <div id="editAttributeTagsArea" style={{display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px"}}>
+          {(selectedCustomer?.tagsArray || [])
+            .filter((tag) => tag !== "ダミー" && tag !== "非表示")
+            .map((tag) => (
+              <div key={tag} className="chip active" role="button" tabIndex={0} onClick={() => setNameInputValue(selectedCustomer?.name || "")}>{tag}</div>
+            ))}
+        </div>
         <div style={{display: "flex", gap: "8px"}}>
           <input type="text" id="customAttrInput" className="input-field" placeholder="オリジナルタグ..." style={{padding: "10px", fontSize: "12px", background: "#FFF", border: "1px solid var(--border-color)"}} />
           <button id="addAttrBtn" data-original-click={"addCustomAttributeTag()"} style={{background: "var(--primary)", color: "#FFF", border: "none", borderRadius: "10px", padding: "0 14px", fontWeight: "700", fontSize: "12px", whiteSpace: "nowrap"}}>追加</button>
@@ -374,7 +538,23 @@ export default function Page() {
       </div>
 
       <span className="label">📝 接客メモ</span>
-      <div className="memo-blocks-wrapper"><div id="editMemoBlocksArea"></div></div>
+      <div className="memo-blocks-wrapper"><div id="editMemoBlocksArea">
+        {getPastMemos(selectedCustomer).map((memo, index) => (
+          <div className="memo-block" key={`${memo.id || memo.date || "memo"}-${index}`} onClick={() => { setActiveModal(null); setActiveTab("create"); setNameInputValue(selectedCustomer?.name || ""); }}>
+            <div style={{display: "flex", justifyContent: "space-between", gap: "8px", marginBottom: "8px"}}>
+              <input type="date" className="input-field memo-date-input" value={String(memo.date || "")} readOnly />
+            </div>
+            <textarea className="input-field memo-text-input" value={String(memo.text || "")} readOnly style={{minHeight: "80px", marginBottom: "8px"}} />
+            {Array.isArray(memo.tags) && memo.tags.length > 0 ? (
+              <div style={{display: "flex", flexWrap: "wrap", gap: "4px"}}>
+                {memo.tags.map((tag: string) => (
+                  <span key={`${memo.id || memo.date || "memo"}-${tag}`} style={{background: "var(--primary-light)", color: "var(--primary)", fontSize: "10px", padding: "3px 8px", borderRadius: "12px", fontWeight: "700"}}>{tag}</span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div></div>
       <div className="add-memo-btn" id="addMemoBtn" data-original-click={"addNewMemoBlock()"}>＋ 日付とエピソードを追加</div>
 
       <div id="editActionArea" style={{display: "flex", gap: "10px"}}>
@@ -434,7 +614,7 @@ export default function Page() {
                     <div className="story-item" key={customer.id || customer.name} onClick={() => selectCustomer(customer)}>
                       <div className={ringClass}>
                         {topBadge}
-                        <div className="story-inner">{getCustomerInitial(customer.name)}</div>
+                        <div className="story-inner" dangerouslySetInnerHTML={{__html: getAvatarSvgMarkup(customer.name, iconTheme)}}></div>
                       </div>
                       <span className="story-name">{customer.name}</span>
                     </div>
@@ -527,7 +707,7 @@ export default function Page() {
 
           <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px"}}>
             <h2 style={{margin: "0", fontWeight: "700", fontSize: "18px"}}>顧客カルテ</h2>
-            <div className="view-toggle" data-original-click={"toggleCompactMode()"}><span id="viewIcon">🗂️ 詳細表示</span></div>
+            <div className="view-toggle" data-original-click={"toggleCompactMode()"} onClick={toggleCompactMode}><span id="viewIcon">{isCompactMode ? "📋 コンパクト" : "🗂️ 詳細表示"}</span></div>
           </div>
 
           <div style={{display: "flex", justifyContent: "center", marginBottom: "12px"}}>
@@ -542,37 +722,37 @@ export default function Page() {
           </div>
 
           <div id="searchContainer">
-            <input type="text" id="customerSearch" className="input-field" placeholder="名前、タグ、メモで検索..." data-original-input={"filterCustomerList()"} style={{paddingRight: "36px", background: "#FFF", border: "1px solid var(--border-color)"}} />
-            <div id="clearSearchBtn" style={{position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.05)", color: "var(--text-sub)", width: "22px", height: "22px", borderRadius: "50%", display: "none", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "bold", cursor: "pointer"}} data-original-click={"clearSearch()"}>×</div>
+            <input type="text" id="customerSearch" className="input-field" placeholder="名前、タグ、メモで検索..." data-original-input={"filterCustomerList()"} value={customerSearchText} onChange={(event) => setCustomerSearchText(event.target.value)} style={{paddingRight: "36px", background: "#FFF", border: "1px solid var(--border-color)"}} />
+            <div id="clearSearchBtn" style={{position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.05)", color: "var(--text-sub)", width: "22px", height: "22px", borderRadius: "50%", display: customerSearchText ? "flex" : "none", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "bold", cursor: "pointer"}} data-original-click={"clearSearch()"} onClick={() => setCustomerSearchText("")}>×</div>
           </div>
 
           <div className="filter-container" style={{paddingBottom: "10px", marginBottom: "0"}}>
-            <div className="filter-btn" id="filter-btn-alert" data-original-click={"setListFilter('alert')"}>
+            <div className={`filter-btn ${currentListFilter === "alert" ? "active-filter" : ""}`} id="filter-btn-alert" data-original-click={"setListFilter('alert')"} onClick={() => setListFilter("alert")}>
               ⚠️ 要連絡
-              <div id="alertBadge" style={{display: "none", position: "absolute", top: "-6px", right: "-6px", background: "var(--alert-text)", color: "#FFF", fontSize: "9px", fontWeight: "700", minWidth: "16px", height: "16px", borderRadius: "8px", padding: "0 4px", alignItems: "center", justifyContent: "center"}}></div>
+              <div id="alertBadge" style={{display: alertCount > 0 ? "flex" : "none", position: "absolute", top: "-6px", right: "-6px", background: "var(--alert-text)", color: "#FFF", fontSize: "9px", fontWeight: "700", minWidth: "16px", height: "16px", borderRadius: "8px", padding: "0 4px", alignItems: "center", justifyContent: "center"}}>{alertCount}</div>
             </div>
-            <div className="filter-btn active-filter" id="filter-btn-all" data-original-click={"setListFilter('all')"}>すべて</div>
-            <div className="filter-btn" id="filter-btn-vip" data-original-click={"setListFilter('vip')"}>💎 一軍</div>
-            <div className="filter-btn" id="filter-btn-new" data-original-click={"setListFilter('new')"}>🔰 新規</div>
-            <div className="filter-btn" id="filter-btn-second" data-original-click={"setListFilter('second')"}>✌️ 2回目</div>
-            <div className="filter-btn" id="filter-btn-regular" data-original-click={"setListFilter('regular')"}>👑 常連</div>
+            <div className={`filter-btn ${currentListFilter === "all" ? "active-filter" : ""}`} id="filter-btn-all" data-original-click={"setListFilter('all')"} onClick={() => setListFilter("all")}>すべて</div>
+            <div className={`filter-btn ${currentListFilter === "vip" ? "active-filter" : ""}`} id="filter-btn-vip" data-original-click={"setListFilter('vip')"} onClick={() => setListFilter("vip")}>💎 一軍</div>
+            <div className={`filter-btn ${currentListFilter === "new" ? "active-filter" : ""}`} id="filter-btn-new" data-original-click={"setListFilter('new')"} onClick={() => setListFilter("new")}>🔰 新規</div>
+            <div className={`filter-btn ${currentListFilter === "second" ? "active-filter" : ""}`} id="filter-btn-second" data-original-click={"setListFilter('second')"} onClick={() => setListFilter("second")}>✌️ 2回目</div>
+            <div className={`filter-btn ${currentListFilter === "regular" ? "active-filter" : ""}`} id="filter-btn-regular" data-original-click={"setListFilter('regular')"} onClick={() => setListFilter("regular")}>👑 常連</div>
           </div>
         </div>
 
-        <div id="customerListArea" style={{marginTop: "12px", position: "relative", zIndex: "1"}}>
+        <div id="customerListArea" className={isCompactMode ? "compact-view" : ""} style={{marginTop: "12px", position: "relative", zIndex: "1"}}>
           {isCustomersLoading ? (
             <>
               <div className="card skeleton" style={{height: "80px", marginBottom: "12px"}}></div>
               <div className="card skeleton" style={{height: "80px", marginBottom: "12px"}}></div>
             </>
-          ) : visibleCustomers.length === 0 ? (
+          ) : filteredCustomers.length === 0 ? (
             <div className="card" style={{textAlign: "center", padding: "28px 18px", color: "var(--text-sub)"}}>
               <div style={{fontSize: "28px", marginBottom: "8px"}}>🗂️</div>
               <div style={{fontWeight: "700", marginBottom: "6px"}}>顧客データがありません</div>
               <div style={{fontSize: "13px", lineHeight: "1.6"}}>顧客を追加するか、検索条件を見直してください。</div>
             </div>
           ) : (
-            visibleCustomers.map((customer) => {
+            filteredCustomers.map((customer) => {
               const stats = getCustomerStats(customer);
               let sysBadge = "";
               if (stats.count === 1) sysBadge = "🔰 新規";
@@ -597,6 +777,7 @@ export default function Page() {
                   <div className="card-inner" style={{display: "flex", justifyContent: "space-between", alignItems: "flex-start"}}>
                     <div style={{flex: "1", marginRight: "10px", overflow: "hidden", position: "relative"}}>
                       <div style={{display: "flex", alignItems: "flex-start"}}>
+                        <div style={{width: "28px", height: "28px", borderRadius: "50%", flexShrink: "0", marginRight: "6px", overflow: "hidden"}} dangerouslySetInnerHTML={{__html: getAvatarSvgMarkup(customer.name, iconTheme)}}></div>
                         {sysBadge ? <span style={{background: "var(--input-bg)", color: "var(--text-sub)", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", fontWeight: "700", border: "1px solid transparent", marginRight: "6px", display: "inline-block", flexShrink: "0", whiteSpace: "nowrap", height: "fit-content"}}>{sysBadge}</span> : null}
                         <b style={{fontSize: "15px", lineHeight: "1.4", wordBreak: "break-word", color: "var(--text-main)"}}>{customer.name}</b>
                       </div>
@@ -635,7 +816,7 @@ export default function Page() {
           </div>
           <div className="setting-item" style={{borderBottom: "1px solid var(--border-color)", paddingBottom: "16px", marginBottom: "16px"}}>
             <span>🏢 業態設定</span>
-            <select className="input-field" id="businessType" data-original-change={"updateChipsAndSave()"} style={{width: "140px", padding: "6px", fontWeight: "700", textAlign: "right", border: "none", background: "transparent"}}>
+            <select className="input-field" id="businessType" data-original-change={"updateChipsAndSave()"} value={selectedBusinessType} onChange={(event) => setBusinessType(event.target.value as BusinessType)} style={{width: "140px", padding: "6px", fontWeight: "700", textAlign: "right", border: "none", background: "transparent"}}>
               <option value="cabaret">キャバクラ</option>
               <option value="fuzoku">風俗・メンエス</option>
               <option value="host">ホスト</option>
@@ -645,7 +826,7 @@ export default function Page() {
             <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px"}}>
               <h3 className="section-title" style={{margin: "0"}}>🎨 アイコンテーマ</h3>
             </div>
-            <select id="icon-theme-select" className="input-field" style={{width: "100%"}}>
+            <select id="icon-theme-select" className="input-field" value={iconTheme} onChange={(event) => setSelectedIconTheme(event.target.value as IconTheme)} style={{width: "100%"}}>
               <option value="glass">🥂 グラス</option>
               <option value="jewel">💎 ジュエル</option>
               <option value="perfume">🧴 パフューム</option>

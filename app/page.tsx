@@ -1793,8 +1793,8 @@ export default function Page() {
         </div>
 
         {/* 💎 CTA 下部固定浮遊 */}
-        <div className="sticky-submit" style={{pointerEvents: "auto", zIndex: 1200}}>
-          <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"} onClick={generateDiary} disabled={isGenerating} style={{pointerEvents: "auto", position: "relative", zIndex: 1201}}>{isGenerating ? "執筆中..." : "✨ AIで作成する"}</button>
+        <div className="sticky-submit" style={{pointerEvents: "auto"}}>
+          <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"} onClick={generateDiary} disabled={isGenerating} style={{pointerEvents: "auto"}}>{isGenerating ? "執筆中..." : "✨ AIで作成する"}</button>
         </div>
 
       </div>

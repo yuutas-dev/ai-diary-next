@@ -100,6 +100,9 @@ body > div:first-of-type {
   min-height: 100%;
   min-height: 100dvh;
   min-height: 100svh;
+  height: 100dvh;
+  max-height: 100dvh;
+  max-height: 100svh;
   width: 100%;
   max-width: 100%;
   background-color: var(--bg-color) !important;
@@ -166,7 +169,12 @@ input[type="radio"].ui-state { display: none; }
   display: flex;
   flex-direction: column;
   height: 100dvh;
+  max-height: 100dvh;
+  max-height: 100svh;
+  min-height: 0;
   position: relative;
+  z-index: 1;
+  overflow: hidden;
 }
 
 .header-area {
@@ -200,8 +208,10 @@ input[type="radio"].ui-state { display: none; }
 
 .scroll-area {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   padding: 10px 16px 240px;
 }
 
@@ -976,7 +986,7 @@ input[type="radio"].ui-state { display: none; }
   transform: translateX(-50%);
   width: min(calc(100vw - 32px), 520px);
   bottom: calc(env(safe-area-inset-bottom, 0px) + 82px);
-  z-index: 850;
+  z-index: 2100;
   padding: 0;
   pointer-events: none; /* ラッパーのクリック判定を消し、スクロールの邪魔をしないようにする */
   animation: waitForLiff 0.4s step-end forwards;
@@ -1025,7 +1035,7 @@ input[type="radio"].ui-state { display: none; }
   bottom: 0;
   left: 0;
   width: 100%;
-  z-index: 1000;
+  z-index: 2000;
   animation: waitForLiff 0.4s step-end forwards;
 }
 
@@ -1034,7 +1044,7 @@ input[type="radio"].ui-state { display: none; }
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 800;
+  z-index: 2000;
   pointer-events: none;
 }
 
@@ -1072,7 +1082,7 @@ input[type="radio"].ui-state { display: none; }
   box-shadow: var(--shadow-float);
   border: 1px solid rgba(255,255,255,0.8);
   cursor: pointer;
-  z-index: 1000;
+  z-index: 2200;
   transition: 0.2s;
 }
 

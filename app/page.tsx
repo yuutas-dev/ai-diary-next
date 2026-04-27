@@ -511,6 +511,7 @@ export default function Page() {
       return statsB.count - statsA.count;
     });
   const alertCount = baseVisibleCustomers.filter(isAlertCustomer).length;
+  const hiddenCustomers = customerData.filter((customer) => customer.tagsArray.includes("非表示"));
   const selectedCustomer = selectedCustomerId
     ? customerData.find((customer) => customer.id === selectedCustomerId) || null
     : null;
@@ -684,6 +685,15 @@ export default function Page() {
       updateCustomerTagsOptimistically(customerId, nextTags);
       void persistCustomerTags(customer, nextTags, previousTags);
     }, 220);
+  }
+
+  function restoreHiddenCustomer(customer: Customer) {
+    if (!customer.id) return;
+    const previousTags = customer.tagsArray;
+    const nextTags = previousTags.filter((tag) => tag !== "非表示");
+    updateCustomerTagsOptimistically(customer.id, nextTags);
+    showActionToast("🟢 非表示を解除しました");
+    void persistCustomerTags(customer, nextTags, previousTags);
   }
 
   function getPastMemos(customer: Customer | null) {
@@ -1195,10 +1205,39 @@ export default function Page() {
   </div>
 
   <div id="hiddenListModal" className="modal-overlay" style={{zIndex: "10005", display: activeModal === "hidden" ? "flex" : "none"}} onClick={closeModal}>
-    <div className="modal-content" style={{maxHeight: "85vh", display: "flex", flexDirection: "column"}} onClick={(event) => event.stopPropagation()}>
+    <div className="modal-content" style={{maxHeight: "85dvh", display: "flex", flexDirection: "column"}} onClick={(event) => event.stopPropagation()}>
       <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}}>💤 非表示にした顧客</h2>
       <p style={{textAlign: "center", fontSize: "11px", color: "var(--text-sub)", marginTop: "-10px", marginBottom: "16px", fontWeight: "700"}}>カードを長押しして記録を確認</p>
-      <div id="hiddenCustomersArea" style={{overflowY: "auto", flex: "1", paddingBottom: "20px", margin: "-10px"}}></div>
+      <div id="hiddenCustomersArea" style={{overflowY: "auto", flex: "1", paddingBottom: "20px", margin: "-10px"}}>
+        {hiddenCustomers.length === 0 ? (
+          <p style={{textAlign: "center", color: "var(--text-sub)", marginTop: "40px", fontWeight: "700"}}>非表示の顧客はいません</p>
+        ) : hiddenCustomers.map((customer) => {
+          const memos = parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
+          const lastMemo = memos[memos.length - 1];
+          const previewMemo = lastMemo?.text ? `${String(lastMemo.text).substring(0, 30)}...` : "メモなし";
+          const visibleTags = customer.tagsArray.filter((tag) => tag !== "ダミー" && tag !== "非表示" && tag !== "一軍固定");
+          return (
+            <div className="card compact-view" key={customer.id || customer.name} onClick={() => openEditCustomer(customer)} style={{padding: "12px 14px", marginBottom: "10px", boxShadow: "var(--shadow-sm)", cursor: "pointer"}}>
+              <div style={{display: "flex", flexDirection: "column"}}>
+                <div style={{display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "center", marginBottom: "4px"}}>
+                  <b style={{fontSize: "15px", color: "var(--text-main)"}}>{customer.name}</b>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); restoreHiddenCustomer(customer); }} style={{background: "#F0FDF4", color: "#16A34A", border: "none", padding: "6px 10px", borderRadius: "999px", fontWeight: "700", fontSize: "11px", whiteSpace: "nowrap"}}>🟢 戻す</button>
+                </div>
+                <div className="card-tags" style={{marginTop: "2px", marginBottom: "4px"}}>
+                  {visibleTags.length > 0 ? (
+                    <div style={{display: "flex", gap: "4px", flexWrap: "wrap"}}>
+                      {visibleTags.map((tag) => (
+                        <span key={`${customer.id}-${tag}`} style={{background: "var(--primary-light)", color: "var(--primary)", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", fontWeight: "700"}}>#{tag}</span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                <div style={{fontSize: "12px", color: "var(--text-sub)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>{previewMemo}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
       <button data-original-click={"closeHiddenListModal()"} onClick={closeModal} style={{width: "100%", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", marginTop: "20px"}}>閉じる</button>
     </div>
   </div>

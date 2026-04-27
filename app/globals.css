@@ -1,3 +1,6 @@
+@config "../tailwind.config.ts";
+@import "tailwindcss";
+
 :root {
   /* 💎 Clean & Soft Neutral Base */
   --bg-color: #F8F7F5; 
@@ -29,8 +32,8 @@
   --shadow-md: 0 6px 20px rgba(67, 62, 60, 0.06);
   --shadow-float: 0 8px 24px rgba(223, 138, 155, 0.25);
   
-  /* 💎 Typography (default: Zen Maru Gothic via next/font --font-maru) */
-  --font-family: var(--font-maru), -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial, sans-serif;
+  /* default: Zen Maru Gothic (next/font → --font-zen-maru on <body>) */
+  --font-family: var(--font-zen-maru), -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial, sans-serif;
   --bottom-nav-height: 66px;
   --cta-gap-from-nav: 10px;
 }
@@ -44,6 +47,10 @@ body[data-app-theme="blue"] {
 
 body[data-app-font="standard"] {
   --font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial, sans-serif;
+}
+
+body[data-app-font="maru"] {
+  --font-family: var(--font-zen-maru), -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial, sans-serif;
 }
 
 body[data-app-font="mincho"] {
@@ -89,7 +96,7 @@ body {
   overflow: hidden;
   background: var(--bg-color);
   color: var(--text-main);
-  font-family: var(--font-family);
+  font-family: var(--font-family) !important;
   -webkit-tap-highlight-color: transparent;
   line-height: 1.6;
 }

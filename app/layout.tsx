@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Serif_JP, Zen_Maru_Gothic } from "next/font/google";
 import "./globals.css";
 
-const zenMaruGothic = Zen_Maru_Gothic({
+const zenMaru = Zen_Maru_Gothic({
+  weight: ["400", "500", "700"],
   subsets: ["latin"],
-  weight: ["400", "500", "700", "900"],
-  variable: "--font-maru",
+  variable: "--font-zen-maru",
   display: "swap",
 });
 
@@ -35,7 +35,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <body className={`${zenMaruGothic.variable} ${notoSerifJp.variable}`}>{children}</body>
+      <body
+        className={`${zenMaru.className} ${zenMaru.variable} ${notoSerifJp.variable} font-sans antialiased`}
+      >
+        {children}
+      </body>
     </html>
   );
 }

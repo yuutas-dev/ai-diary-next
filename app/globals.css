@@ -35,6 +35,8 @@
   /* default: Zen Maru Gothic (next/font → --font-zen-maru on <body>) */
   --font-family: var(--font-zen-maru), -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial, sans-serif;
   --bottom-nav-height: 66px;
+  /* 画面最下端からタブを上げる量（index(2).html 時点の全幅タブ＋下余白の見え方に合わせる） */
+  --bottom-tab-lift: 12px;
   --cta-gap-from-nav: 10px;
 }
 
@@ -212,7 +214,7 @@ input[type="radio"].ui-state { display: none; }
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: 10px 16px 240px;
+  padding: 10px 16px calc(240px + var(--bottom-tab-lift, 0px));
 }
 
 .mode-photo-ui { display: none; }
@@ -985,7 +987,7 @@ input[type="radio"].ui-state { display: none; }
   left: 50%;
   transform: translateX(-50%);
   width: min(calc(100vw - 32px), 520px);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 82px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 82px + var(--bottom-tab-lift, 0px));
   z-index: 2100;
   padding: 0;
   pointer-events: none; /* ラッパーのクリック判定を消し、スクロールの邪魔をしないようにする */
@@ -1032,7 +1034,7 @@ input[type="radio"].ui-state { display: none; }
   border-top: 1px solid var(--border-color);
   pointer-events: auto;
   position: fixed;
-  bottom: 0;
+  bottom: var(--bottom-tab-lift, 0px);
   left: 0;
   width: 100%;
   z-index: 2000;
@@ -1043,7 +1045,7 @@ input[type="radio"].ui-state { display: none; }
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--bottom-tab-lift, 0px);
   z-index: 2000;
   pointer-events: none;
 }
@@ -1067,7 +1069,7 @@ input[type="radio"].ui-state { display: none; }
 
 .fab {
   position: fixed;
-  bottom: calc(env(safe-area-inset-bottom, 12px) + 90px);
+  bottom: calc(env(safe-area-inset-bottom, 12px) + 90px + var(--bottom-tab-lift, 0px));
   right: 20px;
   width: 56px;
   height: 56px;
@@ -1454,7 +1456,7 @@ input[type="radio"].ui-state { display: none; }
 .create-details-half-modal {
   width: min(calc(100vw - 32px), 520px);
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--bottom-nav-height) + 120px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--bottom-nav-height) + 120px + var(--bottom-tab-lift, 0px));
   border-radius: 20px;
   padding: 12px 16px max(20px, env(safe-area-inset-bottom, 0px));
   margin-bottom: 0;
@@ -1473,7 +1475,7 @@ input[type="radio"].ui-state { display: none; }
 }
 
 .create-details-half-modal.open {
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--bottom-nav-height) + 120px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--bottom-nav-height) + 120px + var(--bottom-tab-lift, 0px));
   opacity: 1;
   pointer-events: auto;
   transform: translateX(-50%) translateY(0) scale(1);
@@ -1812,7 +1814,7 @@ input:checked + .slider:before { transform: translateX(18px); }
 
 #cuteToast {
   position: fixed;
-  bottom: calc(env(safe-area-inset-bottom, 12px) + 80px);
+  bottom: calc(env(safe-area-inset-bottom, 12px) + 80px + var(--bottom-tab-lift, 0px));
   right: -250px;
   background: #FFF;
   padding: 10px 18px;

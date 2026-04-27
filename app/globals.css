@@ -30,57 +30,20 @@
   --shadow-float: 0 8px 24px rgba(223, 138, 155, 0.25);
   
   /* 💎 Typography */
-  --font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial, sans-serif;
+  --font-family: var(--font-maru), -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial, sans-serif;
   --bottom-nav-height: 66px;
   --cta-gap-from-nav: 10px;
 }
 
-body[data-app-theme="noir"] {
-  --bg-color: #161217;
-  --card-bg: #211a22;
-  --input-bg: #2d2430;
-  --header-bg: rgba(22, 18, 23, 0.86);
-  --text-main: #fff4f8;
-  --text-sub: #c8aeb9;
-  --text-muted: #836c77;
-  --primary: #ff6fa8;
-  --primary-light: rgba(255, 111, 168, 0.16);
-  --primary-gradient: linear-gradient(135deg, #ff8fbe, #ff4f9b);
-  --border-color: rgba(255, 255, 255, 0.1);
-  --alert-bg: rgba(255, 107, 107, 0.18);
-  --alert-text: #ff8f9a;
-  --vip-bg: rgba(255, 214, 107, 0.14);
-  --vip-border: #d7a84f;
-  --sales-bg: rgba(106, 150, 210, 0.16);
-  --sales-text: #9fc5ff;
-  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.22);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.28);
-  --shadow-float: 0 10px 28px rgba(255, 79, 155, 0.24);
+body[data-app-theme="blue"] {
+  --primary: #7DB9DE;
+  --primary-light: #EEF8FF;
+  --primary-gradient: linear-gradient(135deg, #A7D8F5, #7DB9DE);
+  --shadow-float: 0 8px 24px rgba(125, 185, 222, 0.25);
 }
 
-body[data-app-theme="chic"] {
-  --bg-color: #f5f1e9;
-  --card-bg: #fffdf8;
-  --input-bg: #eee8dc;
-  --header-bg: rgba(255, 253, 248, 0.88);
-  --text-main: #27231f;
-  --text-sub: #746b5f;
-  --text-muted: #aaa092;
-  --primary: #a9823f;
-  --primary-light: #f3ead9;
-  --primary-gradient: linear-gradient(135deg, #d5b16a, #6e604d);
-  --border-color: #e4d8c4;
-  --alert-bg: #fff0eb;
-  --alert-text: #b45a44;
-  --vip-bg: #fff8e7;
-  --vip-border: #c8a04f;
-  --sales-bg: #eef2f3;
-  --sales-text: #667b86;
-  --shadow-float: 0 8px 24px rgba(169, 130, 63, 0.24);
-}
-
-body[data-app-font="maru"] {
-  --font-family: var(--font-maru), -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+body[data-app-font="standard"] {
+  --font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Arial, sans-serif;
 }
 
 body[data-app-font="mincho"] {
@@ -100,7 +63,7 @@ html, body {
   padding: 0;
   overflow: hidden;
   overscroll-behavior-y: none;
-  background-color: #FDF2F8;
+  background-color: #F8F7F5;
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -441,19 +404,6 @@ input[type="radio"].ui-state { display: none; }
   height: fit-content;
   position: relative;
   box-shadow: var(--shadow-sm);
-}
-
-body[data-app-theme="noir"] .input-field,
-body[data-app-theme="chic"] .input-field {
-  background: var(--card-bg) !important;
-  border-color: var(--border-color) !important;
-  color: var(--text-main) !important;
-}
-
-body[data-app-theme="noir"] select.input-field option,
-body[data-app-theme="chic"] select.input-field option {
-  background: var(--card-bg);
-  color: var(--text-main);
 }
 
 .filter-btn:active {
@@ -1282,7 +1232,7 @@ body[data-app-theme="chic"] select.input-field option {
 }
 
 .app-guide-footer {
-  background: linear-gradient(135deg, var(--primary), #e99aa4);
+  background: var(--primary-gradient);
   color: #fff;
   border-radius: 20px;
   padding: 14px;
@@ -1613,7 +1563,7 @@ textarea.input-field {
 
 .settings-option-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 8px;
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 
 type ActiveTab = "create" | "data" | "settings";
 type CreateMode = "text" | "photo";
@@ -10,6 +11,19 @@ type DataView = "customer" | "history";
 type BusinessType = "cabaret" | "fuzoku" | "host";
 type ListFilter = "alert" | "all" | "vip" | "new" | "second" | "regular";
 type IconTheme = "glass" | "jewel" | "perfume" | "moon_star" | "flower" | "teacup" | "symbol";
+
+interface MemoBlock {
+  id: string;
+  entryId?: string | null;
+  date: string;
+  text: string;
+  tags: string[];
+  photoUrl?: string;
+  type: string;
+  status: string;
+  isExpanded: boolean;
+  isReadOnly: boolean;
+}
 
 const LIFF_ID = "2009902106-W8zW5hJA";
 const DEFAULT_USER_ID = "test-user";
@@ -32,6 +46,24 @@ interface Customer {
   entries: CustomerEntry[];
   tagsArray: string[];
 }
+
+const INDUSTRY_MOOD_CONFIGS: Record<BusinessType, string[]> = {
+  cabaret: ["💖 大好き", "✨ 特別な存在", "🥂 一緒に飲みたい", "🥺 早く会いたい", "🤫 ナイショの話", "💕 ずっと一緒にいたい", "🧸 癒やされる", "🍼 頼りにしてる", "💋 ドキドキ", "👗 可愛くなりたい", "🥺 寂しいな", "📱 連絡きて嬉しい", "🖤 独占してほしい", "🎉 楽しすぎた！", "💖 いつもありがとう"],
+  fuzoku: ["💖 あなたが特別", "🧸 癒やされた", "🤤 余韻", "💕 相性良すぎ", "🥺 一緒にいたかった", "🤫 2人の秘密", "💋 ドキドキした", "🍼 甘えちゃった", "🖤 独占したい", "🥺 早く会いたい", "✨ 楽しかった", "📱 連絡待ってる", "🥺 依存しちゃいそう", "💖 感謝", "💤 夢で会いたい"],
+  host: ["👑 お前が一番", "🖤 誰にも渡さない", "🐶 もっと甘やかして", "🥺 会いたくて狂いそう", "✨ 特別なお姫様", "🥂 一緒に酔いたい", "🍼 お前しか無理", "🤫 2人だけの内緒", "💕 愛してる", "🥺 今すぐ会いに来て", "📱 返事待ってる", "💪 絶対ナンバーワン", "🧸 一緒にいると安心", "🎉 最高に楽しかった", "💖 いつも感謝"],
+};
+
+const INDUSTRY_ATTRIBUTE_TAGS: Record<BusinessType, string[]> = {
+  cabaret: ["太客", "細客", "常連", "新規", "痛客", "お酒好き", "下戸", "金持ち", "ケチ", "既婚", "独身", "おじさん", "若者", "イケメン", "優しい"],
+  fuzoku: ["M気質", "S気質", "常連", "新規", "キモい", "優しい", "痛客", "匂いキツめ", "マナー良", "本番要求", "おじさん", "若者", "イケメン", "デブ", "ハゲ"],
+  host: ["太客", "細客", "エース", "痛客", "常連", "新規", "メンヘラ", "金持ち", "ケチ", "酒癖悪い", "マナー良", "独身", "既婚", "若者", "おばさん"],
+};
+
+const INDUSTRY_FACT_CONFIGS: Record<BusinessType, string[]> = {
+  cabaret: ["✨ 本指名", "🥂 同伴", "🍾 シャンパン", "👗 新衣装", "💇‍♀️ ヘアメ", "🍷 ワイン", "🎤 カラオケ", "🍰 アフター", "🎁 プレゼント"],
+  fuzoku: ["✨ 本指名", "🏩 ロング", "🔞 濃厚", "🧴 メンエス", "💋 キス", "🛁 シャワー", "🧼 泡泡", "💆‍♂️ マッサージ", "🦶 足ツボ", "🛌 延長"],
+  host: ["🍾 オリシャン", "🎤 ラスソン", "🥂 アフター", "💸 エース", "👑 枕", "💸 痛客", "🍾 タワー", "🍷 高額ボトル", "🌟 Ｎｏ.１"],
+};
 
 function parseMemoToJSON(memoStr?: string) {
   if (!memoStr) return [];
@@ -62,6 +94,26 @@ function getCustomerStats(customer: Customer) {
 
 function getCustomerInitial(name: string) {
   return name.trim().slice(0, 1) || "?";
+}
+
+function getTodayString() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function createMemoBlock(entry?: Partial<CustomerEntry>, isExpanded = false): MemoBlock {
+  return {
+    id: `memo-block-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    entryId: entry?.id || null,
+    date: entry?.date || getTodayString(),
+    text: entry?.text || "",
+    tags: Array.isArray(entry?.tags) ? entry.tags : [],
+    photoUrl: entry?.photoUrl || "",
+    type: entry?.type || "visit",
+    status: entry?.status || "legacy",
+    isExpanded,
+    isReadOnly: entry?.type === "sales",
+  };
 }
 
 function getStringHash(str: string) {
@@ -182,6 +234,13 @@ export default function Page() {
   const [currentListFilter, setCurrentListFilter] = useState<ListFilter>("all");
   const [isCompactMode, setIsCompactMode] = useState(false);
   const [customerSearchText, setCustomerSearchText] = useState("");
+  const [selectedMoodTags, setSelectedMoodTags] = useState<string[]>([]);
+  const [selectedFactTags, setSelectedFactTags] = useState<string[]>([]);
+  const [customFactTags, setCustomFactTags] = useState<string[]>([]);
+  const [customFactTagInput, setCustomFactTagInput] = useState("");
+  const [editAttributeTags, setEditAttributeTags] = useState<string[]>([]);
+  const [customAttrInput, setCustomAttrInput] = useState("");
+  const [memoBlocks, setMemoBlocks] = useState<MemoBlock[]>([]);
 
   const fetchCustomers = useCallback(async (targetUserId: string) => {
     setIsCustomersLoading(true);
@@ -314,6 +373,13 @@ export default function Page() {
   const selectedCustomer = selectedCustomerId
     ? customerData.find((customer) => customer.id === selectedCustomerId) || null
     : null;
+  const moodTags = INDUSTRY_MOOD_CONFIGS[selectedBusinessType] || INDUSTRY_MOOD_CONFIGS.cabaret;
+  const factTags = Array.from(new Set([...customFactTags, ...(INDUSTRY_FACT_CONFIGS[selectedBusinessType] || INDUSTRY_FACT_CONFIGS.cabaret)]));
+  const editAttributeOptions = Array.from(new Set([
+    ...(INDUSTRY_ATTRIBUTE_TAGS[selectedBusinessType] || INDUSTRY_ATTRIBUTE_TAGS.cabaret),
+    ...(selectedCustomer?.tagsArray || []),
+    ...editAttributeTags,
+  ])).filter((tag) => tag !== "ダミー" && tag !== "非表示" && tag !== "一軍固定");
 
   function closeModal() {
     setActiveModal(null);
@@ -346,6 +412,20 @@ export default function Page() {
     return parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
   }
 
+  function toggleStringValue(value: string, setter: Dispatch<SetStateAction<string[]>>) {
+    setter((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
+  }
+
+  function openEditCustomer(customer: Customer) {
+    const memos = getPastMemos(customer);
+    setSelectedCustomerId(customer.id);
+    setNameInputValue(customer.name);
+    setEditAttributeTags(customer.tagsArray.filter((tag) => tag !== "非表示" && tag !== "一軍固定" && tag !== "ダミー"));
+    setMemoBlocks(memos.length > 0 ? memos.map((memo) => createMemoBlock(memo, false)) : [createMemoBlock({}, true)]);
+    setIsTagAccordionOpen(true);
+    setActiveModal("edit");
+  }
+
   function setListFilter(filterType: ListFilter) {
     setCurrentListFilter((current) => current === filterType && filterType !== "all" ? "all" : filterType);
   }
@@ -365,6 +445,33 @@ export default function Page() {
       localStorage.setItem("isCompactMode", String(!current));
       return !current;
     });
+  }
+
+  function addCustomFactTag() {
+    const newTag = customFactTagInput.trim();
+    if (!newTag) return;
+    setCustomFactTags((current) => current.includes(newTag) ? current : [newTag, ...current]);
+    setSelectedFactTags((current) => current.includes(newTag) ? current : [...current, newTag]);
+    setCustomFactTagInput("");
+  }
+
+  function addCustomAttributeTag() {
+    const newTag = customAttrInput.trim();
+    if (!newTag) return;
+    setEditAttributeTags((current) => current.includes(newTag) ? current : [...current, newTag]);
+    setCustomAttrInput("");
+  }
+
+  function updateMemoBlock(id: string, patch: Partial<MemoBlock>) {
+    setMemoBlocks((current) => current.map((block) => block.id === id ? { ...block, ...patch } : block));
+  }
+
+  function addNewMemoBlock() {
+    setMemoBlocks((current) => [...current, createMemoBlock({}, true)]);
+  }
+
+  function deleteMemoBlock(id: string) {
+    setMemoBlocks((current) => current.filter((block) => block.id !== id));
   }
 
   return (
@@ -421,14 +528,36 @@ export default function Page() {
           <button type="button" data-original-click={"saveMoodPreset()"} style={{background: "var(--primary-light)", border: "none", color: "var(--primary)", fontSize: "10px", padding: "4px 8px", borderRadius: "8px", fontWeight: "700", cursor: "pointer"}}>保存</button>
         </div>
       </div>
-      <div className="tags-scroll-container create-details-tags-grid" id="moodTagsArea" style={{marginBottom: "16px"}}></div>
+      <div className="tags-scroll-container create-details-tags-grid overflow-x-auto no-scrollbar" id="moodTagsArea" style={{marginBottom: "16px"}}>
+        <div className="tag-row">
+          {moodTags.filter((_, index) => index % 2 === 0).map((tag) => (
+            <div key={tag} className={`chip${selectedMoodTags.includes(tag) ? " selected-mood-chip active" : ""}`} onClick={() => toggleStringValue(tag, setSelectedMoodTags)}>{tag}</div>
+          ))}
+        </div>
+        <div className="tag-row">
+          {moodTags.filter((_, index) => index % 2 === 1).map((tag) => (
+            <div key={tag} className={`chip${selectedMoodTags.includes(tag) ? " selected-mood-chip active" : ""}`} onClick={() => toggleStringValue(tag, setSelectedMoodTags)}>{tag}</div>
+          ))}
+        </div>
+      </div>
 
       {/* 事実タグ */}
       <span className="label">📝 今日の出来事（トピック）</span>
-      <div className="tags-scroll-container create-details-tags-grid" id="factTagsArea"></div>
+      <div className="tags-scroll-container create-details-tags-grid overflow-x-auto no-scrollbar" id="factTagsArea">
+        <div className="tag-row">
+          {factTags.filter((_, index) => index % 2 === 0).map((tag) => (
+            <div key={tag} className={`chip${selectedFactTags.includes(tag) ? " selected-fact-chip active" : ""}`} onClick={() => toggleStringValue(tag, setSelectedFactTags)}>{tag}</div>
+          ))}
+        </div>
+        <div className="tag-row">
+          {factTags.filter((_, index) => index % 2 === 1).map((tag) => (
+            <div key={tag} className={`chip${selectedFactTags.includes(tag) ? " selected-fact-chip active" : ""}`} onClick={() => toggleStringValue(tag, setSelectedFactTags)}>{tag}</div>
+          ))}
+        </div>
+      </div>
       <div style={{marginTop: "8px", display: "flex", gap: "8px", marginBottom: "16px"}}>
-        <input type="text" id="customFactTagInput" placeholder="＋オリジナル出来事追加" className="input-field" style={{padding: "10px", fontSize: "12px", background: "var(--input-bg)", border: "1px solid transparent", flex: "1"}} />
-        <button data-original-click={"addCustomFactTag()"} style={{background: "var(--text-sub)", color: "#fff", border: "none", padding: "0 14px", borderRadius: "10px", fontWeight: "700", fontSize: "12px", cursor: "pointer"}}>追加</button>
+        <input type="text" id="customFactTagInput" placeholder="＋オリジナル出来事追加" className="input-field" value={customFactTagInput} onChange={(event) => setCustomFactTagInput(event.target.value)} style={{padding: "10px", fontSize: "12px", background: "var(--input-bg)", border: "1px solid transparent", flex: "1"}} />
+        <button data-original-click={"addCustomFactTag()"} onClick={addCustomFactTag} style={{background: "var(--text-sub)", color: "#fff", border: "none", padding: "0 14px", borderRadius: "10px", fontWeight: "700", fontSize: "12px", cursor: "pointer"}}>追加</button>
       </div>
 
       {/* 本文 */}
@@ -524,38 +653,75 @@ export default function Page() {
         <span>🏷️ 属性タグ</span><span id="tagAccordionIcon">{isTagAccordionOpen ? "▲" : "▼"}</span>
       </div>
       <div className={`accordion-content ${isTagAccordionOpen ? "open" : ""}`} id="tagAccordionContent">
-        <div id="editAttributeTagsArea" style={{display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px"}}>
-          {(selectedCustomer?.tagsArray || [])
-            .filter((tag) => tag !== "ダミー" && tag !== "非表示")
-            .map((tag) => (
-              <div key={tag} className="chip active" role="button" tabIndex={0} onClick={() => setNameInputValue(selectedCustomer?.name || "")}>{tag}</div>
-            ))}
+        <div id="editAttributeTagsArea" className="overflow-y-auto" style={{display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px", maxHeight: "140px", overflowY: "auto"}}>
+          {editAttributeOptions.map((tag) => {
+            const isSelected = editAttributeTags.includes(tag);
+            return (
+              <div key={tag} className={`chip${isSelected ? " active" : ""}`} role="button" tabIndex={0} onClick={() => toggleStringValue(tag, setEditAttributeTags)} style={{background: isSelected ? "var(--primary)" : "#FFF", color: isSelected ? "#FFF" : "var(--text-main)", border: isSelected ? "1px solid transparent" : "1px solid var(--border-color)", boxShadow: isSelected ? "var(--shadow-sm)" : "none"}}>
+                {tag}
+              </div>
+            );
+          })}
         </div>
         <div style={{display: "flex", gap: "8px"}}>
-          <input type="text" id="customAttrInput" className="input-field" placeholder="オリジナルタグ..." style={{padding: "10px", fontSize: "12px", background: "#FFF", border: "1px solid var(--border-color)"}} />
-          <button id="addAttrBtn" data-original-click={"addCustomAttributeTag()"} style={{background: "var(--primary)", color: "#FFF", border: "none", borderRadius: "10px", padding: "0 14px", fontWeight: "700", fontSize: "12px", whiteSpace: "nowrap"}}>追加</button>
+          <input type="text" id="customAttrInput" className="input-field" placeholder="オリジナルタグ..." value={customAttrInput} onChange={(event) => setCustomAttrInput(event.target.value)} style={{padding: "10px", fontSize: "12px", background: "#FFF", border: "1px solid var(--border-color)"}} />
+          <button id="addAttrBtn" data-original-click={"addCustomAttributeTag()"} onClick={addCustomAttributeTag} style={{background: "var(--primary)", color: "#FFF", border: "none", borderRadius: "10px", padding: "0 14px", fontWeight: "700", fontSize: "12px", whiteSpace: "nowrap"}}>追加</button>
         </div>
       </div>
 
       <span className="label">📝 接客メモ</span>
       <div className="memo-blocks-wrapper"><div id="editMemoBlocksArea">
-        {getPastMemos(selectedCustomer).map((memo, index) => (
-          <div className="memo-block" key={`${memo.id || memo.date || "memo"}-${index}`} onClick={() => { setActiveModal(null); setActiveTab("create"); setNameInputValue(selectedCustomer?.name || ""); }}>
-            <div style={{display: "flex", justifyContent: "space-between", gap: "8px", marginBottom: "8px"}}>
-              <input type="date" className="input-field memo-date-input" value={String(memo.date || "")} readOnly />
-            </div>
-            <textarea className="input-field memo-text-input" value={String(memo.text || "")} readOnly style={{minHeight: "80px", marginBottom: "8px"}} />
-            {Array.isArray(memo.tags) && memo.tags.length > 0 ? (
-              <div style={{display: "flex", flexWrap: "wrap", gap: "4px"}}>
-                {memo.tags.map((tag: string) => (
-                  <span key={`${memo.id || memo.date || "memo"}-${tag}`} style={{background: "var(--primary-light)", color: "var(--primary)", fontSize: "10px", padding: "3px 8px", borderRadius: "12px", fontWeight: "700"}}>{tag}</span>
-                ))}
+        {memoBlocks.length === 0 ? (
+          <p style={{textAlign: "center", color: "var(--text-muted)", fontWeight: "700", padding: "20px"}}>過去の記録がありません</p>
+        ) : memoBlocks.map((block) => {
+          const tagsText = block.tags.length > 0 ? block.tags.map((tag) => `#${tag}`).join(" ") : "タグなし";
+          const previewText = block.text ? block.text.split("\n")[0] : "本文なし";
+          const typeBadge = block.type === "sales" ? <span style={{fontSize: "10px", background: "var(--sales-bg)", color: "var(--sales-text)", padding: "2px 6px", borderRadius: "4px", fontWeight: "700", marginRight: "4px"}}>📱営業</span> : null;
+          return (
+            <div className={`memo-block${block.isExpanded ? " expanded" : ""}`} id={block.id} key={block.id} data-entry-id={block.entryId || ""} data-readonly={block.isReadOnly} data-type={block.type} data-status={block.status} data-photo={block.photoUrl || ""}>
+              <div className="memo-summary" onClick={() => updateMemoBlock(block.id, { isExpanded: true })} style={{cursor: "pointer", display: block.isExpanded ? "none" : "block", padding: "4px"}}>
+                <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px"}}>
+                  <div className="memo-date-text" style={{fontSize: "12px", fontWeight: "700", color: "var(--text-sub)"}}>{typeBadge}{block.date}</div>
+                  <div style={{position: "relative", zIndex: 10}}>{block.photoUrl ? <img src={block.photoUrl} style={{width: "32px", height: "32px", borderRadius: "6px", objectFit: "cover", border: "1px solid var(--border-color)", pointerEvents: "auto"}} onClick={(event) => { event.stopPropagation(); setExpandedPhotoUrl(block.photoUrl || ""); setActiveModal("photo"); }} /> : <div style={{width: "32px", height: "32px", borderRadius: "6px", background: "var(--input-bg)", border: "1px dashed var(--text-muted)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "12px"}}>📷</div>}</div>
+                </div>
+                <div className="memo-tags-text" style={{fontSize: "11px", color: "var(--primary)", fontWeight: "700", marginBottom: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>{tagsText}</div>
+                <div className="memo-preview-text" style={{fontSize: "13px", color: "var(--text-main)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>{previewText}</div>
+                <div style={{textAlign: "center", marginTop: "8px", fontSize: "10px", color: "var(--text-muted)", fontWeight: "700"}}>▼ タップして展開</div>
               </div>
-            ) : null}
-          </div>
-        ))}
+              <div className="memo-detail" style={{display: block.isExpanded ? "block" : "none"}}>
+                <div style={{display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px", marginBottom: "8px"}}>
+                  <div style={{display: "flex", alignItems: "center"}}>{block.isReadOnly ? typeBadge : <input type="date" className="memo-date" value={block.date} onChange={(event) => updateMemoBlock(block.id, { date: event.target.value })} style={{width: "fit-content", flex: "0 1 auto", padding: "4px 0"}} />}</div>
+                  <div style={{position: "relative", zIndex: 10}}>{block.photoUrl ? <img src={block.photoUrl} style={{width: "40px", height: "40px", borderRadius: "8px", objectFit: "cover", border: "1px solid var(--border-color)", cursor: "pointer", pointerEvents: "auto"}} onClick={(event) => { event.stopPropagation(); setExpandedPhotoUrl(block.photoUrl || ""); setActiveModal("photo"); }} /> : <div style={{width: "40px", height: "40px", borderRadius: "8px", background: "var(--input-bg)", border: "1px dashed var(--text-muted)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "14px"}}>📷</div>}</div>
+                </div>
+                {block.isReadOnly ? (
+                  <div style={{fontSize: "14px", color: "var(--text-main)", lineHeight: 1.6, marginTop: "4px", padding: "12px", background: "var(--input-bg)", borderRadius: "12px"}}>{block.text || "（本文なし）"}</div>
+                ) : (
+                  <textarea className="memo-text" rows={2} placeholder="エピソードを入力..." value={block.text} onChange={(event) => updateMemoBlock(block.id, { text: event.target.value })}></textarea>
+                )}
+                <div className="memo-tags-area" style={{marginTop: "8px", position: "relative"}}>
+                  <div className="memo-selected-tags" style={{display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "6px"}}>
+                    {block.tags.map((tag) => <span key={`${block.id}-${tag}`} style={{background: "var(--primary-light)", color: "var(--primary)", fontSize: "10px", padding: "3px 8px", borderRadius: "12px", fontWeight: "700"}}>{tag}</span>)}
+                  </div>
+                  <div className="memo-tag-dropdown-content overflow-y-auto" style={{display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "120px", overflowY: "auto"}}>
+                    {factTags.map((tag) => {
+                      const isSelected = block.tags.includes(tag);
+                      return <div key={`${block.id}-${tag}`} className={`chip${isSelected ? " selected-fact-chip active" : ""}`} onClick={() => updateMemoBlock(block.id, { tags: isSelected ? block.tags.filter((currentTag) => currentTag !== tag) : [...block.tags, tag] })}>{tag}</div>;
+                    })}
+                  </div>
+                </div>
+                {!block.isReadOnly ? (
+                  <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", paddingTop: "12px", borderTop: "1px dashed var(--border-color)"}}>
+                    <button type="button" onClick={() => deleteMemoBlock(block.id)} style={{background: "var(--alert-bg)", color: "var(--alert-text)", border: "none", width: "36px", height: "36px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px"}}>🗑️</button>
+                    <button type="button" onClick={() => updateMemoBlock(block.id, { isExpanded: false })} style={{background: "var(--primary-gradient)", color: "#FFF", border: "none", padding: "10px 20px", borderRadius: "20px", fontWeight: "700", fontSize: "13px", boxShadow: "var(--shadow-sm)"}}>💾 このまま保存</button>
+                  </div>
+                ) : null}
+                <div onClick={() => updateMemoBlock(block.id, { isExpanded: false })} style={{textAlign: "center", color: "var(--text-muted)", fontSize: "11px", fontWeight: "700", marginTop: "12px", cursor: "pointer", padding: "8px 0"}}>▲ 閉じる</div>
+              </div>
+            </div>
+          );
+        })}
       </div></div>
-      <div className="add-memo-btn" id="addMemoBtn" data-original-click={"addNewMemoBlock()"}>＋ 日付とエピソードを追加</div>
+      <div className="add-memo-btn" id="addMemoBtn" data-original-click={"addNewMemoBlock()"} onClick={addNewMemoBlock}>＋ 日付とエピソードを追加</div>
 
       <div id="editActionArea" style={{display: "flex", gap: "10px"}}>
         <button data-original-click={"closeEditModal()"} onClick={closeModal} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px"}} id="cancelBtn">閉じる</button>
@@ -794,7 +960,7 @@ export default function Page() {
                     </div>
                     <div className="card-actions" style={{display: "flex", flexDirection: "column", gap: "6px", flexShrink: "0", position: "relative", zIndex: "10"}}>
                       <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); selectCustomer(customer); }} style={{background: "var(--primary-light)", color: "var(--primary)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>✏️</span><span className="action-text">日記作成</span></button>
-                      <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); setSelectedCustomerId(customer.id); setNameInputValue(customer.name); setActiveModal("edit"); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>⚙️</span><span className="action-text">編集</span></button>
+                      <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); openEditCustomer(customer); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>⚙️</span><span className="action-text">編集</span></button>
                     </div>
                   </div>
                 </div>

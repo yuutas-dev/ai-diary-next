@@ -412,6 +412,24 @@ export default function Page() {
 
       const st = root.scrollTop;
       const prev = lastScrollTopRef.current;
+      const clientH = root.clientHeight;
+      const scrollH = root.scrollHeight;
+
+      // 上端 or 上ラバーバンド（scrollTop ≦ 0）: 検索バーは常に表示し、以降の方向判定をしない
+      if (st <= 0) {
+        if (!customerSearchBarVisibleRef.current) {
+          customerSearchBarVisibleRef.current = true;
+          setIsCustomerSearchBarVisible(true);
+        }
+        lastScrollTopRef.current = st;
+        return;
+      }
+
+      // 下端 or 下ラバーバンド: 可視性の setState だけ飛ばす（揺れによるジッターを防ぐ）
+      if (st + clientH >= scrollH) {
+        lastScrollTopRef.current = st;
+        return;
+      }
 
       if (st < 6) {
         if (!customerSearchBarVisibleRef.current) {
@@ -1273,7 +1291,7 @@ export default function Page() {
       }
 
       if (customerId) {
-        await fetch("/api/entries/upsert", {
+        const upsertRes = await fetch("/api/entries/upsert", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1290,6 +1308,10 @@ export default function Page() {
             deletedEntryIds: [],
           }),
         });
+        const upsertData = (await upsertRes.json().catch(() => ({}))) as { success?: boolean; error?: string };
+        if (!upsertRes.ok || upsertData.success === false) {
+          throw new Error(upsertData.error || "エントリの保存に失敗しました");
+        }
       }
 
       await fetchCustomers(userId);
@@ -1621,8 +1643,8 @@ export default function Page() {
       </div>
       <div className="modal-content__footer">
       <div id="editActionArea" style={{display: "flex", gap: "10px"}}>
-        <button data-original-click={"closeEditModal()"} onClick={closeEditModal} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px"}} id="cancelBtn">閉じる</button>
-        <button data-original-click={"saveCustomerEdit()"} id="saveCustomerBtn" onClick={saveCustomerEdit} style={{flex: "1", background: "var(--primary)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px", boxShadow: "var(--shadow-float)"}}>保存する</button>
+        <button type="button" data-original-click={"closeEditModal()"} onClick={closeEditModal} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px"}} id="cancelBtn">閉じる</button>
+        <button type="button" data-original-click={"saveCustomerEdit()"} id="saveCustomerBtn" onClick={saveCustomerEdit} style={{flex: "1", background: "var(--primary)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px", boxShadow: "var(--shadow-float)"}}>保存する</button>
       </div>
 
       <div id="readOnlyActionArea" style={{display: "none", gap: "10px", flexDirection: "column"}}>

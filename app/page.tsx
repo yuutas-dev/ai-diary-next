@@ -134,6 +134,20 @@ function getTargetDummyTag(businessType: BusinessType) {
   return "キャバ客";
 }
 
+function getFactTagsHistoryKey(businessType: BusinessType) {
+  return `factTagsHistory_${businessType}`;
+}
+
+function getDefaultFactTags(businessType: BusinessType) {
+  return INDUSTRY_FACT_CONFIGS[businessType] || INDUSTRY_FACT_CONFIGS.cabaret;
+}
+
+function normalizeTagList(tags: unknown) {
+  return (Array.isArray(tags) ? tags : [])
+    .map((tag) => String(tag).trim())
+    .filter(Boolean);
+}
+
 function getDaysSinceLastVisit(memoStr?: string) {
   const allMemos = parseMemoToJSON(memoStr);
   const visitMemos = allMemos.filter((memo) => !memo.type || memo.type === "visit" || memo.status === "legacy");
@@ -238,7 +252,7 @@ export default function Page() {
   const [customerSearchText, setCustomerSearchText] = useState("");
   const [selectedMoodTags, setSelectedMoodTags] = useState<string[]>([]);
   const [selectedFactTags, setSelectedFactTags] = useState<string[]>([]);
-  const [customFactTags, setCustomFactTags] = useState<string[]>([]);
+  const [commonFactTags, setCommonFactTags] = useState<string[]>(getDefaultFactTags("cabaret"));
   const [customFactTagInput, setCustomFactTagInput] = useState("");
   const [editAttributeTags, setEditAttributeTags] = useState<string[]>([]);
   const [customAttrInput, setCustomAttrInput] = useState("");
@@ -327,6 +341,17 @@ export default function Page() {
     setIsCompactMode(localStorage.getItem("isCompactMode") === "true");
   }, []);
 
+  useEffect(() => {
+    const defaultTags = getDefaultFactTags(selectedBusinessType);
+    let historyTags: string[] = [];
+    try {
+      historyTags = normalizeTagList(JSON.parse(localStorage.getItem(getFactTagsHistoryKey(selectedBusinessType)) || "[]"));
+    } catch {
+      historyTags = [];
+    }
+    setCommonFactTags(Array.from(new Set([...historyTags, ...defaultTags])));
+  }, [selectedBusinessType]);
+
   const targetDummyTag = getTargetDummyTag(selectedBusinessType);
   const baseVisibleCustomers = customerData.filter((customer) => {
     if (customer.tagsArray.includes("非表示")) return false;
@@ -379,7 +404,7 @@ export default function Page() {
     ? customerData.find((customer) => customer.id === selectedCustomerId) || null
     : null;
   const moodTags = INDUSTRY_MOOD_CONFIGS[selectedBusinessType] || INDUSTRY_MOOD_CONFIGS.cabaret;
-  const factTags = Array.from(new Set([...customFactTags, ...(INDUSTRY_FACT_CONFIGS[selectedBusinessType] || INDUSTRY_FACT_CONFIGS.cabaret)]));
+  const factTags = commonFactTags;
   const editAttributeOptions = Array.from(new Set([
     ...(INDUSTRY_ATTRIBUTE_TAGS[selectedBusinessType] || INDUSTRY_ATTRIBUTE_TAGS.cabaret),
     ...(selectedCustomer?.tagsArray || []),
@@ -421,6 +446,30 @@ export default function Page() {
     setter((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
   }
 
+  function rememberFactTag(tag: string, shouldPrependToCurrentList = false) {
+    const normalizedTag = tag.trim();
+    if (!normalizedTag) return;
+
+    const storageKey = getFactTagsHistoryKey(selectedBusinessType);
+    let historyTags: string[] = [];
+    try {
+      historyTags = normalizeTagList(JSON.parse(localStorage.getItem(storageKey) || "[]"));
+    } catch {
+      historyTags = [];
+    }
+    const nextHistory = [normalizedTag, ...historyTags.filter((currentTag) => currentTag !== normalizedTag)];
+    localStorage.setItem(storageKey, JSON.stringify(nextHistory));
+
+    if (shouldPrependToCurrentList) {
+      setCommonFactTags((current) => current.includes(normalizedTag) ? current : [normalizedTag, ...current]);
+    }
+  }
+
+  function toggleFactTag(tag: string) {
+    rememberFactTag(tag);
+    toggleStringValue(tag, setSelectedFactTags);
+  }
+
   function openEditCustomer(customer: Customer) {
     const memos = getPastMemos(customer);
     setIsCreateCustomerMode(false);
@@ -429,7 +478,7 @@ export default function Page() {
     setEditCustomerName(customer.name);
     setEditAttributeTags(customer.tagsArray.filter((tag) => tag !== "非表示" && tag !== "一軍固定" && tag !== "ダミー"));
     setMemoBlocks(memos.length > 0 ? memos.map((memo) => createMemoBlock(memo, false)) : [createMemoBlock({}, true)]);
-    setIsTagAccordionOpen(true);
+    setIsTagAccordionOpen(false);
     setActiveModal("edit");
   }
 
@@ -470,7 +519,7 @@ export default function Page() {
   function addCustomFactTag() {
     const newTag = customFactTagInput.trim();
     if (!newTag) return;
-    setCustomFactTags((current) => current.includes(newTag) ? current : [newTag, ...current]);
+    rememberFactTag(newTag, true);
     setSelectedFactTags((current) => current.includes(newTag) ? current : [...current, newTag]);
     setCustomFactTagInput("");
   }
@@ -501,11 +550,27 @@ export default function Page() {
   function addCustomMemoTag(blockId: string) {
     const newTag = (memoCustomTagInputs[blockId] || "").trim();
     if (!newTag) return;
+    rememberFactTag(newTag, true);
     setMemoBlocks((current) => current.map((block) => {
       if (block.id !== blockId) return block;
       return { ...block, tags: block.tags.includes(newTag) ? block.tags : [...block.tags, newTag] };
     }));
     setMemoCustomTagInput(blockId, "");
+  }
+
+  function toggleMemoTag(blockId: string, tag: string) {
+    rememberFactTag(tag);
+    setMemoBlocks((current) => current.map((block) => {
+      if (block.id !== blockId) return block;
+      const isSelected = block.tags.includes(tag);
+      return { ...block, tags: isSelected ? block.tags.filter((currentTag) => currentTag !== tag) : [...block.tags, tag] };
+    }));
+  }
+
+  function removeMemoTag(blockId: string, tag: string) {
+    setMemoBlocks((current) => current.map((block) => (
+      block.id === blockId ? { ...block, tags: block.tags.filter((currentTag) => currentTag !== tag) } : block
+    )));
   }
 
   async function saveCustomerEdit() {
@@ -636,12 +701,12 @@ export default function Page() {
       <div className="tags-scroll-container create-details-tags-grid overflow-x-auto no-scrollbar" id="factTagsArea">
         <div className="tag-row">
           {factTags.filter((_, index) => index % 2 === 0).map((tag) => (
-            <div key={tag} className={`chip${selectedFactTags.includes(tag) ? " selected-fact-chip active" : ""}`} onClick={() => toggleStringValue(tag, setSelectedFactTags)}>{tag}</div>
+            <div key={tag} className={`chip${selectedFactTags.includes(tag) ? " selected-fact-chip active" : ""}`} onClick={() => toggleFactTag(tag)}>{tag}</div>
           ))}
         </div>
         <div className="tag-row">
           {factTags.filter((_, index) => index % 2 === 1).map((tag) => (
-            <div key={tag} className={`chip${selectedFactTags.includes(tag) ? " selected-fact-chip active" : ""}`} onClick={() => toggleStringValue(tag, setSelectedFactTags)}>{tag}</div>
+            <div key={tag} className={`chip${selectedFactTags.includes(tag) ? " selected-fact-chip active" : ""}`} onClick={() => toggleFactTag(tag)}>{tag}</div>
           ))}
         </div>
       </div>
@@ -790,7 +855,12 @@ export default function Page() {
                 )}
                 <div className="memo-tags-area" style={{marginTop: "8px", position: "relative"}}>
                   <div className="memo-selected-tags" style={{display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "6px"}}>
-                    {block.tags.map((tag) => <span key={`${block.id}-${tag}`} style={{background: "var(--primary-light)", color: "var(--primary)", fontSize: "10px", padding: "3px 8px", borderRadius: "12px", fontWeight: "700"}}>{tag}</span>)}
+                    {block.tags.map((tag) => (
+                      <span key={`${block.id}-${tag}`} style={{background: "var(--primary-light)", color: "var(--primary)", fontSize: "10px", padding: "3px 8px", borderRadius: "12px", fontWeight: "700", display: "inline-flex", alignItems: "center", gap: "4px"}}>
+                        {tag}
+                        {!block.isReadOnly ? <span onClick={() => removeMemoTag(block.id, tag)} style={{cursor: "pointer", fontWeight: "900", lineHeight: 1}}>×</span> : null}
+                      </span>
+                    ))}
                   </div>
                   {!block.isReadOnly ? <button type="button" className="memo-add-tag-btn" onClick={() => updateMemoBlock(block.id, { isDropdownOpen: !block.isDropdownOpen })} style={{background: "var(--primary-light)", border: "none", color: "var(--primary)", fontSize: "11px", padding: "6px 12px", borderRadius: "14px", fontWeight: "700", cursor: "pointer", transition: "0.2s"}}>＋ エピソードタグを追加</button> : null}
                   <div className="memo-tag-dropdown" style={{display: block.isDropdownOpen ? "block" : "none", background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)", border: "1px solid var(--border-color)", borderRadius: "16px", padding: "12px", marginTop: "10px", boxShadow: "var(--shadow-md)", position: "absolute", zIndex: 20, width: "100%"}}>
@@ -798,7 +868,7 @@ export default function Page() {
                     <div className="memo-tag-dropdown-content" style={{display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "120px", overflowY: "auto"}}>
                       {factTags.map((tag) => {
                         const isSelected = block.tags.includes(tag);
-                        return <div key={`${block.id}-${tag}`} className={`chip${isSelected ? " selected-fact-chip active" : ""}`} onClick={() => updateMemoBlock(block.id, { tags: isSelected ? block.tags.filter((currentTag) => currentTag !== tag) : [...block.tags, tag] })}>{tag}</div>;
+                        return <div key={`${block.id}-${tag}`} className={`chip${isSelected ? " selected-fact-chip active" : ""}`} onClick={() => toggleMemoTag(block.id, tag)}>{tag}</div>;
                       })}
                     </div>
                     <div style={{display: "flex", gap: "8px", marginTop: "12px", borderTop: "1px dashed var(--border-color)", paddingTop: "12px"}}>

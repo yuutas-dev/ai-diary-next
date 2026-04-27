@@ -1299,7 +1299,7 @@ export default function Page() {
     <div className="modal-content" style={{maxHeight: "85dvh", display: "flex", flexDirection: "column"}} onClick={(event) => event.stopPropagation()}>
       <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}}>💤 非表示にした顧客</h2>
       <p style={{textAlign: "center", fontSize: "11px", color: "var(--text-sub)", marginTop: "-10px", marginBottom: "16px", fontWeight: "700"}}>カードを長押しして記録を確認</p>
-      <div id="hiddenCustomersArea" style={{overflowY: "auto", flex: "1", paddingBottom: "20px", margin: "-10px"}}>
+      <div id="hiddenCustomersArea" style={{overflowY: "auto", flex: "1", paddingBottom: "8px", margin: "-10px"}}>
         {hiddenCustomers.length === 0 ? (
           <p style={{textAlign: "center", color: "var(--text-sub)", marginTop: "40px", fontWeight: "700"}}>非表示の顧客はいません</p>
         ) : hiddenCustomers.map((customer) => {
@@ -1329,7 +1329,7 @@ export default function Page() {
           );
         })}
       </div>
-      <button data-original-click={"closeHiddenListModal()"} onClick={closeModal} style={{width: "100%", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", marginTop: "20px"}}>閉じる</button>
+      <button data-original-click={"closeHiddenListModal()"} onClick={closeModal} style={{width: "100%", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", marginTop: "8px", flexShrink: 0}}>閉じる</button>
     </div>
   </div>
 
@@ -1431,7 +1431,8 @@ export default function Page() {
   </div>
 
   <div id="editCustomerModal" className="modal-overlay" style={{zIndex: "10006", display: activeModal === "edit" ? "flex" : "none"}} onClick={closeEditModal}>
-    <div className="modal-content" style={{maxHeight: "85vh", overflowY: "auto", position: "relative"}} onClick={(event) => event.stopPropagation()}>
+    <div className="modal-content modal-content--customer-edit" onClick={(event) => event.stopPropagation()}>
+      <div className="modal-content__body">
       {isEditingHiddenCustomer ? (
         <button type="button" aria-label="完全に削除" onClick={openHiddenDeleteConfirm} style={{position: "absolute", top: "14px", right: "14px", width: "34px", height: "34px", borderRadius: "50%", border: "none", background: "var(--alert-bg)", color: "var(--alert-text)", fontSize: "16px", boxShadow: "var(--shadow-sm)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer"}}>🗑️</button>
       ) : null}
@@ -1516,7 +1517,7 @@ export default function Page() {
                   </div>
                 </div>
                 {!block.isReadOnly ? (
-                  <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "12px", paddingTop: "12px", borderTop: "1px dashed var(--border-color)"}}>
+                  <div className="memo-block__actions">
                     <button type="button" onClick={() => deleteMemoBlock(block.id)} style={{background: "var(--alert-bg)", color: "var(--alert-text)", border: "none", width: "36px", height: "36px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px"}}>🗑️</button>
                     <button type="button" onClick={() => updateMemoBlock(block.id, { isExpanded: false })} style={{background: "var(--primary-gradient)", color: "#FFF", border: "none", padding: "10px 20px", borderRadius: "20px", fontWeight: "700", fontSize: "13px", boxShadow: "var(--shadow-sm)"}}>💾 このまま保存</button>
                   </div>
@@ -1529,17 +1530,20 @@ export default function Page() {
       </div></div>
       <div className="add-memo-btn" id="addMemoBtn" data-original-click={"addNewMemoBlock()"} onClick={addNewMemoBlock}>＋ 日付とエピソードを追加</div>
 
+      </div>
+      <div className="modal-content__footer">
       <div id="editActionArea" style={{display: "flex", gap: "10px"}}>
         <button data-original-click={"closeEditModal()"} onClick={closeEditModal} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px"}} id="cancelBtn">閉じる</button>
         <button data-original-click={"saveCustomerEdit()"} id="saveCustomerBtn" onClick={saveCustomerEdit} style={{flex: "1", background: "var(--primary)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px", boxShadow: "var(--shadow-float)"}}>保存する</button>
       </div>
 
-      <div id="readOnlyActionArea" style={{display: "none", gap: "10px", marginTop: "16px", flexDirection: "column"}}>
+      <div id="readOnlyActionArea" style={{display: "none", gap: "10px", flexDirection: "column"}}>
         <div style={{display: "flex", gap: "10px"}}>
           <button data-original-click={"restoreHiddenFromModal()"} style={{flex: "1", background: "#F0FDF4", color: "#16A34A", border: "none", padding: "14px", borderRadius: "12px", fontWeight: "700", fontSize: "13px"}}>🟢 非表示を解除</button>
           <button data-original-click={"openDeleteConfirmModal()"} style={{flex: "1", background: "var(--alert-bg)", color: "var(--alert-text)", border: "none", padding: "14px", borderRadius: "12px", fontWeight: "700", fontSize: "13px"}}>🗑️ 完全に削除</button>
         </div>
         <button data-original-click={"closeEditModal()"} style={{width: "100%", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "12px", fontWeight: "700", fontSize: "13px"}}>閉じる</button>
+      </div>
       </div>
     </div>
   </div>

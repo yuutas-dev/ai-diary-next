@@ -8,7 +8,7 @@ type CreateMode = "text" | "photo";
 type VisitStatus = "yes" | "no";
 type StyleTab = "cute" | "custom" | "neat";
 type DataView = "customer" | "history";
-type BusinessType = "cabaret" | "fuzoku" | "host";
+type BusinessType = "cabaret" | "fuzoku" | "garuba";
 type ListFilter = "alert" | "all" | "vip" | "new" | "second" | "regular";
 type IconTheme = "glass" | "jewel" | "perfume" | "moon_star" | "flower" | "teacup" | "symbol";
 
@@ -58,30 +58,35 @@ interface Customer {
 const INDUSTRY_MOOD_CONFIGS: Record<BusinessType, string[]> = {
   cabaret: ["💖 大好き", "✨ 特別な存在", "🥂 一緒に飲みたい", "🥺 早く会いたい", "🤫 ナイショの話", "💕 ずっと一緒にいたい", "🧸 癒やされる", "🍼 頼りにしてる", "💋 ドキドキ", "👗 可愛くなりたい", "🥺 寂しいな", "📱 連絡きて嬉しい", "🖤 独占してほしい", "🎉 楽しすぎた！", "💖 いつもありがとう"],
   fuzoku: ["💖 あなたが特別", "🧸 癒やされた", "🤤 余韻", "💕 相性良すぎ", "🥺 一緒にいたかった", "🤫 2人の秘密", "💋 ドキドキした", "🍼 甘えちゃった", "🖤 独占したい", "🥺 早く会いたい", "✨ 楽しかった", "📱 連絡待ってる", "🥺 依存しちゃいそう", "💖 感謝", "💤 夢で会いたい"],
-  host: ["👑 お前が一番", "🖤 誰にも渡さない", "🐶 もっと甘やかして", "🥺 会いたくて狂いそう", "✨ 特別なお姫様", "🥂 一緒に酔いたい", "🍼 お前しか無理", "🤫 2人だけの内緒", "💕 愛してる", "🥺 今すぐ会いに来て", "📱 返事待ってる", "💪 絶対ナンバーワン", "🧸 一緒にいると安心", "🎉 最高に楽しかった", "💖 いつも感謝"],
+  garuba: ["🍻 乾杯したい", "✨ 楽しかった", "🥺 また話したい", "🎤 一緒に歌いたい", "💕 気になる", "🤫 2人だけの話", "📱 連絡待ってる", "🧸 癒やされた", "🎉 最高だった", "💖 いつもありがとう", "🥂 また飲もうね", "😂 笑いすぎた", "🥺 会いたい", "🌙 夜更かししたい", "💤 夢で会いたい"],
 };
 
 const INDUSTRY_ATTRIBUTE_TAGS: Record<BusinessType, string[]> = {
   cabaret: ["太客", "細客", "常連", "新規", "痛客", "お酒好き", "下戸", "金持ち", "ケチ", "既婚", "独身", "おじさん", "若者", "イケメン", "優しい"],
   fuzoku: ["M気質", "S気質", "常連", "新規", "キモい", "優しい", "痛客", "匂いキツめ", "マナー良", "本番要求", "おじさん", "若者", "イケメン", "デブ", "ハゲ"],
-  host: ["太客", "細客", "エース", "痛客", "常連", "新規", "メンヘラ", "金持ち", "ケチ", "酒癖悪い", "マナー良", "独身", "既婚", "若者", "おばさん"],
+  garuba: ["太客", "細客", "常連", "新規", "痛客", "お酒好き", "下戸", "金持ち", "ケチ", "既婚", "独身", "おじさん", "若者", "イケメン", "優しい"],
 };
 
 const INDUSTRY_FACT_CONFIGS: Record<BusinessType, string[]> = {
   cabaret: [
-    // 💰 売上・特別感
-    "🍾 シャンパン", "🍷 ボトル", "🥂 ドリンク", "🎉 祝・イベント",
-    // 🚶‍♂️ 時間の共有
+    "🍾 シャンパン", "🍷 ボトル", "🥂 ドリンク", "🎉 お祝い",
     "✨ 本指名", "🥂 同伴", "🍰 アフター", "⏳ 延長", "🏃‍♂️ 駆け込み",
-    // 🗣️ 会話・空気感
-    "😂 爆笑", "🥺 深い話・相談", "💕 恋愛トーク", "🎤 カラீரல்", "🎮 飲みゲー",
-    // 🎁 記憶・視覚情報
-    "🎁 プレゼント", "📸 写真撮った", "👗 新衣装・ドレス", "🍽️ フード",
-    // 🩹 気遣い・フォロー
-    "👔 お疲れ", "🥴 酔っ払ってた", "🙇‍♀️ 席外してごめんね", "💼 遠方・出張"
+    "😂 爆笑", "🥺 相談", "💕 恋バナ", "🎤 カラオケ", "🎮 飲みゲー",
+    "🎁 プレゼント", "📸 写真", "👗 ドレス", "🍽️ フード",
+    "👔 お疲れ", "🥴 泥酔", "🙇‍♀️ 席外し", "💼 出張"
   ],
-  fuzoku: ["✨ 本指名", "🏩 ロング", "🔞 濃厚", "🧴 メンエス", "💋 キス", "🛁 シャワー", "🧼 泡泡", "💆‍♂️ マッサージ", "🦶 足ツボ", "🛌 延長"],
-  host: ["🍾 オリシャン", "🎤 ラスソン", "🥂 アフター", "💸 エース", "👑 枕", "💸 痛客", "🍾 タワー", "🍷 高額ボトル", "🌟 Ｎｏ.１"],
+  fuzoku: [
+    "✨ 本指名", "🏩 ロング", "🔞 濃厚", "🧴 メンエス", "💋 キス",
+    "🛁 お風呂", "🧼 泡", "💆‍♂️ 癒やし", "🛌 延長", "🏃‍♂️ スキマ",
+    "👗 コスプレ", "🤐 秘密", "🥺 甘え", "🍼 イチャ",
+    "👔 仕事帰り", "🥴 快感", "🤫 絶頂", "🛌 爆睡"
+  ],
+  garuba: [
+    "🍻 乾杯", "🍹 オリカク", "🥃 テキーラ", "🍾 シャンパン",
+    "🎤 カラオケ", "🎯 ダーツ", "🍜 締め", "🏃‍♂️ 終電",
+    "😂 爆笑", "🥴 泥酔", "📸 チェキ", "🍽️ 差し入れ",
+    "⏳ 朝まで", "🥺 ガチ恋", "👕 私服", "🙇‍♀️ バタバタ"
+  ]
 };
 
 function parseMemoToJSON(memoStr?: string) {
@@ -148,7 +153,7 @@ function getStringHash(str: string) {
 
 function getTargetDummyTag(businessType: BusinessType) {
   if (businessType === "fuzoku") return "風俗客";
-  if (businessType === "host") return "ホスト客";
+  if (businessType === "garuba") return "ガルバ客";
   return "キャバ客";
 }
 
@@ -359,10 +364,13 @@ export default function Page() {
   }, [fetchCustomers]);
 
   useEffect(() => {
-    const savedBusinessType = localStorage.getItem("businessType") as BusinessType | null;
+    const savedBusinessType = localStorage.getItem("businessType");
     const savedIconTheme = localStorage.getItem("iconTheme") as IconTheme | null;
-    if (savedBusinessType && ["cabaret", "fuzoku", "host"].includes(savedBusinessType)) {
-      setSelectedBusinessType(savedBusinessType);
+    if (savedBusinessType === "host") {
+      setSelectedBusinessType("garuba");
+      localStorage.setItem("businessType", "garuba");
+    } else if (savedBusinessType && ["cabaret", "fuzoku", "garuba"].includes(savedBusinessType)) {
+      setSelectedBusinessType(savedBusinessType as BusinessType);
     }
     if (savedIconTheme && ["glass", "jewel", "perfume", "moon_star", "flower", "teacup", "symbol"].includes(savedIconTheme)) {
       setIconTheme(savedIconTheme);
@@ -936,7 +944,7 @@ export default function Page() {
       <select id="initialBusinessType" className="input-field" style={{marginBottom: "24px", fontWeight: "700", textAlign: "center", background: "#FFF", border: "1px solid var(--border-color)"}}>
         <option value="cabaret">キャバクラ・ラウンジ</option>
         <option value="fuzoku">風俗・メンエス</option>
-        <option value="host">ホストクラブ</option>
+        <option value="garuba">ガルバ</option>
       </select>
       <button data-original-click={"saveInitialSetup()"} style={{width: "100%", background: "var(--primary)", color: "#FFF", border: "none", padding: "16px", borderRadius: "24px", fontWeight: "700", fontSize: "14px", boxShadow: "var(--shadow-float)"}}>はじめる ✨</button>
     </div>
@@ -1370,7 +1378,7 @@ export default function Page() {
             <select className="input-field" id="businessType" data-original-change={"updateChipsAndSave()"} value={selectedBusinessType} onChange={(event) => setBusinessType(event.target.value as BusinessType)} style={{width: "140px", padding: "6px", fontWeight: "700", textAlign: "right", border: "none", background: "transparent"}}>
               <option value="cabaret">キャバクラ</option>
               <option value="fuzoku">風俗・メンエス</option>
-              <option value="host">ホスト</option>
+              <option value="garuba">ガルバ</option>
             </select>
           </div>
           <div className="setting-item">

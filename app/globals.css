@@ -1200,18 +1200,44 @@ input[type="radio"].ui-state { display: none; }
   filter: brightness(0.98);
 }
 
-.modal-content.style-modal-content,
-.modal-content.help-modal-content {
+.modal-content.style-modal-content {
   min-height: 520px;
   display: flex;
   flex-direction: column;
 }
 
-.help-body {
-  flex: 1;
+/* 顧客編集モーダルと同じ外枠サイズ（max-height: 90vh） */
+.modal-content.help-modal-content {
+  max-height: 90vh;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.modal-content.help-modal-content .app-guide-title {
+  flex-shrink: 0;
+  padding: 20px 20px 0;
+}
+
+.modal-content.help-modal-content .help-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  padding-right: 4px;
-  margin-bottom: 16px;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 20px 8px;
+  margin-bottom: 0;
+}
+
+.modal-content.help-modal-content > button:last-of-type {
+  flex-shrink: 0;
+  margin: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box;
+  border-radius: 0 0 24px 24px !important;
+  padding: 14px 20px calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  border-top: 1px solid var(--border-color);
 }
 
 .help-section {

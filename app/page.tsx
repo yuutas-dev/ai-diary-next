@@ -114,7 +114,7 @@ export default function Page() {
 
     async function initAndFetchCustomers() {
       const params = new URLSearchParams(window.location.search);
-      const devUser = params.get("dev_user");
+      const devUser = params.get("dev_user")?.trim();
 
       if (devUser) {
         if (!cancelled) {
@@ -127,12 +127,18 @@ export default function Page() {
       try {
         const liff = (await import("@line/liff")).default;
         await liff.init({ liffId: LIFF_ID });
-        const resolvedUserId = liff.isLoggedIn()
-          ? (await liff.getProfile()).userId
-          : DEFAULT_USER_ID;
+
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+
+        const profile = await liff.getProfile();
+        const profileUserId = profile.userId;
+
         if (!cancelled) {
-          setUserId(resolvedUserId);
-          await fetchCustomers(resolvedUserId);
+          setUserId(profileUserId);
+          await fetchCustomers(profileUserId);
         }
       } catch (error) {
         console.error("LIFF init Error:", error);

@@ -89,6 +89,12 @@ const INDUSTRY_FACT_CONFIGS: Record<BusinessType, string[]> = {
   ]
 };
 
+const MODE_LABELS: Record<BusinessType, { main: string; thanks: string }> = {
+  fuzoku: { main: "写メ日記", thanks: "お礼日記" },
+  cabaret: { main: "ブログ・SNS", thanks: "お礼LINE" },
+  garuba: { main: "ブログ・SNS", thanks: "お礼LINE" },
+};
+
 function parseMemoToJSON(memoStr?: string) {
   if (!memoStr) return [];
   try {
@@ -452,6 +458,7 @@ export default function Page() {
   const selectedCustomer = selectedCustomerId
     ? customerData.find((customer) => customer.id === selectedCustomerId) || null
     : null;
+  const modeLabels = MODE_LABELS[selectedBusinessType] || MODE_LABELS.cabaret;
   const moodTags = INDUSTRY_MOOD_CONFIGS[selectedBusinessType] || INDUSTRY_MOOD_CONFIGS.cabaret;
   const factTags = INDUSTRY_FACT_CONFIGS[selectedBusinessType] || INDUSTRY_FACT_CONFIGS.cabaret;
   const editAttributeOptions = Array.from(new Set([
@@ -1233,8 +1240,8 @@ export default function Page() {
   <div className="app-container">
     <header className="header-area">
       <div className="toggle-container header-toggle">
-        <label htmlFor="mode-text" className="toggle-label toggle-text">💌 お礼日記</label>
-        <label htmlFor="mode-photo" className="toggle-label toggle-photo">📸 写メ日記</label>
+        <label htmlFor="mode-text" className="toggle-label toggle-text">💌 {modeLabels.thanks}</label>
+        <label htmlFor="mode-photo" className="toggle-label toggle-photo">📸 {modeLabels.main}</label>
       </div>
     </header>
 
@@ -1451,7 +1458,7 @@ export default function Page() {
                       </div>
                     </div>
                     <div className="card-actions" style={{display: "flex", flexDirection: "column", gap: "6px", flexShrink: "0", position: "relative", zIndex: "10"}}>
-                      <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); selectCustomer(customer); }} style={{background: "var(--primary-light)", color: "var(--primary)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>✏️</span><span className="action-text">日記作成</span></button>
+                      <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); selectCustomer(customer); }} style={{background: "var(--primary-light)", color: "var(--primary)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>✏️</span><span className="action-text">{modeLabels.thanks}作成</span></button>
                       <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); openEditCustomer(customer); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>⚙️</span><span className="action-text">編集</span></button>
                     </div>
                   </div>

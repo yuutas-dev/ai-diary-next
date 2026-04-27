@@ -1516,7 +1516,7 @@ export default function Page() {
           </div>
           <div className="app-guide-card">
             <div className="app-guide-icon">🌙☀️</div>
-            <div><b>「人間らしさ」を再現</b><p>朝と夜、初めての人と常連さん。その時の「心のゆらぎ」まで計算します。</p></div>
+            <div><b>「人間らしさ」を再現</b><p>季節と曜日、初めての人と常連さん。その時の「心のゆらぎ」まで計算します。</p></div>
           </div>
         </section>
 

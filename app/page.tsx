@@ -1088,10 +1088,8 @@ export default function Page() {
       }).join("\n---\n");
       const isAlertStatus = targetCustomer ? isAlertCustomer(targetCustomer) : false;
       const now = new Date();
-      const currentHour = now.getHours();
-      const currentDay = now.getDay();
-      const timeContext = currentHour >= 17 && currentHour <= 20 ? "夕方" : currentHour >= 21 || currentHour <= 3 ? "深夜" : "昼";
-      const dayContext = currentDay === 5 || currentDay === 6 ? "週末" : currentDay === 0 ? "日曜日" : currentDay === 1 ? "週始め" : "平日";
+      const dayOfWeek = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"][now.getDay()];
+      const currentMonth = `${now.getMonth() + 1}月`;
 
       const payload = {
         userId,
@@ -1102,8 +1100,8 @@ export default function Page() {
         visitCount: String(visitCount),
         visitStatus: visitStatus === "yes" ? "visit" : "sales",
         isAlert: String(isAlertStatus),
-        timeContext,
-        dayContext,
+        dayOfWeek,
+        currentMonth,
         episodeText: todayEpisodeText,
         pastMemo: filteredMemosStr,
         customerTags: cleanedCustomerTags.join(","),

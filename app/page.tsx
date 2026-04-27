@@ -1265,9 +1265,44 @@ export default function Page() {
   </div>
 
   <div id="helpModal" className="modal-overlay" style={{display: activeModal === "help" ? "flex" : "none"}} onClick={closeModal}>
-    <div className="modal-content help-modal-content" onClick={(event) => event.stopPropagation()}>
-      <h2 id="helpModalTitle" style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}}></h2>
-      <div id="helpModalBody" className="help-body"></div>
+    <div className="modal-content help-modal-content app-guide-modal" onClick={(event) => event.stopPropagation()}>
+      <h2 id="helpModalTitle" className="app-guide-title">「きてほしい」と「ありがとう」を、もっと楽に。</h2>
+      <div id="helpModalBody" className="help-body app-guide-body">
+        <div className="app-guide-lead">
+          このアプリは、あなたの指先の代わりにメッセージを考える「専属ライター」です✍️✨
+        </div>
+
+        <section className="app-guide-section">
+          <h3>🌟 あなたにうれしい3つのこと</h3>
+          <div className="app-guide-card">
+            <div className="app-guide-icon">⏱️</div>
+            <div><b>考える時間をゼロに</b><p>営業LINEやブログの「なに送ろう…」をAIが解決。</p></div>
+          </div>
+          <div className="app-guide-card">
+            <div className="app-guide-icon">📈</div>
+            <div><b>使うほど「あなたの声」に</b><p>お気に入りを保存すると、AIがあなたの「言葉のクセ」を学習します。</p></div>
+          </div>
+          <div className="app-guide-card">
+            <div className="app-guide-icon">🌙☀️</div>
+            <div><b>「人間らしさ」を再現</b><p>朝と夜、初めての人と常連さん。その時の「心のゆらぎ」まで計算します。</p></div>
+          </div>
+        </section>
+
+        <section className="app-guide-section">
+          <h3>🧠 AIが読んでいる「ヒミツのヒント」</h3>
+          <p className="app-guide-note">選んだボタンやメモは、すべてAIが大切な情報として読み取ります。</p>
+          <div className="app-guide-mini-grid">
+            <div><span>🏷️</span><b>タグ</b><p>お客様のタイプや、その日の出来事</p></div>
+            <div><span>📝</span><b>メモ</b><p>あなただけが知っている小さなエピソード</p></div>
+            <div><span>🔢</span><b>回数</b><p>これまで会った回数にぴったりの距離感</p></div>
+          </div>
+        </section>
+
+        <div className="app-guide-footer">
+          <b>🚀 もっとあなたらしく！</b>
+          <p>「お気に入り」を登録して、AIをあなた色に育ててみてください。<br />あなたの個性を消さずに、もっと楽に、もっと伝わる。</p>
+        </div>
+      </div>
       <button data-original-click={"closeHelpModal()"} onClick={closeModal} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700"}}>閉じる</button>
     </div>
   </div>

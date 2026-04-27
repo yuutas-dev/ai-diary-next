@@ -23,10 +23,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return sendJson(res, 405, { success: false, error: 'Method Not Allowed' });
   try {
     const data = parseRequestBody(req.body);
-    const userId = data?.userId || 'test-user';
-    const difyApiUrl = (process.env.DIFY_API_URL || '').trim();
+    const userId = data?.userId || 'default-user';
     const difyApiKey = (process.env.DIFY_API_KEY || '').trim();
-    if (!difyApiUrl || !difyApiKey) throw new Error('Difyの環境変数が読み込めていません');
+    if (!difyApiKey) throw new Error('Difyの環境変数が読み込めていません');
     const supabase = getSupabase();
     const mode = data?.messageMode === 'photo' ? 'photo' : 'text';
     const visitStatus = data?.visitStatus === 'visit' ? 'visit' : 'sales';
@@ -38,8 +37,8 @@ export default async function handler(req, res) {
     const favoriteTextCount = favoriteTexts ? favoriteTexts.split('\n').filter(Boolean).length : 0;
     const customerName = trimText(data?.customerName);
     const customerId = await findCustomerIdByName({ supabase, userId, customerId: data?.customerId, name: customerName });
-    const difyInputs = { customerName, businessType: data?.businessType || 'cabaret', customerRank: data?.customerRank || '新規', visitStatus, isAlert: String(data?.isAlert || 'false'), episodeText, pastMemo: data?.pastMemo || '', customerTags: customerTags.join(', '), factTags: factTags.join(', '), moodTags: moodTags.join(', '), style: data?.style || 'cute', tension: data?.tension || '3', emoji: data?.emoji || '4', customText: trimText(data?.customText), favoriteTexts, messageMode: mode, imageFile: data?.imageFile || null };
-    const difyRes = await fetch(difyApiUrl, { method: 'POST', headers: { Authorization: `Bearer ${difyApiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ inputs: difyInputs, response_mode: 'blocking', user: userId }) });
+    const difyInputs = { customerName, businessType: data?.businessType || 'cabaret', customerRank: data?.customerRank || '新規', visitStatus: data?.visitStatus || visitStatus, isAlert: String(data?.isAlert || 'false'), episodeText: data?.episodeText || episodeText, pastMemo: data?.pastMemo || '', customerTags: data?.customerTags || '', factTags: data?.factTags || '', moodTags: data?.moodTags || '', style: data?.style || 'cute', tension: data?.tension || '3', emoji: data?.emoji || '4', customText: data?.customText || '', favoriteTexts, messageMode: data?.messageMode || mode, imageFile: data?.imageFile || null };
+    const difyRes = await fetch('https://api.dify.ai/v1/workflows/run', { method: 'POST', headers: { Authorization: `Bearer ${difyApiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ inputs: difyInputs, response_mode: 'blocking', user: userId }) });
     if (!difyRes.ok) throw new Error(`Dify生成エラー: ${difyRes.status} ${await difyRes.text().catch(() => '')}`);
     const difyData = await difyRes.json();
     const aiText = difyData?.data?.outputs?.text || difyData?.data?.outputs?.answer || difyData?.answer || '生成されましたがテキストが空です。';

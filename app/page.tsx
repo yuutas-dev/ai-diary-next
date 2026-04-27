@@ -315,7 +315,7 @@ export default function Page() {
   const [selectedBusinessType, setSelectedBusinessType] = useState<BusinessType>("cabaret");
   const [iconTheme, setIconTheme] = useState<IconTheme>("glass");
   const [appTheme, setAppTheme] = useState<AppTheme>("pink");
-  const [appFont, setAppFont] = useState<AppFont>("standard");
+  const [appFont, setAppFont] = useState<AppFont>("maru");
   const [currentListFilter, setCurrentListFilter] = useState<ListFilter>("all");
   const [isCompactMode, setIsCompactMode] = useState(false);
   const [customerSearchText, setCustomerSearchText] = useState("");
@@ -461,6 +461,8 @@ export default function Page() {
     const savedAppFont = localStorage.getItem("appFont") as AppFont | null;
     if (savedAppFont && ["standard", "maru", "mincho"].includes(savedAppFont)) {
       setAppFont(savedAppFont);
+    } else {
+      localStorage.setItem("appFont", "maru");
     }
     const savedStyle = localStorage.getItem("selectedStyle") as StyleTab | null;
     if (savedStyle && ["cute", "custom", "neat"].includes(savedStyle)) {

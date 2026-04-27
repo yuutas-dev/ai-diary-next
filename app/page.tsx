@@ -1262,64 +1262,76 @@ export default function Page() {
     }
   }
 
-  async function saveCustomerEdit() {
+  function saveCustomerEdit() {
     const newName = editCustomerName.trim();
     if (!newName) {
       showNotice("名前を入力してください");
       return;
     }
 
-    try {
-      let customerId = selectedCustomerId;
-      if (isCreateCustomerMode) {
-        const res = await fetch("/api/customers/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, newName, newTags: editAttributeTags }),
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || "顧客作成に失敗しました");
-        customerId = data.customer?.id || null;
-      } else {
-        const res = await fetch("/api/customers/update", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, customerId: selectedCustomerId, newName, newTags: editAttributeTags }),
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.error || "顧客更新に失敗しました");
-      }
+    const newTags = editAttributeTags.slice();
+    const entriesPayload = memoBlocks.map((block) => ({
+      id: block.entryId || null,
+      date: block.date,
+      text: block.text,
+      tags: block.tags,
+      photoUrl: block.photoUrl || null,
+      type: block.type,
+    }));
+    const creating = isCreateCustomerMode;
+    const initialCustomerId = selectedCustomerId;
 
-      if (customerId) {
-        const upsertRes = await fetch("/api/entries/upsert", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId,
-            customerId,
-            entries: memoBlocks.map((block) => ({
-              id: block.entryId || null,
-              date: block.date,
-              text: block.text,
-              tags: block.tags,
-              photoUrl: block.photoUrl || null,
-              type: block.type,
-            })),
-            deletedEntryIds: [],
-          }),
-        });
-        const upsertData = (await upsertRes.json().catch(() => ({}))) as { success?: boolean; error?: string };
-        if (!upsertRes.ok || upsertData.success === false) {
-          throw new Error(upsertData.error || "エントリの保存に失敗しました");
+    closeEditModal();
+    setActiveTab("data");
+    setDataView("customer");
+    showActionToast("保存したよ！");
+
+    void (async () => {
+      try {
+        let customerId: string | null = initialCustomerId;
+        if (creating) {
+          const res = await fetch("/api/customers/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, newName, newTags }),
+          });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || "顧客作成に失敗しました");
+          customerId = data.customer?.id || null;
+        } else {
+          const res = await fetch("/api/customers/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, customerId: initialCustomerId, newName, newTags }),
+          });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || "顧客更新に失敗しました");
         }
-      }
 
-      await fetchCustomers(userId);
-      closeEditModal();
-    } catch (error) {
-      console.error("saveCustomerEdit Error:", error);
-      showNotice(error instanceof Error ? error.message : "保存に失敗しました");
-    }
+        if (customerId) {
+          const upsertRes = await fetch("/api/entries/upsert", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId,
+              customerId,
+              entries: entriesPayload,
+              deletedEntryIds: [],
+            }),
+          });
+          const upsertData = (await upsertRes.json().catch(() => ({}))) as { success?: boolean; error?: string };
+          if (!upsertRes.ok || upsertData.success === false) {
+            throw new Error(upsertData.error || "エントリの保存に失敗しました");
+          }
+        }
+
+        await fetchCustomers(userId);
+      } catch (error) {
+        console.error("saveCustomerEdit Error:", error);
+        showActionToast("通信エラーのため元に戻しました");
+        await fetchCustomers(userId);
+      }
+    })();
   }
 
   return (

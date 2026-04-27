@@ -1178,6 +1178,16 @@ input[type="radio"].ui-state { display: none; }
   margin-top: 0;
 }
 
+.modal-content--customer-edit .modal-content__footer #saveCustomerBtn {
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.modal-content--customer-edit .modal-content__footer #saveCustomerBtn:active {
+  transform: scale(0.97);
+  filter: brightness(0.98);
+}
+
 .modal-content.style-modal-content,
 .modal-content.help-modal-content {
   min-height: 520px;

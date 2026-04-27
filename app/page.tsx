@@ -169,6 +169,12 @@ function isAlertCustomer(customer: Customer) {
   return days >= 30;
 }
 
+const EMOTION_TAG_KEYWORDS = ["会いたい", "逢いたい", "逢い", "寂しい", "さみしい", "さびしい", "愛して", "好き", "秘密", "内緒", "おやすみ", "嬉しい", "うれしい", "夢心地", "待ってる", "独占", "枕", "病み", "メンヘラ"];
+
+function isEmotionTag(tag: string) {
+  return EMOTION_TAG_KEYWORDS.some((keyword) => tag.includes(keyword));
+}
+
 function getAvatarSvgMarkup(name: string, iconTheme: IconTheme) {
   const hash = getStringHash(name || "ゲスト");
   const hue = hash % 360;
@@ -254,6 +260,11 @@ export default function Page() {
   const [memoBlocks, setMemoBlocks] = useState<MemoBlock[]>([]);
   const [isCreateCustomerMode, setIsCreateCustomerMode] = useState(false);
   const [editCustomerName, setEditCustomerName] = useState("");
+  const [todayEpisodeText, setTodayEpisodeText] = useState("");
+  const [inlineResultText, setInlineResultText] = useState("");
+  const [currentEntryId, setCurrentEntryId] = useState("");
+  const [isInlineResultVisible, setIsInlineResultVisible] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const fetchCustomers = useCallback(async (targetUserId: string) => {
     setIsCustomersLoading(true);
@@ -511,6 +522,95 @@ export default function Page() {
     )));
   }
 
+  async function generateDiary() {
+    if (isCreateDetailsOpen) setIsCreateDetailsOpen(false);
+
+    const name = nameInputValue.trim();
+    const isPhoto = createMode === "photo";
+    const targetCustomer = selectedCustomer || customerData.find((customer) => customer.name === name) || null;
+
+    if (!isPhoto && !name && !window.confirm("名前が入力されていませんが、そのまま作成しますか？")) {
+      return;
+    }
+
+    setIsInlineResultVisible(false);
+    setInlineResultText("");
+    setCurrentEntryId("");
+    setIsGenerating(true);
+
+    try {
+      let customerRank = "新規";
+      if (targetCustomer) {
+        const stats = getCustomerStats(targetCustomer);
+        if (stats.isVip) customerRank = "VIP";
+        else if (stats.count === 1) customerRank = "新規";
+        else if (stats.count === 2) customerRank = "2回目";
+        else customerRank = "常連";
+      }
+
+      const forbiddenTags = ["新規", "初回", "初回来店", "初めて", "一見", "常連", "リピーター", "2回目", "二回目", "3回目", "三回目", "1回目", "一回目"];
+      const cleanedCustomerTags = (targetCustomer?.tagsArray || []).filter((tag) => !forbiddenTags.some((forbidden) => tag.includes(forbidden)));
+      const memos = parseMemoToJSON(targetCustomer ? targetCustomer.memo : "").filter((memo) => memo.type !== "sales");
+      const filteredMemosStr = memos.map((memo) => {
+        const filteredTags = (memo.tags || []).filter((tag: string) => !isEmotionTag(tag));
+        const tagsStr = filteredTags.length > 0 ? `(タグ: ${filteredTags.join(", ")})` : "";
+        return `${memo.date}: ${memo.text} ${tagsStr}`.trim();
+      }).join("\n---\n");
+      const isAlertStatus = targetCustomer ? isAlertCustomer(targetCustomer) : false;
+
+      const payload = {
+        userId,
+        customerId: targetCustomer?.id || selectedCustomerId,
+        name,
+        episodeText: todayEpisodeText,
+        factTags: selectedFactTags.join(","),
+        moodTags: selectedMoodTags.join(","),
+        visitStatus: visitStatus === "yes" ? "visit" : "sales",
+        pastMemo: filteredMemosStr,
+        style: styleTab,
+        tension: "3",
+        emoji: "4",
+        customText: "",
+        businessType: selectedBusinessType,
+        industryPrompt: "",
+        customerTags: cleanedCustomerTags.join(","),
+        customerRank,
+        isAlert: String(isAlertStatus),
+        image: null,
+        mode: isPhoto ? "photo" : "text",
+      };
+
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "不明なエラー");
+      }
+
+      if (!isPhoto && name) {
+        await fetchCustomers(userId);
+      }
+
+      setInlineResultText(data.generatedText || "（テキストがありません）");
+      setIsInlineResultVisible(true);
+      setSelectedFactTags([]);
+      setCurrentEntryId(data.entry_id || "");
+
+      window.setTimeout(() => {
+        document.querySelector(".scroll-area")?.scrollTo({ top: document.querySelector(".scroll-area")?.scrollHeight || 0, behavior: "smooth" });
+      }, 100);
+    } catch (error) {
+      console.error("generateDiary Error:", error);
+      showNotice(`エラーが発生しました: ${error instanceof Error ? error.message : "不明なエラー"}`);
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
   async function saveCustomerEdit() {
     const newName = editCustomerName.trim();
     if (!newName) {
@@ -652,8 +752,8 @@ export default function Page() {
       {/* 本文 */}
       <span className="label">📝 今日の出来事・接客メモ</span>
       <div className="textarea-wrapper">
-        <textarea id="todayEpisodeInput" className="input-field" placeholder="（例）こけてみんなで爆笑した！ウザ絡みされたけどシャンパン入れてくれた笑&#10;※AIが空気を読んで綺麗なメッセージにします✨" data-original-input={"autoScrollTextarea()"} style={{background: "var(--input-bg)", border: "1px solid transparent"}}></textarea>
-        <div className="clear-btn" data-original-click={"clearEpisodeInput()"}>🧹 クリア</div>
+        <textarea id="todayEpisodeInput" className="input-field" placeholder="（例）こけてみんなで爆笑した！ウザ絡みされたけどシャンパン入れてくれた笑&#10;※AIが空気を読んで綺麗なメッセージにします✨" data-original-input={"autoScrollTextarea()"} value={todayEpisodeText} onChange={(event) => setTodayEpisodeText(event.target.value)} style={{background: "var(--input-bg)", border: "1px solid transparent"}}></textarea>
+        <div className="clear-btn" data-original-click={"clearEpisodeInput()"} onClick={() => { if (!todayEpisodeText && selectedFactTags.length === 0 && selectedMoodTags.length === 0) return; if (window.confirm("入力をクリアしますか？")) { setTodayEpisodeText(""); setSelectedFactTags([]); setSelectedMoodTags([]); } }}>🧹 クリア</div>
       </div>
     </div>
   </div>
@@ -944,9 +1044,9 @@ export default function Page() {
           </div>
         </div>
 
-        <div id="inlineResultArea" className="card" style={{display: "none", border: "1px solid var(--primary-light)", background: "#FFF", marginTop: "24px", position: "relative"}}>
-          <textarea id="inlineResultText" className="input-field" style={{height: "200px", lineHeight: "1.6", fontSize: "14px", marginBottom: "12px", resize: "vertical"}} placeholder="ここに生成された文章が表示されます。自由に修正できます。"></textarea>
-          <input type="hidden" id="currentEntryId" value="" />
+        <div id="inlineResultArea" className="card" style={{display: isInlineResultVisible ? "block" : "none", border: "1px solid var(--primary-light)", background: "#FFF", marginTop: "24px", position: "relative"}}>
+          <textarea id="inlineResultText" className="input-field" value={inlineResultText} onChange={(event) => setInlineResultText(event.target.value)} style={{height: "200px", lineHeight: "1.6", fontSize: "14px", marginBottom: "12px", resize: "vertical"}} placeholder="ここに生成された文章が表示されます。自由に修正できます。"></textarea>
+          <input type="hidden" id="currentEntryId" value={currentEntryId} />
           <h3 style={{textAlign: "center", marginBottom: "6px", color: "var(--primary)", fontSize: "16px"}}>✨ 執筆完了！</h3>
           <div style={{textAlign: "center", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "16px"}}>
             💡 自由に手直しOK！送信・コピー時に履歴に上書き保存されるよ✨
@@ -962,8 +1062,8 @@ export default function Page() {
         </div>
 
         {/* 💎 CTA 下部固定浮遊 */}
-        <div className="sticky-submit">
-          <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"}>✨ AIで作成する</button>
+        <div className="sticky-submit" style={{pointerEvents: "auto", zIndex: 50}}>
+          <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"} onClick={generateDiary} disabled={isGenerating} style={{pointerEvents: "auto", position: "relative", zIndex: 51}}>{isGenerating ? "執筆中..." : "✨ AIで作成する"}</button>
         </div>
 
       </div>

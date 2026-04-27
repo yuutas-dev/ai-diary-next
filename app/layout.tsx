@@ -38,7 +38,9 @@ export default function RootLayout({
       <body
         className={`${zenMaru.className} ${zenMaru.variable} ${notoSerifJp.variable} font-sans antialiased`}
       >
-        {children}
+        <div id="__next" className="app-next-root">
+          {children}
+        </div>
       </body>
     </html>
   );

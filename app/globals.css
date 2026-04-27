@@ -64,13 +64,18 @@ body[data-app-font="mincho"] {
   box-sizing: border-box;
 }
 
-html, body {
+/* iOS/LIFF: 画面外に覗く白を擬態（ルート全面をテーマ背景で塗る） */
+html,
+body {
   height: 100%;
+  width: 100%;
+  max-width: 100%;
   margin: 0;
   padding: 0;
   overflow: hidden;
+  overscroll-behavior: none;
   overscroll-behavior-y: none;
-  background-color: #F8F7F5;
+  background-color: var(--bg-color) !important;
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -88,13 +93,30 @@ button, a, input, textarea, .accordion-header {
 
 * { box-sizing: border-box; }
 
+/* Next ルート：Viewport 追従＋同じベース色（#__next は layout で付与） */
+#__next,
+.app-next-root,
+body > div:first-of-type {
+  min-height: 100%;
+  min-height: 100dvh;
+  min-height: 100svh;
+  width: 100%;
+  max-width: 100%;
+  background-color: var(--bg-color) !important;
+  box-sizing: border-box;
+  position: relative;
+}
+
 body {
   width: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
+  min-height: 100svh;
   height: 100dvh;
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: var(--bg-color);
+  background: var(--bg-color) !important;
   color: var(--text-main);
   font-family: var(--font-family) !important;
   -webkit-tap-highlight-color: transparent;
@@ -1056,17 +1078,15 @@ input[type="radio"].ui-state { display: none; }
 
 .modal-overlay {
   position: fixed !important;
-  inset: 0 !important;
+  /* inset の代わりに下方向へ物理延長（iOS 下端の抜け防止） */
   top: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
   left: 0 !important;
-  width: 100vw;
-  height: 100vh;
-  height: 100svh;
-  height: 100dvh;
-  min-height: 100vh;
-  min-height: 100dvh;
+  right: 0 !important;
+  bottom: -50px !important;
+  width: 100%;
+  min-height: calc(100dvh + 50px);
+  min-height: calc(100svh + 50px);
+  min-height: calc(100vh + 50px);
   background: rgba(67, 62, 60, 0.5);
   backdrop-filter: blur(4px);
   display: none;
@@ -1083,8 +1103,8 @@ input[type="radio"].ui-state { display: none; }
   position: fixed;
   left: 0;
   right: 0;
-  bottom: -2px;
-  height: calc(env(safe-area-inset-bottom, 0px) + 34px);
+  bottom: -52px;
+  height: calc(env(safe-area-inset-bottom, 0px) + 84px);
   background: rgba(67, 62, 60, 0.5);
   pointer-events: none;
   z-index: 0;
@@ -1330,17 +1350,14 @@ input[type="radio"].ui-state { display: none; }
 
 .half-modal-backdrop {
   position: fixed !important;
-  inset: 0 !important;
   top: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
   left: 0 !important;
-  width: 100vw;
-  height: 100vh;
-  height: 100svh;
-  height: 100dvh;
-  min-height: 100vh;
-  min-height: 100dvh;
+  right: 0 !important;
+  bottom: -50px !important;
+  width: 100%;
+  min-height: calc(100dvh + 50px);
+  min-height: calc(100svh + 50px);
+  min-height: calc(100vh + 50px);
   background: rgba(67, 62, 60, 0.4);
   backdrop-filter: blur(4px);
   z-index: 10000;
@@ -1360,15 +1377,16 @@ input[type="radio"].ui-state { display: none; }
   right: 0;
   left: 0;
   width: 100%;
+  max-width: 100%;
+  margin: 0;
   background: var(--card-bg);
   border-radius: 24px 24px 0 0;
-  padding: 20px 20px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  padding: 20px 20px calc(max(20px, env(safe-area-inset-bottom, 0px)) + 8px);
   z-index: 10001;
   transition: bottom 0.4s cubic-bezier(0.1, 0.8, 0.2, 1);
   box-shadow: 0 -10px 40px rgba(67, 62, 60, 0.1);
   display: flex;
   flex-direction: column;
-  margin: 0;
 }
 
 .half-modal:not(.create-details-half-modal)::after {
@@ -1382,7 +1400,9 @@ input[type="radio"].ui-state { display: none; }
   pointer-events: none;
 }
 
-.half-modal.open:not(.create-details-half-modal) { bottom: 0 !important; }
+.half-modal.open:not(.create-details-half-modal) {
+  bottom: 0 !important;
+}
 
 .half-modal-handle {
   width: 40px;
@@ -1397,7 +1417,8 @@ input[type="radio"].ui-state { display: none; }
   left: 50%;
   bottom: calc(env(safe-area-inset-bottom, 0px) + var(--bottom-nav-height) + 120px);
   border-radius: 20px;
-  padding: 12px 16px 16px;
+  padding: 12px 16px max(20px, env(safe-area-inset-bottom, 0px));
+  margin-bottom: 0;
   box-shadow: var(--shadow-md);
   overflow: hidden;
   transform: translateX(-50%) translateY(10px) scale(0.985);

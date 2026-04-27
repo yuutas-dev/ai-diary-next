@@ -370,6 +370,30 @@ input[type="radio"].ui-state { display: none; }
 
 .filter-container::-webkit-scrollbar { display: none; }
 
+.magic-filter-container {
+  position: relative;
+}
+
+.filter-magic-pill {
+  position: absolute;
+  z-index: 0;
+  border-radius: 20px;
+  background: var(--primary);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+  transition:
+    left 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    top 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.filter-magic-pill.alert {
+  background: var(--alert-text);
+}
+
 .filter-btn {
   background: #FFF;
   border: 1px solid var(--border-color);
@@ -384,19 +408,109 @@ input[type="radio"].ui-state { display: none; }
   flex-shrink: 0;
   height: fit-content;
   position: relative;
+  z-index: 1;
   box-shadow: var(--shadow-sm);
 }
 
 .filter-btn.active-filter {
-  background: var(--primary);
+  background: transparent;
+  color: #FFF;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+#filter-btn-alert.active-filter {
+  background: transparent;
   color: #FFF;
   border-color: transparent;
 }
 
-#filter-btn-alert.active-filter {
-  background: var(--alert-text);
-  color: #FFF;
-  border-color: transparent;
+.customer-list-card {
+  position: relative;
+  transform-origin: center top;
+  animation: customerCardIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.22s ease,
+    max-height 0.24s ease,
+    padding 0.24s ease,
+    margin 0.24s ease,
+    border-width 0.24s ease;
+  max-height: 180px;
+  will-change: transform, opacity, max-height;
+}
+
+.customer-card-hiding {
+  opacity: 0;
+  transform: translateX(24px) scale(0.98);
+  max-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+  border-width: 0 !important;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.customer-context-menu {
+  position: absolute;
+  right: 14px;
+  top: -8px;
+  z-index: 40;
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(255,255,255,0.94);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(14px);
+  animation: popoverIn 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.customer-context-menu::after {
+  content: "";
+  position: absolute;
+  right: 26px;
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  background: rgba(255,255,255,0.94);
+  border-right: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  transform: rotate(45deg);
+}
+
+.customer-context-menu button {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 11px;
+  background: var(--input-bg);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+}
+
+.vip-bounce-badge {
+  animation: vipBadgePop 0.62s cubic-bezier(0.2, 1.35, 0.32, 1);
+}
+
+@keyframes customerCardIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes popoverIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes vipBadgePop {
+  0% { transform: scale(0.72); }
+  52% { transform: scale(1.24); }
+  100% { transform: scale(1); }
 }
 
 .view-toggle {

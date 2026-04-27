@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, PointerEvent, SetStateAction } from "react";
 
 type ActiveTab = "create" | "data" | "settings";
 type CreateMode = "text" | "photo";
@@ -330,9 +330,14 @@ export default function Page() {
   const [expandedHistoryIds, setExpandedHistoryIds] = useState<string[]>([]);
   const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null);
   const [historyEditTexts, setHistoryEditTexts] = useState<Record<string, string>>({});
+  const [activeCustomerMenuId, setActiveCustomerMenuId] = useState<string | null>(null);
+  const [hidingCustomerIds, setHidingCustomerIds] = useState<string[]>([]);
+  const [vipBounceCustomerIds, setVipBounceCustomerIds] = useState<string[]>([]);
+  const [filterPillStyle, setFilterPillStyle] = useState({ left: 0, top: 0, width: 0, height: 0 });
   const actionToastTimerRef = useRef<number | null>(null);
   const cuteToastTimerRef = useRef<number | null>(null);
   const inlineResultRef = useRef<HTMLDivElement | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
   const filterContainerRef = useRef<HTMLDivElement | null>(null);
   const filterButtonRefs = useRef<Record<ListFilter, HTMLDivElement | null>>({
     alert: null,
@@ -448,6 +453,7 @@ export default function Page() {
     return () => {
       if (actionToastTimerRef.current) window.clearTimeout(actionToastTimerRef.current);
       if (cuteToastTimerRef.current) window.clearTimeout(cuteToastTimerRef.current);
+      if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
     };
   }, []);
 
@@ -456,6 +462,27 @@ export default function Page() {
     window.setTimeout(() => {
       filterButtonRefs.current[currentListFilter]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
     }, 80);
+  }, [activeTab, dataView, currentListFilter]);
+
+  useEffect(() => {
+    if (activeTab !== "data" || dataView !== "customer") return;
+    const updateFilterPill = () => {
+      const container = filterContainerRef.current;
+      const button = filterButtonRefs.current[currentListFilter];
+      if (!container || !button) return;
+      const containerRect = container.getBoundingClientRect();
+      const buttonRect = button.getBoundingClientRect();
+      setFilterPillStyle({
+        left: buttonRect.left - containerRect.left + container.scrollLeft,
+        top: buttonRect.top - containerRect.top,
+        width: buttonRect.width,
+        height: buttonRect.height,
+      });
+    };
+    updateFilterPill();
+    window.setTimeout(updateFilterPill, 120);
+    window.addEventListener("resize", updateFilterPill);
+    return () => window.removeEventListener("resize", updateFilterPill);
   }, [activeTab, dataView, currentListFilter]);
 
   const targetDummyTag = getTargetDummyTag(selectedBusinessType);
@@ -604,6 +631,81 @@ export default function Page() {
     setNameInputValue(customer.name);
     setCreateMode("text");
     setActiveTab("create");
+  }
+
+  function clearCustomerLongPress() {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
+
+  function openCustomerMenu(customer: Customer) {
+    if (!customer.id) return;
+    setActiveCustomerMenuId(customer.id);
+    navigator.vibrate?.(18);
+  }
+
+  function startCustomerLongPress(customer: Customer, event: PointerEvent<HTMLDivElement>) {
+    if ((event.target as HTMLElement).closest("button")) return;
+    clearCustomerLongPress();
+    longPressTimerRef.current = window.setTimeout(() => {
+      openCustomerMenu(customer);
+    }, 420);
+  }
+
+  function updateCustomerTagsOptimistically(customerId: string, nextTags: string[]) {
+    setCustomerData((current) => current.map((customer) => (
+      customer.id === customerId
+        ? { ...customer, tags: nextTags.join(", "), tagsArray: nextTags }
+        : customer
+    )));
+  }
+
+  async function persistCustomerTags(customer: Customer, nextTags: string[], previousTags: string[]) {
+    if (!customer.id) return;
+    try {
+      const res = await fetch("/api/customers/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, customerId: customer.id, newName: customer.name, newTags: nextTags }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "更新に失敗しました");
+    } catch (error) {
+      console.error("persistCustomerTags Error:", error);
+      updateCustomerTagsOptimistically(customer.id, previousTags);
+      setHidingCustomerIds((current) => current.filter((id) => id !== customer.id));
+      showActionToast("通信エラーのため元に戻しました");
+    }
+  }
+
+  function toggleCustomerVip(customer: Customer) {
+    if (!customer.id) return;
+    const customerId = customer.id;
+    const previousTags = customer.tagsArray;
+    const isFixedVip = previousTags.includes("一軍固定");
+    const nextTags = isFixedVip ? previousTags.filter((tag) => tag !== "一軍固定") : [...previousTags, "一軍固定"];
+    setActiveCustomerMenuId(null);
+    updateCustomerTagsOptimistically(customerId, nextTags);
+    if (!isFixedVip) {
+      setVipBounceCustomerIds((current) => [...current.filter((id) => id !== customerId), customerId]);
+      window.setTimeout(() => setVipBounceCustomerIds((current) => current.filter((id) => id !== customerId)), 720);
+    }
+    void persistCustomerTags(customer, nextTags, previousTags);
+  }
+
+  function hideCustomerOptimistically(customer: Customer) {
+    if (!customer.id) return;
+    const customerId = customer.id;
+    const previousTags = customer.tagsArray;
+    const nextTags = previousTags.includes("非表示") ? previousTags : [...previousTags, "非表示"];
+    setActiveCustomerMenuId(null);
+    setHidingCustomerIds((current) => [...current.filter((id) => id !== customerId), customerId]);
+    window.setTimeout(() => {
+      updateCustomerTagsOptimistically(customerId, nextTags);
+      void persistCustomerTags(customer, nextTags, previousTags);
+    }, 220);
   }
 
   function getPastMemos(customer: Customer | null) {
@@ -1059,14 +1161,6 @@ export default function Page() {
     </div>
   </div>
 
-  <div id="cardActionModalBackdrop" className="half-modal-backdrop" data-original-click={"closeCardActionModal()"}></div>
-  <div id="cardActionHalfModal" className="half-modal" style={{zIndex: "10002"}}>
-    <div className="half-modal-handle"></div>
-    <h3 id="actionModalName" style={{margin: "0 0 16px", fontWeight: "700", textAlign: "center", color: "var(--text-main)"}}></h3>
-    <button id="btnToggleVip" data-original-click={"toggleVipPin()"} style={{width: "100%", background: "var(--input-bg)", color: "var(--text-main)", border: "1px solid var(--border-color)", padding: "14px", borderRadius: "12px", fontWeight: "700", fontSize: "14px", marginBottom: "10px", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", boxShadow: "var(--shadow-sm)"}}></button>
-    <button data-original-click={"setHidden()"} style={{width: "100%", background: "var(--alert-bg)", color: "var(--alert-text)", border: "1px solid transparent", padding: "14px", borderRadius: "12px", fontWeight: "700", fontSize: "14px", marginBottom: "10px", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px"}}>💤 非表示にする</button>
-  </div>
-
   <div id="createDetailsBackdrop" className={`half-modal-backdrop ${isCreateDetailsOpen ? "show" : ""}`} data-original-click={"closeCreateDetailsModal()"} onClick={() => setIsCreateDetailsOpen(false)} style={{zIndex: 899}}></div>
   <div id="createDetailsHalfModal" className={`half-modal create-details-half-modal ${isCreateDetailsOpen ? "open" : ""}`} onClick={(event) => event.stopPropagation()} style={{height: isCreateDetailsOpen ? "320px" : undefined}}>
     <div className="half-modal-handle" data-original-click={"closeCreateDetailsModal()"} role="button" tabIndex={0} onClick={() => setIsCreateDetailsOpen(false)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setIsCreateDetailsOpen(false); } }} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); closeCreateDetailsModal(); }"}></div>
@@ -1455,7 +1549,8 @@ export default function Page() {
             <div id="clearSearchBtn" style={{position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,0.05)", color: "var(--text-sub)", width: "22px", height: "22px", borderRadius: "50%", display: customerSearchText ? "flex" : "none", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "bold", cursor: "pointer"}} data-original-click={"clearSearch()"} onClick={() => setCustomerSearchText("")}>×</div>
           </div>
 
-          <div className="filter-container" ref={filterContainerRef} style={{paddingBottom: "10px", marginBottom: "0", display: dataView === "customer" ? "flex" : "none"}}>
+          <div className="filter-container magic-filter-container" ref={filterContainerRef} style={{paddingBottom: "10px", marginBottom: "0", display: dataView === "customer" ? "flex" : "none"}}>
+            <div className={`filter-magic-pill ${currentListFilter === "alert" ? "alert" : ""}`} style={{left: `${filterPillStyle.left}px`, top: `${filterPillStyle.top}px`, width: `${filterPillStyle.width}px`, height: `${filterPillStyle.height}px`, opacity: filterPillStyle.width ? 1 : 0}}></div>
             <div ref={(element) => { filterButtonRefs.current.alert = element; }} className={`filter-btn ${currentListFilter === "alert" ? "active-filter" : ""}`} id="filter-btn-alert" data-original-click={"setListFilter('alert')"} onClick={() => setListFilter("alert")}>
               ⚠️ 要連絡
               <div id="alertBadge" style={{display: alertCount > 0 ? "flex" : "none", position: "absolute", top: "-6px", right: "-6px", background: "var(--alert-text)", color: "#FFF", fontSize: "9px", fontWeight: "700", minWidth: "16px", height: "16px", borderRadius: "8px", padding: "0 4px", alignItems: "center", justifyContent: "center"}}>{alertCount}</div>
@@ -1468,7 +1563,7 @@ export default function Page() {
           </div>
         </div>
 
-        <div id="customerListArea" className={isCompactMode ? "compact-view" : ""} style={{marginTop: "12px", position: "relative", zIndex: "1", display: dataView === "customer" ? "block" : "none"}}>
+        <div id="customerListArea" className={isCompactMode ? "compact-view" : ""} onClick={() => setActiveCustomerMenuId(null)} style={{marginTop: "12px", position: "relative", zIndex: "1", display: dataView === "customer" ? "block" : "none"}}>
           {isCustomersLoading ? (
             <>
               <div className="card skeleton" style={{height: "80px", marginBottom: "12px"}}></div>
@@ -1499,15 +1594,24 @@ export default function Page() {
                     ? lastMemo.tags.join(", ")
                     : "メモなし"
                 : "メモなし";
-              const cardClass = stats.isVip ? "card card-vip" : "card";
+              const isMenuOpen = activeCustomerMenuId === customer.id;
+              const isHiding = Boolean(customer.id && hidingCustomerIds.includes(customer.id));
+              const isVipBouncing = Boolean(customer.id && vipBounceCustomerIds.includes(customer.id));
+              const cardClass = `${stats.isVip ? "card card-vip" : "card"} customer-list-card${isHiding ? " customer-card-hiding" : ""}`;
 
               return (
-                <div className={cardClass} key={customer.id || customer.name}>
+                <div className={cardClass} key={customer.id || customer.name} onPointerDown={(event) => startCustomerLongPress(customer, event)} onPointerUp={clearCustomerLongPress} onPointerCancel={clearCustomerLongPress} onPointerLeave={clearCustomerLongPress}>
+                  {isMenuOpen ? (
+                    <div className="customer-context-menu" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+                      <button type="button" onClick={() => toggleCustomerVip(customer)}>{customer.tagsArray.includes("一軍固定") ? "👑 一軍解除" : "👑 一軍へ"}</button>
+                      <button type="button" onClick={() => hideCustomerOptimistically(customer)}>👻 非表示</button>
+                    </div>
+                  ) : null}
                   <div className="card-inner" style={{display: "flex", justifyContent: "space-between", alignItems: "flex-start"}}>
                     <div style={{flex: "1", marginRight: "10px", overflow: "hidden", position: "relative"}}>
                       <div style={{display: "flex", alignItems: "flex-start"}}>
                         <div style={{width: "28px", height: "28px", borderRadius: "50%", flexShrink: "0", marginRight: "6px", overflow: "hidden"}} dangerouslySetInnerHTML={{__html: getAvatarSvgMarkup(customer.name, iconTheme)}}></div>
-                        {sysBadge ? <span style={{background: "var(--input-bg)", color: "var(--text-sub)", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", fontWeight: "700", border: "1px solid transparent", marginRight: "6px", display: "inline-block", flexShrink: "0", whiteSpace: "nowrap", height: "fit-content"}}>{sysBadge}</span> : null}
+                        {sysBadge ? <span className={isVipBouncing ? "vip-bounce-badge" : ""} style={{background: "var(--input-bg)", color: "var(--text-sub)", fontSize: "10px", padding: "2px 6px", borderRadius: "4px", fontWeight: "700", border: "1px solid transparent", marginRight: "6px", display: "inline-block", flexShrink: "0", whiteSpace: "nowrap", height: "fit-content"}}>{sysBadge}</span> : null}
                         <b style={{fontSize: "15px", lineHeight: "1.4", wordBreak: "break-word", color: "var(--text-main)"}}>{customer.name}</b>
                       </div>
                       <small className="card-memo" style={{color: "var(--text-sub)", display: "block", marginTop: "4px", lineHeight: "1.4"}}>{previewMemo}</small>

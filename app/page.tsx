@@ -323,6 +323,7 @@ export default function Page() {
   const [historyEditTexts, setHistoryEditTexts] = useState<Record<string, string>>({});
   const actionToastTimerRef = useRef<number | null>(null);
   const cuteToastTimerRef = useRef<number | null>(null);
+  const inlineResultRef = useRef<HTMLDivElement | null>(null);
   const filterContainerRef = useRef<HTMLDivElement | null>(null);
   const filterButtonRefs = useRef<Record<ListFilter, HTMLDivElement | null>>({
     alert: null,
@@ -333,8 +334,9 @@ export default function Page() {
     regular: null,
   });
 
-  const fetchCustomers = useCallback(async (targetUserId: string) => {
-    setIsCustomersLoading(true);
+  const fetchCustomers = useCallback(async (targetUserId: string, options: { showLoading?: boolean } = {}) => {
+    const showLoading = options.showLoading !== false;
+    if (showLoading) setIsCustomersLoading(true);
     try {
       const res = await fetch("/api/customers/list", {
         method: "POST",
@@ -350,11 +352,13 @@ export default function Page() {
       setCurrentFavoriteTexts(Array.isArray(data.favoriteTexts) ? data.favoriteTexts.map((text: unknown) => String(text)).filter(Boolean) : []);
     } catch (error) {
       console.error("fetchCustomers Error:", error);
-      setCustomerData([]);
-      setCurrentFavoriteIds([]);
-      setCurrentFavoriteTexts([]);
+      if (showLoading) {
+        setCustomerData([]);
+        setCurrentFavoriteIds([]);
+        setCurrentFavoriteTexts([]);
+      }
     } finally {
-      setIsCustomersLoading(false);
+      if (showLoading) setIsCustomersLoading(false);
     }
   }, []);
 
@@ -920,7 +924,7 @@ export default function Page() {
 
       showCuteToast(true);
       if (!isPhoto && name) {
-        await fetchCustomers(userId);
+        await fetchCustomers(userId, { showLoading: false });
       }
 
       setInlineResultText(data.generatedText || "（テキストがありません）");
@@ -929,8 +933,12 @@ export default function Page() {
       setCurrentEntryId(data.entry_id || "");
 
       window.setTimeout(() => {
-        document.querySelector(".scroll-area")?.scrollTo({ top: document.querySelector(".scroll-area")?.scrollHeight || 0, behavior: "smooth" });
-      }, 100);
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            inlineResultRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+          });
+        });
+      }, 650);
     } catch (error) {
       console.error("generateDiary Error:", error);
       showCuteErrorToast();
@@ -1373,7 +1381,7 @@ export default function Page() {
           </div>
         </div>
 
-        <div id="inlineResultArea" className="card" style={{display: isInlineResultVisible ? "block" : "none", border: "1px solid var(--primary-light)", background: "#FFF", marginTop: "24px", position: "relative"}}>
+        <div id="inlineResultArea" ref={inlineResultRef} className="card" style={{display: isInlineResultVisible ? "block" : "none", border: "1px solid var(--primary-light)", background: "#FFF", marginTop: "24px", position: "relative"}}>
           <textarea id="inlineResultText" className="input-field" value={inlineResultText} onChange={(event) => setInlineResultText(event.target.value)} style={{height: "200px", lineHeight: "1.6", fontSize: "14px", marginBottom: "12px", resize: "vertical"}} placeholder="ここに生成された文章が表示されます。自由に修正できます。"></textarea>
           <input type="hidden" id="currentEntryId" value={currentEntryId} />
           <h3 style={{textAlign: "center", marginBottom: "6px", color: "var(--primary)", fontSize: "16px"}}>✨ 執筆完了！</h3>
@@ -1553,24 +1561,16 @@ export default function Page() {
       <div className="page page-settings" style={{position: "relative"}}>
         <h2 style={{margin: "0 0 16px", fontWeight: "700", fontSize: "18px"}}>設定・情報</h2>
 
-        <div className="card" style={{marginBottom: "24px"}}>
-          <div className="setting-item" style={{borderBottom: "1px solid var(--border-color)", paddingBottom: "16px", marginBottom: "16px"}} data-original-click={"openStyleModal()"} onClick={() => setActiveModal("style")}>
-            <span>🎨 AIスタイル・口調設定</span>
-            <span className="settings-val" id="styleOverviewText">かわいい・カスタム・清楚</span>
+        <div className="card" style={{marginBottom: "24px", padding: "22px"}}>
+          <div className="setting-item" style={{borderBottom: "1px solid var(--border-color)", paddingBottom: "20px", marginBottom: "18px", minHeight: "58px"}} data-original-click={"openStyleModal()"} onClick={() => setActiveModal("style")}>
+            <span style={{fontSize: "15px"}}>🎨 AIスタイル・口調設定</span>
+            <span className="settings-val" id="styleOverviewText" style={{fontSize: "12px"}}>かわいい・カスタム・清楚</span>
           </div>
-          <div className="setting-item" style={{borderBottom: "1px solid var(--border-color)", paddingBottom: "16px", marginBottom: "16px"}}>
-            <span>🏢 業態設定</span>
-            <select className="input-field" id="businessType" data-original-change={"updateChipsAndSave()"} value={selectedBusinessType} onChange={(event) => setBusinessType(event.target.value as BusinessType)} style={{width: "140px", padding: "6px", fontWeight: "700", textAlign: "right", border: "none", background: "transparent"}}>
-              <option value="cabaret">キャバクラ</option>
-              <option value="fuzoku">風俗・メンエス</option>
-              <option value="garuba">ガルバ</option>
-            </select>
-          </div>
-          <div className="setting-item">
+          <div className="setting-item" style={{borderBottom: "1px solid var(--border-color)", paddingBottom: "20px", marginBottom: "14px"}}>
             <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px"}}>
               <h3 className="section-title" style={{margin: "0"}}>🎨 アイコンテーマ</h3>
             </div>
-            <select id="icon-theme-select" className="input-field" value={iconTheme} onChange={(event) => setSelectedIconTheme(event.target.value as IconTheme)} style={{width: "100%"}}>
+            <select id="icon-theme-select" className="input-field" value={iconTheme} onChange={(event) => setSelectedIconTheme(event.target.value as IconTheme)} style={{width: "100%", padding: "12px", fontWeight: "700"}}>
               <option value="glass">🥂 グラス</option>
               <option value="jewel">💎 ジュエル</option>
               <option value="perfume">🧴 パフューム</option>
@@ -1578,6 +1578,14 @@ export default function Page() {
               <option value="flower">🌹 フラワー</option>
               <option value="teacup">☕ ティーカップ</option>
               <option value="symbol">♠️ カラーサークル</option>
+            </select>
+          </div>
+          <div className="setting-item" style={{paddingTop: "2px", fontSize: "12px", minHeight: "auto"}}>
+            <span style={{color: "var(--text-sub)", fontWeight: "700"}}>🏢 業態設定</span>
+            <select className="input-field" id="businessType" data-original-change={"updateChipsAndSave()"} value={selectedBusinessType} onChange={(event) => setBusinessType(event.target.value as BusinessType)} style={{width: "130px", padding: "4px", fontSize: "12px", fontWeight: "700", textAlign: "right", border: "none", background: "transparent", marginBottom: 0}}>
+              <option value="cabaret">キャバクラ</option>
+              <option value="fuzoku">風俗・メンエス</option>
+              <option value="garuba">ガルバ</option>
             </select>
           </div>
         </div>

@@ -475,14 +475,12 @@ export default function Page() {
     if (isSameCustomer) {
       setSelectedCustomerId(null);
       setNameInputValue("");
-      setVisitStatus("yes");
       return;
     }
 
     setSelectedCustomerId(customer.id);
     setNameInputValue(customer.name);
     setCreateMode("text");
-    setVisitStatus("yes");
     setActiveTab("create");
   }
 
@@ -640,8 +638,10 @@ export default function Page() {
 
     try {
       let customerRank = "新規";
+      let visitCount = 1;
       if (targetCustomer) {
         const stats = getCustomerStats(targetCustomer);
+        visitCount = stats.count;
         if (stats.isVip) customerRank = "VIP";
         else if (stats.count === 1) customerRank = "新規";
         else if (stats.count === 2) customerRank = "2回目";
@@ -658,6 +658,11 @@ export default function Page() {
       }).join("\n---\n");
       const isAlertStatus = targetCustomer ? isAlertCustomer(targetCustomer) : false;
       const currentFavoriteTexts: string[] = [];
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentDay = now.getDay();
+      const timeContext = currentHour >= 17 && currentHour <= 20 ? "夕方" : currentHour >= 21 || currentHour <= 3 ? "深夜" : "昼";
+      const dayContext = currentDay === 5 || currentDay === 6 ? "週末" : currentDay === 0 ? "日曜日" : currentDay === 1 ? "週始め" : "平日";
 
       const payload = {
         userId,
@@ -665,8 +670,11 @@ export default function Page() {
         customerName: targetCustomer ? targetCustomer.name : name,
         businessType: selectedBusinessType,
         customerRank,
+        visitCount: String(visitCount),
         visitStatus: visitStatus === "yes" ? "visit" : "sales",
         isAlert: String(isAlertStatus),
+        timeContext,
+        dayContext,
         episodeText: todayEpisodeText,
         pastMemo: filteredMemosStr,
         customerTags: cleanedCustomerTags.join(","),

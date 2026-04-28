@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 /** 外部ブラウザ（Safari / Chrome など LINE アプリ以外）での閲覧・試行用モック userId — API validateUserId と対応 */
 export const BROWSER_FALLBACK_LINE_USER_ID = "testuser";
@@ -77,6 +78,8 @@ export function useLiffAuth(
   sessionReady: boolean;
   authErrorDetail: string | null;
 } {
+  const pathname = usePathname();
+  const isUiCardRefactorRoute = pathname === "/ui-card-refactor";
   const [userId, setUserId] = useState<string | null>(null);
   const [liffAuthStatus, setLiffAuthStatus] = useState<LiffAuthStatus>("initializing");
   const [authErrorDetail, setAuthErrorDetail] = useState<string | null>(null);
@@ -86,6 +89,14 @@ export function useLiffAuth(
 
     async function bootstrap() {
       try {
+        /** /ui-card-refactor のみ認証エラー表示をバイパスし、見た目確認を優先する */
+        if (isUiCardRefactorRoute) {
+          setUserId(BROWSER_FALLBACK_LINE_USER_ID);
+          setAuthErrorDetail(null);
+          if (!cancelled) setLiffAuthStatus("ready");
+          return;
+        }
+
         const params = new URLSearchParams(window.location.search);
         const devUser = params.get("dev_user")?.trim();
         if (devUser) {
@@ -202,7 +213,7 @@ export function useLiffAuth(
     return () => {
       cancelled = true;
     };
-  }, [fetchCustomers, onInAppAuthFailure]);
+  }, [fetchCustomers, onInAppAuthFailure, isUiCardRefactorRoute]);
 
   const sessionReady =
     liffAuthStatus === "ready" &&

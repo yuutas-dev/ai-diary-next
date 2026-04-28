@@ -64,6 +64,17 @@ interface Customer {
   isMasterDummy?: boolean;
 }
 
+/** /api/entries/history の行 — 作った文章タブ用（業態フィルタと独立） */
+interface HistorySourceRow {
+  id: string;
+  customerId: string | null;
+  customerName: string;
+  customerTags: string[];
+  displayText: string;
+  displayDate: string;
+  inputText: string;
+}
+
 function parseCustomerBusinessType(value: unknown): BusinessType | undefined {
   if (value === undefined || value === null) return undefined;
   const v = String(value).trim();
@@ -427,6 +438,7 @@ export default function Page() {
   const [expandedHistoryIds, setExpandedHistoryIds] = useState<string[]>([]);
   const [editingHistoryId, setEditingHistoryId] = useState<string | null>(null);
   const [historyEditTexts, setHistoryEditTexts] = useState<Record<string, string>>({});
+  const [historySourceRows, setHistorySourceRows] = useState<HistorySourceRow[]>([]);
   const [activeCustomerMenuId, setActiveCustomerMenuId] = useState<string | null>(null);
   const [hidingCustomerIds, setHidingCustomerIds] = useState<string[]>([]);
   const [vipBounceCustomerIds, setVipBounceCustomerIds] = useState<string[]>([]);
@@ -554,6 +566,46 @@ export default function Page() {
 
   const flushLoadingOnAuthError = useCallback(() => setIsCustomersLoading(false), []);
 
+  /** /api/entries/history — 一覧は業態フィルタに依存しないユーザーの全文履歴（作った文章タブ） */
+  const fetchHistoryEntries = useCallback(async (targetUserId: string) => {
+    try {
+      const res = await fetch("/api/entries/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: targetUserId }),
+      });
+      const data = await res.json() as { success?: boolean; items?: unknown[] };
+      if (!data.success || !Array.isArray(data.items)) return;
+      const mapped: HistorySourceRow[] = [];
+      for (const raw of data.items) {
+        if (!raw || typeof raw !== "object") continue;
+        const row = raw as {
+          entryId?: unknown;
+          customerId?: unknown;
+          customerName?: unknown;
+          aiGeneratedText?: unknown;
+          finalSentText?: unknown;
+          entryDate?: unknown;
+        };
+        const displayText =
+          String(row.finalSentText ?? "").trim() || String(row.aiGeneratedText ?? "").trim();
+        if (!displayText) continue;
+        mapped.push({
+          id: String(row.entryId ?? ""),
+          customerId: row.customerId != null ? String(row.customerId) : null,
+          customerName: typeof row.customerName === "string" ? row.customerName : "不明な顧客",
+          customerTags: [],
+          displayText,
+          displayDate: typeof row.entryDate === "string" ? row.entryDate : "",
+          inputText: "",
+        });
+      }
+      setHistorySourceRows(mapped);
+    } catch (e) {
+      console.error("fetchHistoryEntries Error:", e);
+    }
+  }, []);
+
   const fetchCustomers = useCallback(async (targetUserId: string, options: { showLoading?: boolean } = {}) => {
     const showLoading = options.showLoading !== false;
     if (showLoading) setIsCustomersLoading(true);
@@ -597,17 +649,19 @@ export default function Page() {
       setCustomerSource({ masters, users });
       setCurrentFavoriteIds(Array.isArray(data.favoriteIds) ? data.favoriteIds.map((id: unknown) => String(id)).filter(Boolean) : []);
       setCurrentFavoriteTexts(Array.isArray(data.favoriteTexts) ? data.favoriteTexts.map((text: unknown) => String(text)).filter(Boolean) : []);
+      await fetchHistoryEntries(targetUserId);
     } catch (error) {
       console.error("fetchCustomers Error:", error);
       if (showLoading) {
         setCustomerSource({ masters: [], users: [] });
         setCurrentFavoriteIds([]);
         setCurrentFavoriteTexts([]);
+        setHistorySourceRows([]);
       }
     } finally {
       if (showLoading) setIsCustomersLoading(false);
     }
-  }, []);
+  }, [fetchHistoryEntries]);
 
   const { userId, liffAuthStatus, sessionReady, authErrorDetail } = useLiffAuth(fetchCustomers, flushLoadingOnAuthError);
 
@@ -747,26 +801,15 @@ export default function Page() {
     ...(selectedCustomer?.tagsArray || []),
     ...editAttributeTags,
   ])).filter((tag) => tag !== "ダミー" && tag !== "非表示" && tag !== "一軍固定");
-  const historyItems = customerData
-    .flatMap((customer) => (Array.isArray(customer.entries) ? customer.entries : []).map((entry) => {
-      const generatedText = entry.finalSentText || entry.final_sent_text || entry.aiGeneratedText || entry.ai_generated_text || "";
-      return {
-        ...entry,
-        customerId: customer.id,
-        customerName: customer.name,
-        customerTags: customer.tagsArray || [],
-        displayText: generatedText,
-        displayDate: entry.date || entry.entry_date || "",
-        inputText: entry.inputMemo || entry.input_memo || entry.text || "",
-      };
-    }))
-    .filter((entry) => entry.displayText)
-    .sort((a, b) => {
-      const aFav = currentFavoriteIds.includes(String(a.id || "")) ? 1 : 0;
-      const bFav = currentFavoriteIds.includes(String(b.id || "")) ? 1 : 0;
-      if (aFav !== bFav) return bFav - aFav;
-      return new Date(b.displayDate || 0).getTime() - new Date(a.displayDate || 0).getTime();
-    });
+  const historyItems = useMemo(() => {
+    return [...historySourceRows]
+      .sort((a, b) => {
+        const aFav = currentFavoriteIds.includes(String(a.id || "")) ? 1 : 0;
+        const bFav = currentFavoriteIds.includes(String(b.id || "")) ? 1 : 0;
+        if (aFav !== bFav) return bFav - aFav;
+        return new Date(b.displayDate || 0).getTime() - new Date(a.displayDate || 0).getTime();
+      });
+  }, [historySourceRows, currentFavoriteIds]);
 
   function closeModal() {
     if (activeModal === "edit") {
@@ -1290,7 +1333,9 @@ export default function Page() {
         finalSentText: newText,
         deliveryStatus: "copied",
       }),
-    }).catch((error) => console.error("History save API Error:", error));
+    })
+      .then(() => fetchHistoryEntries(userId))
+      .catch((error) => console.error("History save API Error:", error));
 
     cancelEditHistory(targetId);
   }
@@ -1381,6 +1426,8 @@ export default function Page() {
       showCuteToast(true);
       if (!isPhoto && name) {
         await fetchCustomers(userId, { showLoading: false });
+      } else {
+        await fetchHistoryEntries(userId);
       }
 
       setInlineResultText(data.generatedText || "（テキストがありません）");

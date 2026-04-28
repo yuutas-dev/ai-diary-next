@@ -53,9 +53,9 @@ export default function UiCardRefactorPage() {
   const customerFront = frontMode === "customer";
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-[#fceef0]">
+    <div className="fixed inset-0 z-[9999] bg-gradient-to-b from-[#ffeef5] via-[#fff3f8] to-[#fff9fc]">
       <main className="mx-auto flex h-screen w-full max-w-[430px] flex-col px-3 pb-28 pt-5">
-        <div className="mx-auto mb-3 w-fit rounded-full bg-white/70 px-3 py-1 text-[11px] font-bold text-[#9b7883]">
+        <div className="mx-auto mb-3 w-fit rounded-full bg-white/80 px-3 py-1 text-[11px] font-bold text-[#b98795]">
           カードUIテスト中2
         </div>
 
@@ -64,27 +64,27 @@ export default function UiCardRefactorPage() {
           <motion.section
             animate={
               customerFront
-                ? { x: -20, y: -10, scale: 0.94, rotateX: 6, opacity: 0.7 }
-                : { x: 0, y: 0, scale: 1, rotateX: 0, opacity: 1 }
+                ? { x: 0, y: -20, scale: 0.95, opacity: 0.88 }
+                : { x: 0, y: 0, scale: 1, opacity: 1 }
             }
             transition={{ type: "spring", stiffness: 100, damping: 15 }}
-            className="absolute inset-x-2 top-7 bottom-0 rounded-[28px] border border-[#f0dde5] bg-gradient-to-b from-white to-[#fff9fc] p-4 pt-8 shadow-[0_20px_40px_rgba(188,138,151,0.22)]"
-            style={{ zIndex: customerFront ? 10 : 30, transformOrigin: "center top", boxShadow: "0 30px 60px rgba(176, 108, 131, 0.35)" }}
+            className="absolute inset-x-2 top-7 bottom-0 rounded-[30px] border border-[#f5dfea] bg-gradient-to-b from-[#fffefe] to-[#fff7fb] p-4 pt-8 shadow-[0_22px_40px_rgba(230,159,185,0.24)]"
+            style={{ zIndex: customerFront ? 0 : 10, transformOrigin: "center top" }}
           >
             <button
               type="button"
               onClick={swapCards}
-              className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full border border-[#f2dce5] bg-[#fff4f8] px-5 py-1.5 text-base font-black text-[#d1718c] shadow-[0_8px_18px_rgba(205,130,151,0.25)]"
+              className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full border border-[#f8ddeb] bg-white px-5 py-1.5 text-base font-black text-[#e28aa4] shadow-[0_10px_18px_rgba(232,153,182,0.25)]"
               aria-label="写メカードを前面にする"
             >
               📷
             </button>
-            <h3 className="mb-4 text-[15px] font-extrabold text-[#4d4045]">写メ日記モード</h3>
-            <div className="grid h-[340px] place-items-center rounded-2xl border-2 border-dashed border-[#e8c9d6] bg-gradient-to-b from-[#fff5fa] to-white text-center">
+            <h3 className="mb-4 text-[15px] font-extrabold text-[#b57085]">写メ日記モード</h3>
+            <div className="grid h-[340px] place-items-center rounded-3xl border-2 border-dashed border-[#f4d7e5] bg-gradient-to-b from-[#fff6fb] to-white text-center">
               <div className="px-4">
-                <div className="mb-2 text-4xl">🖼️</div>
-                <p className="text-[14px] font-bold text-[#8f6976]">大きな写真アップロード枠</p>
-                <p className="mt-1 text-[11px] text-[#b38a96]">SNS / ブログ用の写真をここに配置</p>
+                <div className="mb-2 text-4xl">📸</div>
+                <p className="text-[14px] font-bold text-[#c27d92]">大きな写真アップロード枠</p>
+                <p className="mt-1 text-[11px] text-[#d19caf]">SNS / ブログ用の写真をここに配置</p>
               </div>
             </div>
           </motion.section>
@@ -94,24 +94,24 @@ export default function UiCardRefactorPage() {
             animate={
               customerFront
                 ? { x: 0, y: 0, scale: 1, rotateX: 0, opacity: 1 }
-                : { x: 18, y: 14, scale: 0.965, rotateX: 4, opacity: 0.8 }
+                : { x: 0, y: 14, scale: 0.97, rotateX: 2, opacity: 0.78 }
             }
             transition={{ type: "spring", stiffness: 100, damping: 15 }}
-            className="absolute inset-0 rounded-[28px] border border-[#f1dde6] bg-white p-4 shadow-[0_24px_45px_rgba(198,134,151,0.2)]"
-            style={{ zIndex: customerFront ? 30 : 10, transformOrigin: "center top" }}
+            className="absolute inset-0 rounded-[30px] border border-[#f3dce8] bg-white p-4 shadow-[0_25px_45px_rgba(223,138,165,0.22)]"
+            style={{ zIndex: customerFront ? 20 : 0, transformOrigin: "center top" }}
             drag={customerFront ? "x" : false}
             dragConstraints={{ left: -140, right: 140 }}
-            dragElastic={0.12}
+            dragElastic={0.14}
             onDragEnd={(_, info) => {
               if (customerFront && Math.abs(info.offset.x) > 70) swapCards();
             }}
           >
-            <h2 className="mb-3 text-[18px] font-black text-[#4a3f43]">👤 誰に送る？</h2>
+            <h2 className="mb-3 text-[18px] font-black text-[#b86f86]">👤 誰に送る？</h2>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="顧客を検索..."
-              className="w-full rounded-2xl border border-[#edd9e1] bg-[#fff8fb] px-4 py-3 text-[13px] text-[#564a4f] outline-none"
+              className="w-full rounded-2xl border border-[#f4dcea] bg-[#fff8fc] px-4 py-3 text-[13px] text-[#946a79] outline-none"
             />
 
             <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
@@ -142,13 +142,14 @@ export default function UiCardRefactorPage() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={selected.id}
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 20, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10 }}
-                transition={{ duration: 0.28, ease: "easeOut" }}
-                className="mt-4 rounded-2xl border border-[#f0dde5] bg-gradient-to-b from-[#fff6fa] to-white p-3"
+                transition={{ type: "spring", stiffness: 120, damping: 18 }}
+                className="relative mt-4 rounded-3xl bg-white/80 p-4 backdrop-blur-sm"
+                style={{ boxShadow: "0 12px 28px rgba(255,255,255,0.95), 0 10px 30px rgba(231,171,191,0.28)" }}
               >
-                <p className="mb-1.5 text-[12px] font-extrabold text-[#815f69]">📖 過去エピソード</p>
+                <p className="mb-1.5 text-[12px] font-extrabold text-[#be768d]">☁️ 過去エピソード</p>
                 <p className="text-[12px] leading-relaxed text-[#594d52]">{selected.episode}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <span className="rounded-full border border-[#f8dce7] bg-[#ffeef4] px-2 py-1 text-[11px] font-bold text-[#8b6170]">
@@ -158,6 +159,13 @@ export default function UiCardRefactorPage() {
                     事実タグ：#初来店
                   </span>
                 </div>
+                <button
+                  type="button"
+                  aria-label="エピソードを追加"
+                  className="absolute -right-3 top-1/2 h-9 w-9 -translate-y-1/2 rounded-full bg-white text-xl font-bold text-[#d87f9a] shadow-[0_8px_18px_rgba(216,127,154,0.25)]"
+                >
+                  ＋
+                </button>
               </motion.div>
             </AnimatePresence>
           </motion.section>

@@ -496,6 +496,21 @@ export default function Page() {
   dataViewRef.current = dataView;
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const pageParam = params.get("page");
+      const modeParam = params.get("mode");
+
+      if (pageParam === "create" || pageParam === "data" || pageParam === "settings") {
+        setActiveTab(pageParam as ActiveTab);
+      }
+      if (modeParam === "text" || modeParam === "photo") {
+        setCreateMode(modeParam as CreateMode);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     customerSearchBarVisibleRef.current = isCustomerSearchBarVisible;
   }, [isCustomerSearchBarVisible]);
 

@@ -224,6 +224,13 @@ function getTargetDummyTag(businessType: BusinessType) {
   return "キャバ客";
 }
 
+/** 画面上の業態選択と顧客の business_type が一致するときのみ一覧に出す（未設定や不正値は除外） */
+function passesBusinessTypeSelection(c: Customer, selected: BusinessType): boolean {
+  const bt = parseCustomerBusinessType(c.businessType);
+  if (bt === undefined) return false;
+  return bt === selected;
+}
+
 type CustomerSource = { masters: Customer[]; users: Customer[] };
 
 /**
@@ -238,6 +245,7 @@ function mergeCustomerDisplayPipeline(
   const targetDummyTag = getTargetDummyTag(businessType);
 
   const mastersPassed = source.masters.filter((c) => {
+    if (!passesBusinessTypeSelection(c, businessType)) return false;
     if (c.tagsArray.includes("非表示")) return false;
     if (!c.tagsArray.includes(targetDummyTag)) return false;
     if (c.id && hiddenDummyIds.has(c.id)) return false;
@@ -245,6 +253,7 @@ function mergeCustomerDisplayPipeline(
   });
 
   const usersPassed = source.users.filter((c) => {
+    if (!passesBusinessTypeSelection(c, businessType)) return false;
     if (c.tagsArray.includes("非表示")) return false;
     if (c.isDummy === true) {
       return c.tagsArray.includes(targetDummyTag);

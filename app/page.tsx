@@ -650,6 +650,10 @@ export default function Page() {
   const selectedCustomer = selectedCustomerId
     ? customerData.find((customer) => customer.id === selectedCustomerId) || null
     : null;
+  const isEditingDummyCustomer =
+    !isCreateCustomerMode &&
+    selectedCustomer != null &&
+    (selectedCustomer.isMasterDummy === true || selectedCustomer.tagsArray.includes("ダミー"));
   const messageMode = createMode === "photo" ? "diary" : "line";
   const modeLabels = MODE_LABELS[selectedBusinessType] || MODE_LABELS.cabaret;
   const stylePlaceholder = STYLE_PLACEHOLDERS[selectedBusinessType] || STYLE_PLACEHOLDERS.cabaret;
@@ -911,10 +915,6 @@ export default function Page() {
   }
 
   function openEditCustomer(customer: Customer, fromHiddenList = false) {
-    if (customer.isMasterDummy) {
-      showActionToast("お試しサンプルは編集できません");
-      return;
-    }
     const memos = getPastMemos(customer);
     setIsCreateCustomerMode(false);
     setIsEditingHiddenCustomer(fromHiddenList);
@@ -1313,6 +1313,17 @@ export default function Page() {
       return;
     }
 
+    const customerBeingEdited =
+      !isCreateCustomerMode && selectedCustomerId
+        ? customerData.find((c) => c.id === selectedCustomerId) ?? null
+        : null;
+    if (
+      customerBeingEdited &&
+      (customerBeingEdited.isMasterDummy === true || customerBeingEdited.tagsArray.includes("ダミー"))
+    ) {
+      return;
+    }
+
     const newTags = editAttributeTags.slice();
     const entriesPayload = memoBlocks.map((block) => ({
       id: block.entryId || null,
@@ -1685,7 +1696,25 @@ export default function Page() {
                 {!block.isReadOnly ? (
                   <div className="memo-block__actions">
                     <button type="button" onClick={() => deleteMemoBlock(block.id)} style={{background: "var(--alert-bg)", color: "var(--alert-text)", border: "none", width: "36px", height: "36px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px"}}>🗑️</button>
-                    <button type="button" onClick={() => updateMemoBlock(block.id, { isExpanded: false })} style={{background: "var(--primary-gradient)", color: "#FFF", border: "none", padding: "10px 20px", borderRadius: "20px", fontWeight: "700", fontSize: "13px", boxShadow: "var(--shadow-sm)"}}>💾 このまま保存</button>
+                    <button
+                      type="button"
+                      disabled={isEditingDummyCustomer}
+                      onClick={() => updateMemoBlock(block.id, { isExpanded: false })}
+                      style={{
+                        background: isEditingDummyCustomer ? "var(--input-bg)" : "var(--primary-gradient)",
+                        color: isEditingDummyCustomer ? "var(--text-muted)" : "#FFF",
+                        border: "none",
+                        padding: "10px 20px",
+                        borderRadius: "20px",
+                        fontWeight: "700",
+                        fontSize: "13px",
+                        boxShadow: isEditingDummyCustomer ? "none" : "var(--shadow-sm)",
+                        opacity: isEditingDummyCustomer ? 0.55 : 1,
+                        cursor: isEditingDummyCustomer ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      💾 このまま保存
+                    </button>
                   </div>
                 ) : null}
                 <div onClick={() => updateMemoBlock(block.id, { isExpanded: false })} style={{textAlign: "center", color: "var(--text-muted)", fontSize: "11px", fontWeight: "700", marginTop: "12px", cursor: "pointer", padding: "8px 0"}}>▲ 閉じる</div>
@@ -1700,7 +1729,28 @@ export default function Page() {
       <div className="modal-content__footer">
       <div id="editActionArea" style={{display: "flex", gap: "10px"}}>
         <button type="button" data-original-click={"closeEditModal()"} onClick={closeEditModal} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px"}} id="cancelBtn">閉じる</button>
-        <button type="button" data-original-click={"saveCustomerEdit()"} id="saveCustomerBtn" onClick={saveCustomerEdit} style={{flex: "1", background: "var(--primary)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px", boxShadow: "var(--shadow-float)"}}>保存する</button>
+        <button
+          type="button"
+          disabled={isEditingDummyCustomer}
+          data-original-click={"saveCustomerEdit()"}
+          id="saveCustomerBtn"
+          onClick={saveCustomerEdit}
+          style={{
+            flex: "1",
+            background: isEditingDummyCustomer ? "var(--input-bg)" : "var(--primary)",
+            color: isEditingDummyCustomer ? "var(--text-muted)" : "#FFF",
+            border: "none",
+            padding: "14px",
+            borderRadius: "20px",
+            fontWeight: "700",
+            fontSize: "13px",
+            boxShadow: isEditingDummyCustomer ? "none" : "var(--shadow-float)",
+            opacity: isEditingDummyCustomer ? 0.55 : 1,
+            cursor: isEditingDummyCustomer ? "not-allowed" : "pointer",
+          }}
+        >
+          保存する
+        </button>
       </div>
 
       <div id="readOnlyActionArea" style={{display: "none", gap: "10px", flexDirection: "column"}}>
@@ -2039,9 +2089,19 @@ export default function Page() {
                     </div>
                     <div className="card-actions" style={{display: "flex", flexDirection: "column", gap: "6px", flexShrink: "0", position: "relative", zIndex: "10"}}>
                       <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); selectCustomer(customer); }} style={{background: "var(--primary-light)", color: "var(--primary)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>✏️</span><span className="action-text">{modeLabels.thanks}作成</span></button>
-                      {!customer.isMasterDummy ? (
-                        <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); openEditCustomer(customer); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>⚙️</span><span className="action-text">編集</span></button>
-                      ) : null}
+                      <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); openEditCustomer(customer); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}>
+                        {customer.isMasterDummy || customer.tagsArray.includes("ダミー") ? (
+                          <>
+                            <span className="action-icon" style={{fontSize: "14px"}}>🔍</span>
+                            <span className="action-text">閲覧</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="action-icon" style={{fontSize: "14px"}}>⚙️</span>
+                            <span className="action-text">編集</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                 </div>

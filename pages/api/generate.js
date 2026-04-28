@@ -7,8 +7,27 @@ function normalizeTags(tags) { if (Array.isArray(tags)) return tags.map(tag => S
 function getSupabase() { const supabaseUrl = (process.env.SUPABASE_URL || '').trim(); const supabaseKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim(); if (!supabaseUrl || !supabaseKey) throw new Error('Vercelの環境変数が読み込めていません'); return createClient(supabaseUrl, supabaseKey); }function getTodayFormatted() { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; }
 async function findCustomerIdByName({ supabase, userId, customerId, name }) {
   const trimmedCustomerId = trimText(customerId);
-  if (trimmedCustomerId) { const { data, error } = await supabase.from('customers').select('id').eq('user_id', userId).eq('id', trimmedCustomerId).maybeSingle(); if (error) throw new Error(`顧客取得エラー: ${error.message}`); if (data?.id) return data.id; }
-  const trimmedName = trimText(name); if (!trimmedName) return null;
+  if (trimmedCustomerId) {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('id', trimmedCustomerId)
+      .maybeSingle();
+    if (error) throw new Error(`顧客取得エラー: ${error.message}`);
+    if (data?.id) return data.id;
+    /** マスターダミーは user_id と紐付かない行があるため、id で is_master_dummy のみ許可して解決 */
+    const master = await supabase
+      .from('customers')
+      .select('id')
+      .eq('id', trimmedCustomerId)
+      .eq('is_master_dummy', true)
+      .maybeSingle();
+    if (master.error) throw new Error(`顧客取得エラー: ${master.error.message}`);
+    if (master.data?.id) return master.data.id;
+  }
+  const trimmedName = trimText(name);
+  if (!trimmedName) return null;
   const { data, error } = await supabase.from('customers').select('id').eq('user_id', userId).eq('name', trimmedName).order('updated_at', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(1);
   if (error) throw new Error(`顧客取得エラー: ${error.message}`);
   return data?.[0]?.id || null;

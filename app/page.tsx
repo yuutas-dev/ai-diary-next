@@ -2195,9 +2195,7 @@ export default function Page() {
                       </div>
                     </div>
                     <div className="card-actions" style={{display: "flex", flexDirection: "column", gap: "6px", flexShrink: "0", position: "relative", zIndex: "10"}}>
-                      {!customer.isDummy ? (
-                        <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); selectCustomer(customer); }} style={{background: "var(--primary-light)", color: "var(--primary)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>✏️</span><span className="action-text">{modeLabels.thanks}作成</span></button>
-                      ) : null}
+                      <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); selectCustomer(customer); }} style={{background: "var(--primary-light)", color: "var(--primary)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>✏️</span><span className="action-text">{modeLabels.thanks}作成</span></button>
                       {customer.isDummy ? (
                         <>
                           <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); hideCustomerOptimistically(customer); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>👻</span><span className="action-text">非表示</span></button>

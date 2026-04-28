@@ -455,7 +455,7 @@ export default function Page() {
   const [actionToastText, setActionToastText] = useState("完了しました");
   const [isActionToastVisible, setIsActionToastVisible] = useState(false);
   const [cuteToastIcon, setCuteToastIcon] = useState("🐰");
-  const [cuteToastText, setCuteToastText] = useState("執筆中だよ...");
+  const [cuteToastText, setCuteToastText] = useState("考え中だよ...");
   const [isCuteToastVisible, setIsCuteToastVisible] = useState(false);
   const [isCuteToastIconAnimating, setIsCuteToastIconAnimating] = useState(false);
   const [currentFavoriteIds, setCurrentFavoriteIds] = useState<string[]>([]);
@@ -901,13 +901,13 @@ export default function Page() {
     }
 
     if (!/^image\//.test(file.type)) {
-      showNotice("画像ファイルを選択してください。");
+      showNotice("画像ファイルを選んでね📸");
       resetInput();
       return;
     }
 
     if (file.size > MAX_DIARY_PHOTO_FILE_BYTES) {
-      showNotice("画像のサイズが大きすぎます（5MB以下にしてください）。");
+      showNotice("画像サイズが大きすぎるみたい💦（5MB以下にしてね）");
       resetInput();
       return;
     }
@@ -919,7 +919,7 @@ export default function Page() {
     reader.onload = () => {
       const raw = reader.result;
       if (typeof raw !== "string") {
-        showNotice("ファイルの読み込み結果が無効です。");
+        showNotice("ファイルの読み込みに失敗しちゃった💦 (無効なデータ)");
         setImageFile(null);
         setPhotoJpegDataUrl(null);
         return;
@@ -932,7 +932,7 @@ export default function Page() {
         let width = img.width;
         let height = img.height;
         if (!width || !height) {
-          showNotice("画像の寸法を読み取れませんでした。別の画像をお試しください。");
+          showNotice("画像のサイズ（寸法）が読み取れなかったよ💦 別の画像で試してね");
           setImageFile(null);
           setPhotoJpegDataUrl(null);
           return;
@@ -949,7 +949,7 @@ export default function Page() {
         canvas.width = width;
         canvas.height = height;
         if (!ctx) {
-          showNotice("ブラウザが画像処理に対応していません。");
+          showNotice("お使いのブラウザが画像処理に対応していないみたい💦");
           setImageFile(null);
           setPhotoJpegDataUrl(null);
           return;
@@ -960,20 +960,20 @@ export default function Page() {
           setPhotoJpegDataUrl(dataUrl);
         } catch {
           console.error("Canvas export failed");
-          showNotice("画像の圧縮に失敗しました。");
+          showNotice("画像の圧縮に失敗しちゃった💦");
           setImageFile(null);
           setPhotoJpegDataUrl(null);
         }
       };
       img.onerror = () => {
-        showNotice("画像の読み込みに失敗しました。別の画像をお試しください。");
+        showNotice("画像の読み込みに失敗しちゃった💦 別の画像で試してね");
         setImageFile(null);
         setPhotoJpegDataUrl(null);
       };
       img.src = raw;
     };
     reader.onerror = () => {
-      showNotice("ファイルの読み込みに失敗しました。");
+      showNotice("ファイルの読み込みに失敗しちゃった💦");
       setImageFile(null);
       setPhotoJpegDataUrl(null);
     };
@@ -1003,7 +1003,7 @@ export default function Page() {
 
     if (!isComplete) {
       setCuteToastIcon("🐰");
-      setCuteToastText("執筆中だよ...");
+      setCuteToastText("考え中だよ...");
       setIsCuteToastIconAnimating(true);
       setIsCuteToastVisible(true);
       return;
@@ -1082,7 +1082,7 @@ export default function Page() {
   async function persistCustomerTags(customer: Customer, nextTags: string[], previousTags: string[]) {
     if (!customer.id) return;
     if (!sessionReady || userId === null) {
-      showActionToast("認証の完了を待ってから試してください");
+      showActionToast("ユーザー認証が終わるまで少し待ってから試してね⏳");
       return;
     }
     try {
@@ -1097,12 +1097,12 @@ export default function Page() {
         })),
       });
       const data = await res.json();
-      if (!data.success) throw new Error(data.error || "更新に失敗しました");
+      if (!data.success) throw new Error(data.error || "データの更新に失敗しちゃった💦");
     } catch (error) {
       console.error("persistCustomerTags Error:", error);
       updateCustomerTagsOptimistically(customer.id, previousTags);
       setHidingCustomerIds((current) => current.filter((id) => id !== customer.id));
-      showActionToast("通信エラーのため元に戻しました");
+      showActionToast("通信エラーがおきたので元に戻したよ🥺");
     }
   }
 
@@ -1133,7 +1133,7 @@ export default function Page() {
     if (customer.isDummy && customer.isMasterDummy) {
       setActiveCustomerMenuId(null);
       persistHiddenDummyForCustomer(customer.id);
-      showActionToast("サンプル顧客を非表示にしました");
+      showActionToast("サンプルのお客様を非表示にしたよ👻");
       return;
     }
     const customerId = customer.id;
@@ -1152,7 +1152,7 @@ export default function Page() {
     const previousTags = customer.tagsArray;
     const nextTags = previousTags.filter((tag) => tag !== "非表示");
     updateCustomerTagsOptimistically(customer.id, nextTags);
-    showActionToast("🟢 非表示を解除しました");
+    showActionToast("🟢 非表示を解除したよ！");
     void persistCustomerTags(customer, nextTags, previousTags);
   }
 
@@ -1166,7 +1166,7 @@ export default function Page() {
     const target = deleteTargetCustomer;
     if (!target?.id) return;
     if (!sessionReady || userId === null) {
-      showActionToast("認証の完了を待ってから試してください");
+      showActionToast("ユーザー認証が終わるまで少し待ってから試してね⏳");
       return;
     }
     const previousSource = customerSource;
@@ -1177,7 +1177,7 @@ export default function Page() {
     setActiveModal("hidden");
     setIsEditingHiddenCustomer(false);
     setDeleteTargetCustomer(null);
-    showActionToast("🗑️ 完全に削除しました");
+    showActionToast("🗑️ 完全に削除したよ");
 
     try {
       const res = await fetch("/api/customers/delete", {
@@ -1186,11 +1186,11 @@ export default function Page() {
         body: JSON.stringify({ userId, customerId: target.id }),
       });
       const data = await res.json();
-      if (!data.success) throw new Error(data.error || "削除に失敗しました");
+      if (!data.success) throw new Error(data.error || "削除に失敗しちゃった💦");
     } catch (error) {
       console.error("executeDeleteCustomer Error:", error);
       setCustomerSource(previousSource);
-      showActionToast("通信エラーのため元に戻しました");
+      showActionToast("通信エラーがおきたので元に戻したよ🥺");
     }
   }
 
@@ -1277,7 +1277,7 @@ export default function Page() {
 
   function resetHiddenDummyCustomers() {
     persistHiddenDummyIds(new Set());
-    showActionToast("サンプル顧客の非表示をリセットしました");
+    showActionToast("サンプルのお客様をすべて再表示したよ✨");
   }
 
   function addCustomAttributeTag() {
@@ -1371,7 +1371,7 @@ export default function Page() {
     const targetId = String(item.id || "");
     if (!targetId) return;
     if (!sessionReady || userId === null) {
-      showActionToast("認証の完了を待ってから試してください");
+      showActionToast("ユーザー認証が終わるまで少し待ってから試してね⏳");
       return;
     }
 
@@ -1440,7 +1440,7 @@ export default function Page() {
     const targetId = String(item.id || "");
     if (!targetId) return;
     if (!sessionReady || userId === null) {
-      showActionToast("認証の完了を待ってから試してください");
+      showActionToast("ユーザー認証が終わるまで少し待ってから試してね⏳");
       return;
     }
 
@@ -1499,7 +1499,7 @@ export default function Page() {
     if (isCreateDetailsOpen) setIsCreateDetailsOpen(false);
 
     if (!sessionReady || userId === null) {
-      showNotice("ユーザー認証の完了をお待ちください");
+      showNotice("ユーザー認証が終わるまで少し待ってね⏳");
       return;
     }
 
@@ -1623,7 +1623,7 @@ export default function Page() {
     }
 
     if (!sessionReady || userId === null) {
-      showNotice("ユーザー認証の完了をお待ちください");
+      showNotice("ユーザー認証が終わるまで少し待ってね⏳");
       return;
     }
 
@@ -1705,7 +1705,7 @@ export default function Page() {
         await fetchCustomers(userId);
       } catch (error) {
         console.error("saveCustomerEdit Error:", error);
-        showActionToast("通信エラーのため元に戻しました");
+        showActionToast("通信エラーがおきたので元に戻したよ🥺");
         await fetchCustomers(userId);
       }
     })();
@@ -1796,7 +1796,7 @@ export default function Page() {
 
   <div id="hiddenListModal" className="modal-overlay" style={{zIndex: "10005", display: activeModal === "hidden" ? "flex" : "none"}} onClick={closeModal}>
     <div className="modal-content" style={{maxHeight: "85dvh", display: "flex", flexDirection: "column"}} onClick={(event) => event.stopPropagation()}>
-      <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}}>💤 非表示にした顧客</h2>
+      <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}}>💤 非表示にしたお客様</h2>
       <p style={{textAlign: "center", fontSize: "11px", color: "var(--text-sub)", marginTop: "-10px", marginBottom: "16px", fontWeight: "700"}}>カードを長押しして記録を確認</p>
       <div id="hiddenCustomersArea" style={{overflowY: "auto", flex: "1", paddingBottom: "8px", margin: "-10px"}}>
         {hiddenCustomers.length === 0 ? (
@@ -1935,7 +1935,7 @@ export default function Page() {
       {isEditingHiddenCustomer ? (
         <button type="button" aria-label="完全に削除" onClick={openHiddenDeleteConfirm} style={{position: "absolute", top: "14px", right: "14px", width: "34px", height: "34px", borderRadius: "50%", border: "none", background: "var(--alert-bg)", color: "var(--alert-text)", fontSize: "16px", boxShadow: "var(--shadow-sm)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer"}}>🗑️</button>
       ) : null}
-      <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}} id="modalTitle">{isCreateCustomerMode ? "新規顧客の登録" : "顧客情報の編集"}</h2>
+      <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}} id="modalTitle">{isCreateCustomerMode ? "✨ お客様とうろく" : "📝 お客様情報のへんしゅう"}</h2>
       <input type="hidden" id="editCustomerIndex" />
       <input type="hidden" id="isCreateMode" value={isCreateCustomerMode ? "true" : "false"} />
       <input type="hidden" id="editCustomerId" value={selectedCustomerId || ""} />
@@ -1944,7 +1944,7 @@ export default function Page() {
       <input readOnly={isEditingDummyCustomer} type="text" id="editCustomerName" className="input-field" value={editCustomerName} onChange={(event) => setEditCustomerName(event.target.value)} style={{marginBottom: "16px", background: "#FFF", border: "1px solid var(--border-color)", opacity: isEditingDummyCustomer ? 0.92 : 1}} />
 
       <div className="accordion-header" data-original-click={"toggleTagAccordion()"} onClick={() => { if (!isEditingDummyCustomer) setIsTagAccordionOpen((isOpen) => !isOpen); }}>
-        <span>🏷️ 属性タグ</span><span id="tagAccordionIcon">{isTagAccordionOpen ? "▲" : "▼"}</span>
+        <span>🏷️ お客様のタイプ・特徴</span><span id="tagAccordionIcon">{isTagAccordionOpen ? "▲" : "▼"}</span>
       </div>
       <div className={`accordion-content ${isTagAccordionOpen ? "open" : ""}`} id="tagAccordionContent">
         <div id="editAttributeTagsArea" className="overflow-y-auto" style={{display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px", maxHeight: "140px", overflowY: "auto"}}>
@@ -2249,7 +2249,7 @@ export default function Page() {
         <div id="inlineResultArea" ref={inlineResultRef} className="card" style={{display: isInlineResultVisible ? "block" : "none", border: "1px solid var(--primary-light)", background: "#FFF", marginTop: "24px", position: "relative"}}>
           <textarea id="inlineResultText" className="input-field" value={inlineResultText} onChange={(event) => setInlineResultText(event.target.value)} style={{height: "200px", lineHeight: "1.6", fontSize: "14px", marginBottom: "12px", resize: "vertical"}} placeholder="ここに生成された文章が表示されます。自由に修正できます。"></textarea>
           <input type="hidden" id="currentEntryId" value={currentEntryId} />
-          <h3 style={{textAlign: "center", marginBottom: "6px", color: "var(--primary)", fontSize: "16px"}}>✨ 執筆完了！</h3>
+          <h3 style={{textAlign: "center", marginBottom: "6px", color: "var(--primary)", fontSize: "16px"}}>✨ 文章ができたよ！</h3>
           <div style={{textAlign: "center", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "16px"}}>
             💡 自由に手直しOK！送信・コピー時に履歴に上書き保存されるよ✨
           </div>
@@ -2265,7 +2265,7 @@ export default function Page() {
 
         {/* 💎 CTA 下部固定浮遊 */}
         <div className="sticky-submit" style={{pointerEvents: "auto"}}>
-          <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"} onClick={generateDiary} disabled={isGenerating || !sessionReady} style={{pointerEvents: "auto"}}>{isGenerating ? "執筆中..." : "✨ AIで作成する"}</button>
+          <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"} onClick={generateDiary} disabled={isGenerating || !sessionReady} style={{pointerEvents: "auto"}}>{isGenerating ? "考え中..." : "✨ AIで作成する"}</button>
         </div>
 
       </div>
@@ -2344,7 +2344,7 @@ export default function Page() {
 
           <div className="filter-container" ref={filterContainerRef} style={{paddingBottom: "10px", marginBottom: "0", display: dataView === "customer" ? "flex" : "none"}}>
             <div ref={(element) => { filterButtonRefs.current.alert = element; }} className={`filter-btn ${currentListFilter === "alert" ? "active-filter" : ""}`} id="filter-btn-alert" data-original-click={"setListFilter('alert')"} onClick={() => setListFilter("alert")}>
-              ⚠️ 要連絡
+              ⚠️ ご無沙汰
               <div id="alertBadge" style={{display: alertCount > 0 ? "flex" : "none", position: "absolute", top: "-6px", right: "-6px", background: "var(--alert-text)", color: "#FFF", fontSize: "9px", fontWeight: "700", minWidth: "16px", height: "16px", borderRadius: "8px", padding: "0 4px", alignItems: "center", justifyContent: "center"}}>{alertCount}</div>
             </div>
             <div ref={(element) => { filterButtonRefs.current.all = element; }} className={`filter-btn ${currentListFilter === "all" ? "active-filter" : ""}`} id="filter-btn-all" data-original-click={"setListFilter('all')"} onClick={() => setListFilter("all")}>すべて</div>
@@ -2364,8 +2364,8 @@ export default function Page() {
           ) : filteredCustomers.length === 0 ? (
             <div className="card" style={{textAlign: "center", padding: "28px 18px", color: "var(--text-sub)"}}>
               <div style={{fontSize: "28px", marginBottom: "8px"}}>🗂️</div>
-              <div style={{fontWeight: "700", marginBottom: "6px"}}>顧客データがありません</div>
-              <div style={{fontSize: "13px", lineHeight: "1.6"}}>顧客を追加するか、検索条件を見直してください。</div>
+              <div style={{fontWeight: "700", marginBottom: "6px"}}>お客様の記録がまだないみたい🗂️</div>
+              <div style={{fontSize: "13px", lineHeight: "1.6"}}>新しく追加するか、検索ワードを変えてみてね🔍</div>
             </div>
           ) : (
             filteredCustomers.map((customer) => {
@@ -2550,9 +2550,9 @@ export default function Page() {
         </div>
 
         <div className="card settings-card" style={{ marginTop: "6px" }}>
-          <div className="setting-card-title">🧪 サンプル顧客の表示</div>
+          <div className="setting-card-title">🧪 お試し用データの表示</div>
           <p style={{ fontSize: "12px", color: "var(--text-sub)", fontWeight: "600", margin: "0 0 12px", lineHeight: 1.55 }}>
-            リストから非表示にしたお試しサンプルのみ、まとめて再表示します。
+            リストから消した「お試し用データ」を、まとめて再表示するよ。
           </p>
           <button
             type="button"
@@ -2569,7 +2569,7 @@ export default function Page() {
               cursor: "pointer",
             }}
           >
-            サンプル顧客の非表示をリセット（すべて再表示）
+            お試し用データをすべて再表示する
           </button>
         </div>
 
@@ -2592,7 +2592,7 @@ export default function Page() {
         </div>
 
         <div className="settings-list">
-          <div className="settings-item" data-original-click={"openHiddenListModal()"} onClick={() => setActiveModal("hidden")}><span>💤 非表示にした顧客</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
+          <div className="settings-item" data-original-click={"openHiddenListModal()"} onClick={() => setActiveModal("hidden")}><span>💤 非表示にしたお客様</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
           <div className="settings-item" data-original-click={"openHelpModal()"} onClick={() => setActiveModal("help")}><span>📖 アプリの使い方と仕様（必読）</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
         </div>
         <div className="settings-list" style={{marginBottom: "40px"}}>

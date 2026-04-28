@@ -2144,6 +2144,7 @@ export default function Page() {
         </div>
       ) : null}
       <div className="page page-create">
+        <div style={{fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px"}}>カードUIテスト中</div>
         {/* 👤 誰に送る？ */}
         <div className="card card-customer-select">
           <span className="label">👤 誰に送る？ <span style={{fontSize: "11px", fontWeight: "normal", color: "var(--text-muted)"}}>(任意)</span></span>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLiffAuth } from "../hooks/useLiffAuth";
 import { buildCustomersCreatePayload, buildCustomersUpdatePayload } from "../lib/buildCustomerApiPayload.js";
-import type { Dispatch, PointerEvent, SetStateAction } from "react";
+import type { ChangeEvent, Dispatch, PointerEvent, SetStateAction } from "react";
 
 type ActiveTab = "create" | "data" | "settings";
 type CreateMode = "text" | "photo";
@@ -32,6 +32,9 @@ interface MemoBlock {
 
 /** サンプル（マスタ）ダミーを一覧から隠す ID のみ LS。memo/名前の差分マージは行わず API の値を表示 */
 const HIDDEN_DUMMY_IDS_KEY = "hidden_dummy_customer_ids";
+
+/** 写メ日記のアップロード上限（バイト）。超える場合はアラートし読み込まない */
+const MAX_DIARY_PHOTO_FILE_BYTES = 5 * 1024 * 1024;
 
 interface CustomerEntry {
   id?: string | null;
@@ -443,6 +446,12 @@ export default function Page() {
   const [currentEntryId, setCurrentEntryId] = useState("");
   const [isInlineResultVisible, setIsInlineResultVisible] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  /** OSから選んだ元ファイル（プレビューは URL.createObjectURL 側と同期） */
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [photoPreviewObjectUrl, setPhotoPreviewObjectUrl] = useState<string | null>(null);
+  /** API 送信用（canvas リサイズ後の JPEG data URL） */
+  const [photoJpegDataUrl, setPhotoJpegDataUrl] = useState<string | null>(null);
+  const photoUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [actionToastText, setActionToastText] = useState("完了しました");
   const [isActionToastVisible, setIsActionToastVisible] = useState(false);
   const [cuteToastIcon, setCuteToastIcon] = useState("🐰");
@@ -489,6 +498,19 @@ export default function Page() {
   useEffect(() => {
     customerSearchBarVisibleRef.current = isCustomerSearchBarVisible;
   }, [isCustomerSearchBarVisible]);
+
+  /** imageFile からプレビュー用 blob URL（解放漏れ防止） */
+  useEffect(() => {
+    if (!imageFile) {
+      setPhotoPreviewObjectUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(imageFile);
+    setPhotoPreviewObjectUrl(objectUrl);
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [imageFile]);
 
   useEffect(() => {
     if (activeTab !== "data" || dataView !== "customer") {
@@ -849,6 +871,108 @@ export default function Page() {
   function showNotice(message: string) {
     window.alert(message);
   }
+
+  /** 写メ日記: ファイル取得 → imageFile + 即時プレビュー、並行で canvas JPEG を API 用にセット */
+  function handlePhotoFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const inputEl = event.currentTarget;
+    const resetInput = () => {
+      inputEl.value = "";
+    };
+
+    const file = inputEl.files?.[0];
+    if (!file) {
+      resetInput();
+      return;
+    }
+
+    if (!/^image\//.test(file.type)) {
+      showNotice("画像ファイルを選択してください。");
+      resetInput();
+      return;
+    }
+
+    if (file.size > MAX_DIARY_PHOTO_FILE_BYTES) {
+      showNotice("画像のサイズが大きすぎます（5MB以下にしてください）。");
+      resetInput();
+      return;
+    }
+
+    setImageFile(file);
+    setPhotoJpegDataUrl(null);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const raw = reader.result;
+      if (typeof raw !== "string") {
+        showNotice("ファイルの読み込み結果が無効です。");
+        setImageFile(null);
+        setPhotoJpegDataUrl(null);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const MAX_SIZE = 1024;
+        let width = img.width;
+        let height = img.height;
+        if (!width || !height) {
+          showNotice("画像の寸法を読み取れませんでした。別の画像をお試しください。");
+          setImageFile(null);
+          setPhotoJpegDataUrl(null);
+          return;
+        }
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else if (height > MAX_SIZE) {
+          width *= MAX_SIZE / height;
+          height = MAX_SIZE;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        if (!ctx) {
+          showNotice("ブラウザが画像処理に対応していません。");
+          setImageFile(null);
+          setPhotoJpegDataUrl(null);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        try {
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+          setPhotoJpegDataUrl(dataUrl);
+        } catch {
+          console.error("Canvas export failed");
+          showNotice("画像の圧縮に失敗しました。");
+          setImageFile(null);
+          setPhotoJpegDataUrl(null);
+        }
+      };
+      img.onerror = () => {
+        showNotice("画像の読み込みに失敗しました。別の画像をお試しください。");
+        setImageFile(null);
+        setPhotoJpegDataUrl(null);
+      };
+      img.src = raw;
+    };
+    reader.onerror = () => {
+      showNotice("ファイルの読み込みに失敗しました。");
+      setImageFile(null);
+      setPhotoJpegDataUrl(null);
+    };
+    reader.readAsDataURL(file);
+    resetInput();
+  }
+
+  useEffect(() => {
+    if (createMode !== "photo") {
+      setImageFile(null);
+      setPhotoJpegDataUrl(null);
+      if (photoUploadInputRef.current) photoUploadInputRef.current.value = "";
+    }
+  }, [createMode]);
 
   function showActionToast(message: string) {
     if (actionToastTimerRef.current) window.clearTimeout(actionToastTimerRef.current);
@@ -1372,6 +1496,15 @@ export default function Page() {
       return;
     }
 
+    if (isPhoto && (!imageFile || !photoJpegDataUrl)) {
+      if (imageFile && !photoJpegDataUrl) {
+        showNotice("画像の処理が完了するまでお待ちください。");
+      } else {
+        showNotice("写真を選択してください。");
+      }
+      return;
+    }
+
     setIsInlineResultVisible(false);
     setInlineResultText("");
     setCurrentEntryId("");
@@ -1425,7 +1558,7 @@ export default function Page() {
         customText: customStyleText,
         favoriteTexts: currentFavoriteTexts.slice(0, 5).join("\n"),
         messageMode,
-        imageFile: null,
+        imageFile: isPhoto ? photoJpegDataUrl : null,
       };
 
       const res = await fetch("/api/generate", {
@@ -2063,10 +2196,17 @@ export default function Page() {
 
         <div className="card mode-photo-ui">
           <span className="label">📷 写真を選ぶ</span>
-          <input type="file" id="photoUpload" accept="image/*" style={{display: "none"}} data-original-change={"previewPhoto(event)"} />
+          <input
+            ref={photoUploadInputRef}
+            type="file"
+            id="photoUpload"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={handlePhotoFileChange}
+          />
           <label htmlFor="photoUpload" id="uploadArea" className="upload-area">
-            <div id="uploadText">📸<br /><br />タップして写真をアップロード</div>
-            <img id="photoPreview" alt="" />
+            <div id="uploadText" style={{ display: photoPreviewObjectUrl ? "none" : undefined }}>📸<br /><br />タップして写真をアップロード</div>
+            <img id="photoPreview" alt="" src={photoPreviewObjectUrl ?? undefined} style={{ display: photoPreviewObjectUrl ? "block" : "none" }} />
           </label>
         </div>
 

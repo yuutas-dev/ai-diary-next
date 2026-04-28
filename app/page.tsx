@@ -519,6 +519,9 @@ export default function Page() {
 
   const { userId, liffAuthStatus, sessionReady } = useLiffAuth(fetchCustomers, flushLoadingOnAuthError);
 
+  /** 認証未完了または顧客データ取得中 — コンテンツ領域のみスケルトン（レイアウトシェルは常時表示） */
+  const showCustomersDataSkeleton = !sessionReady || isCustomersLoading;
+
   const persistHiddenDummyIds = useCallback((next: Set<string>) => {
     try {
       localStorage.setItem(HIDDEN_DUMMY_IDS_KEY, JSON.stringify([...next]));
@@ -590,6 +593,8 @@ export default function Page() {
   const baseVisibleCustomers = customerData.filter((customer) => {
     if (customer.tagsArray.includes("非表示")) return false;
     if (customer.isMasterDummy && customer.id && hiddenDummyIds.has(customer.id)) return false;
+    // マスターお試し: 現在の業態に対応するタグ（キャバ客／ガルバ客／風俗客など）のみ
+    if (customer.isMasterDummy && !customer.tagsArray.includes(targetDummyTag)) return false;
     if (
       !customer.isMasterDummy
       && customer.tagsArray.includes("ダミー")
@@ -1375,68 +1380,6 @@ export default function Page() {
 
   return (
     <>
-  {liffAuthStatus !== "ready" ? (
-    <div
-      role="alertdialog"
-      aria-busy={liffAuthStatus === "initializing"}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 2147483640,
-        backgroundColor: "rgba(255,255,255,0.97)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "28px",
-        textAlign: "center",
-      }}
-    >
-      {liffAuthStatus === "error" ? (
-        <>
-          <p style={{ fontSize: "15px", fontWeight: 700, marginBottom: "12px", color: "var(--text-main)" }}>
-            ログインに失敗しました
-          </p>
-          <p style={{ fontSize: "13px", lineHeight: 1.65, marginBottom: "20px", color: "var(--text-sub)", maxWidth: "320px" }}>
-            LINEアプリから開くか、しばらくしてからページを読み込み直してください。
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              window.location.reload();
-            }}
-            style={{
-              background: "var(--primary)",
-              color: "#FFF",
-              border: "none",
-              padding: "12px 24px",
-              borderRadius: "20px",
-              fontWeight: 700,
-              fontSize: "14px",
-              cursor: "pointer",
-            }}
-          >
-            再読み込み
-          </button>
-        </>
-      ) : (
-        <>
-          <p style={{ fontSize: "14px", fontWeight: 700, marginBottom: "14px", color: "var(--text-main)" }}>認証中…</p>
-          <div
-            aria-hidden="true"
-            style={{
-              width: "36px",
-              height: "36px",
-              border: "3px solid var(--border-color)",
-              borderTopColor: "var(--primary)",
-              borderRadius: "50%",
-              animation: "spin 0.85s linear infinite",
-            }}
-          />
-        </>
-      )}
-    </div>
-  ) : null}
 <div id="actionToast" data-current-user-id={userId ?? ""} style={{top: isActionToastVisible ? "0" : "-150px", whiteSpace: "pre-line"}}>{actionToastText}</div>
 
   <div id="cuteToast" style={{right: isCuteToastVisible ? "0px" : "-250px"}}>
@@ -1780,13 +1723,58 @@ export default function Page() {
     </header>
 
     <main ref={mainScrollAreaRef} className="scroll-area">
+      {liffAuthStatus === "error" ? (
+        <div
+          role="alert"
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 50,
+            margin: "0 0 10px",
+            padding: "12px 14px",
+            borderRadius: "14px",
+            background: "var(--alert-bg)",
+            color: "var(--alert-text)",
+            fontSize: "13px",
+            fontWeight: 700,
+            lineHeight: 1.5,
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "10px",
+            justifyContent: "space-between",
+            boxShadow: "var(--shadow-sm)",
+          }}
+        >
+          <span>LINEログインに失敗しました。LINEアプリから開くか、再読み込みしてください。</span>
+          <button
+            type="button"
+            onClick={() => {
+              window.location.reload();
+            }}
+            style={{
+              background: "#FFF",
+              color: "var(--alert-text)",
+              border: "1px solid rgba(0,0,0,0.12)",
+              padding: "8px 14px",
+              borderRadius: "12px",
+              fontWeight: 700,
+              fontSize: "12px",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            再読み込み
+          </button>
+        </div>
+      ) : null}
       <div className="page page-create">
         {/* 👤 誰に送る？ */}
         <div className="card card-customer-select">
           <span className="label">👤 誰に送る？ <span style={{fontSize: "11px", fontWeight: "normal", color: "var(--text-muted)"}}>(任意)</span></span>
           <div className="fade-scroll-wrapper">
             <div className="stories-scroll" id="quickAccessArea">
-              {isCustomersLoading ? (
+              {showCustomersDataSkeleton ? (
                 <div className="story-item">
                   <div className="skeleton" style={{width: "58px", height: "58px", borderRadius: "50%", flexShrink: "0"}}></div>
                   <div className="skeleton" style={{width: "40px", height: "8px", borderRadius: "4px", marginTop: "4px"}}></div>
@@ -1986,7 +1974,7 @@ export default function Page() {
         </div>
 
         <div id="customerListArea" className={isCompactMode ? "compact-view" : ""} onClick={() => setActiveCustomerMenuId(null)} style={{marginTop: "12px", position: "relative", zIndex: "1", display: dataView === "customer" ? "block" : "none"}}>
-          {isCustomersLoading ? (
+          {showCustomersDataSkeleton ? (
             <>
               <div className="card skeleton" style={{height: "80px", marginBottom: "12px"}}></div>
               <div className="card skeleton" style={{height: "80px", marginBottom: "12px"}}></div>
@@ -2062,7 +2050,13 @@ export default function Page() {
           )}
         </div>
         <div id="historyListArea" style={{display: dataView === "history" ? "block" : "none", marginTop: "12px", position: "relative", zIndex: "1"}}>
-          {historyItems.length === 0 ? (
+          {showCustomersDataSkeleton ? (
+            <>
+              <div className="card skeleton" style={{height: "112px", marginBottom: "12px"}} />
+              <div className="card skeleton" style={{height: "112px", marginBottom: "12px"}} />
+              <div className="card skeleton" style={{height: "112px", marginBottom: "12px"}} />
+            </>
+          ) : historyItems.length === 0 ? (
             <div style={{textAlign: "center", padding: "40px 20px", color: "var(--text-muted)", fontWeight: "700", fontSize: "13px"}}>作った文章はまだありません<br /><span style={{fontSize: "11px", fontWeight: "normal", marginTop: "8px", display: "inline-block"}}>AIでメッセージを作るとここに保存されます</span></div>
           ) : (
             <>

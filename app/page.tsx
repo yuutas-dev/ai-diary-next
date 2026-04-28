@@ -346,6 +346,16 @@ function getAvatarSvgMarkup(name: string, iconTheme: IconTheme) {
   return `<div style="width: 100%; height: 100%; border-radius: 50%; background-color: #ffffff; border: 1px solid #f0e6e6; box-shadow: 0 2px 6px rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" fill="none" style="width: 55%; height: 55%;">${selectedPath}</svg></div>`;
 }
 
+function memoFieldAsStringFromApi(memo: unknown): string {
+  if (memo === undefined || memo === null) return "";
+  if (typeof memo === "string") return memo;
+  try {
+    return JSON.stringify(memo);
+  } catch {
+    return "";
+  }
+}
+
 function normalizeCustomer(customer: {
   id?: string | null;
   name?: string;
@@ -358,13 +368,15 @@ function normalizeCustomer(customer: {
   [key: string]: unknown;
 }): Customer {
   const businessTypeParsed = parseCustomerBusinessType(customer.business_type ?? customer.businessType);
+  const memoStr = memoFieldAsStringFromApi(customer.memo);
+  /** 一覧・編集共通: エピソードは customers.memo を parse した結果のみ（API の entries 列依存を排除） */
   const normalized: Record<string, unknown> = {
     ...customer,
     id: customer.id || null,
     name: customer.name || "",
-    memo: customer.memo || "",
+    memo: memoStr,
     tags: customer.tags || "",
-    entries: Array.isArray(customer.entries) ? customer.entries : [],
+    entries: parseMemoToJSON(memoStr),
     tagsArray: customer.tags ? customer.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : [],
     isMasterDummy: customer.is_master_dummy === true,
   };

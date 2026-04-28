@@ -1,4 +1,5 @@
 ﻿import { createClient } from '@supabase/supabase-js';
+import { requireResolvedUserId } from '../../lib/validateUserId.js';
 function sendJson(res, status, payload) { return res.status(status).json(payload); }
 function parseRequestBody(body) { if (!body) return {}; if (typeof body === 'string') return JSON.parse(body); return body; }
 function trimText(value) { return typeof value === 'string' ? value.trim() : ''; }
@@ -23,7 +24,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return sendJson(res, 405, { success: false, error: 'Method Not Allowed' });
   try {
     const data = parseRequestBody(req.body);
-    const userId = data?.userId || 'default-user';
+    const userId = requireResolvedUserId(data?.userId, res);
+    if (!userId) return;
     const difyApiKey = (process.env.DIFY_API_KEY || '').trim();
     if (!difyApiKey) throw new Error('Difyの環境変数が読み込めていません');
     const supabase = getSupabase();

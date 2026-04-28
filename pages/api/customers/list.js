@@ -1,4 +1,5 @@
 ﻿import { createClient } from '@supabase/supabase-js';
+import { requireResolvedUserId } from '../../../lib/validateUserId.js';
 
 function sendJson(res, status, payload) {
   return res.status(status).json(payload);
@@ -42,7 +43,8 @@ export default async function handler(req, res) {
 
   try {
     const data = parseRequestBody(req.body);
-    const userId = data?.userId || 'test-user';
+    const userId = requireResolvedUserId(data?.userId, res);
+    if (!userId) return;
     const supabase = getSupabase();
     const [userCustomersResult, dummyCustomersResult] = await Promise.all([
       supabase.from('customers').select('*').eq('user_id', userId),

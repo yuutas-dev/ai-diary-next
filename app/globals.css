@@ -981,6 +981,12 @@ input[type="radio"].ui-state { display: none; }
   100% { opacity: 1; }
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* 💎 CTA 下部浮遊 */
 .sticky-submit {
   position: fixed; /* sticky から fixed に変更して画面に固定 */

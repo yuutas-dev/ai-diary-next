@@ -29,7 +29,11 @@ interface MemoBlock {
 }
 
 const LIFF_ID = "2009902106-W8zW5hJA";
-const DEFAULT_USER_ID = "test-user";
+
+/** Desktop devのみ（NODE_ENV===development && !isInClient）でのローカルDB検証向けモック userId — LIFFブラウザでは使用しない */
+const DEV_BROWSER_MOCK_USER_ID = "test-user";
+
+type LiffAuthStatus = "initializing" | "ready" | "error";
 
 interface CustomerEntry {
   id?: string | null;
@@ -303,7 +307,8 @@ export default function Page() {
   const [visitStatus, setVisitStatus] = useState<VisitStatus>("yes");
   const [styleTab, setStyleTab] = useState<StyleTab>("cute");
   const [dataView, setDataView] = useState<DataView>("customer");
-  const [userId, setUserId] = useState(DEFAULT_USER_ID);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [liffAuthStatus, setLiffAuthStatus] = useState<LiffAuthStatus>("initializing");
   const [customerData, setCustomerData] = useState<Customer[]>([]);
   const [isCustomersLoading, setIsCustomersLoading] = useState(true);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -498,6 +503,10 @@ export default function Page() {
     }
   }, []);
 
+  /** LIFF と userId が確定するまで同期的なデータ操作や API で userId が空になる状態を防ぐ */
+  const sessionReady =
+    liffAuthStatus === "ready" && typeof userId === "string" && userId.length > 0;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -509,36 +518,55 @@ export default function Page() {
         if (!cancelled) {
           setUserId(devUser);
           await fetchCustomers(devUser);
+          setLiffAuthStatus("ready");
         }
         return;
       }
 
+      let liff: typeof import("@line/liff").default | undefined;
       try {
-        const liff = (await import("@line/liff")).default;
+        liff = (await import("@line/liff")).default;
         await liff.init({ liffId: LIFF_ID });
 
         if (!liff.isLoggedIn()) {
-          liff.login();
+          liff.login({ redirectUri: window.location.href });
           return;
         }
 
         const profile = await liff.getProfile();
-        const profileUserId = profile.userId;
+        const profileUserId = profile.userId?.trim();
+        if (!profileUserId) {
+          throw new Error("LINE userId が取得できませんでした");
+        }
 
         if (!cancelled) {
           setUserId(profileUserId);
           await fetchCustomers(profileUserId);
+          setLiffAuthStatus("ready");
         }
       } catch (error) {
         console.error("LIFF init Error:", error);
+        const inLineClient =
+          typeof liff !== "undefined" && liff?.isInClient?.() === true;
+        const allowDevBrowserMock =
+          process.env.NODE_ENV === "development" && !inLineClient;
+
+        if (!cancelled && allowDevBrowserMock) {
+          setUserId(DEV_BROWSER_MOCK_USER_ID);
+          await fetchCustomers(DEV_BROWSER_MOCK_USER_ID);
+          setLiffAuthStatus("ready");
+          return;
+        }
+
         if (!cancelled) {
-          setUserId(DEFAULT_USER_ID);
-          await fetchCustomers(DEFAULT_USER_ID);
+          setUserId(null);
+          setLiffAuthStatus("error");
+          setIsCustomersLoading(false);
         }
       }
     }
 
-    initAndFetchCustomers();
+    void initAndFetchCustomers();
 
     return () => {
       cancelled = true;
@@ -797,6 +825,10 @@ export default function Page() {
 
   async function persistCustomerTags(customer: Customer, nextTags: string[], previousTags: string[]) {
     if (!customer.id) return;
+    if (!sessionReady || userId === null) {
+      showActionToast("認証の完了を待ってから試してください");
+      return;
+    }
     try {
       const res = await fetch("/api/customers/update", {
         method: "POST",
@@ -859,6 +891,10 @@ export default function Page() {
   async function executeDeleteCustomer() {
     const target = deleteTargetCustomer;
     if (!target?.id) return;
+    if (!sessionReady || userId === null) {
+      showActionToast("認証の完了を待ってから試してください");
+      return;
+    }
     const previousCustomers = customerData;
     setCustomerData((current) => current.filter((customer) => customer.id !== target.id));
     setActiveModal("hidden");
@@ -1016,6 +1052,7 @@ export default function Page() {
 
   function sendCompletionStatus(status: string) {
     if (!currentEntryId || !inlineResultText) return;
+    if (!sessionReady || userId === null) return;
     fetch("/api/entries/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1049,6 +1086,10 @@ export default function Page() {
   async function toggleFavoriteHistory(item: (typeof historyItems)[number]) {
     const targetId = String(item.id || "");
     if (!targetId) return;
+    if (!sessionReady || userId === null) {
+      showActionToast("認証の完了を待ってから試してください");
+      return;
+    }
 
     const isCurrentlyFavorited = currentFavoriteIds.includes(targetId);
     const targetText = String(item.displayText || "").trim();
@@ -1114,6 +1155,10 @@ export default function Page() {
   async function saveAndCopyHistory(item: (typeof historyItems)[number]) {
     const targetId = String(item.id || "");
     if (!targetId) return;
+    if (!sessionReady || userId === null) {
+      showActionToast("認証の完了を待ってから試してください");
+      return;
+    }
 
     const newText = (historyEditTexts[targetId] || "").trim();
     if (!newText) {
@@ -1160,6 +1205,11 @@ export default function Page() {
 
   async function generateDiary() {
     if (isCreateDetailsOpen) setIsCreateDetailsOpen(false);
+
+    if (!sessionReady || userId === null) {
+      showNotice("ユーザー認証の完了をお待ちください");
+      return;
+    }
 
     const name = nameInputValue.trim();
     const isPhoto = createMode === "photo";
@@ -1269,6 +1319,11 @@ export default function Page() {
       return;
     }
 
+    if (!sessionReady || userId === null) {
+      showNotice("ユーザー認証の完了をお待ちください");
+      return;
+    }
+
     const newTags = editAttributeTags.slice();
     const entriesPayload = memoBlocks.map((block) => ({
       id: block.entryId || null,
@@ -1336,7 +1391,69 @@ export default function Page() {
 
   return (
     <>
-<div id="actionToast" data-current-user-id={userId} style={{top: isActionToastVisible ? "0" : "-150px", whiteSpace: "pre-line"}}>{actionToastText}</div>
+  {liffAuthStatus !== "ready" ? (
+    <div
+      role="alertdialog"
+      aria-busy={liffAuthStatus === "initializing"}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2147483640,
+        backgroundColor: "rgba(255,255,255,0.97)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "28px",
+        textAlign: "center",
+      }}
+    >
+      {liffAuthStatus === "error" ? (
+        <>
+          <p style={{ fontSize: "15px", fontWeight: 700, marginBottom: "12px", color: "var(--text-main)" }}>
+            ログインに失敗しました
+          </p>
+          <p style={{ fontSize: "13px", lineHeight: 1.65, marginBottom: "20px", color: "var(--text-sub)", maxWidth: "320px" }}>
+            LINEアプリから開くか、しばらくしてからページを読み込み直してください。
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              window.location.reload();
+            }}
+            style={{
+              background: "var(--primary)",
+              color: "#FFF",
+              border: "none",
+              padding: "12px 24px",
+              borderRadius: "20px",
+              fontWeight: 700,
+              fontSize: "14px",
+              cursor: "pointer",
+            }}
+          >
+            再読み込み
+          </button>
+        </>
+      ) : (
+        <>
+          <p style={{ fontSize: "14px", fontWeight: 700, marginBottom: "14px", color: "var(--text-main)" }}>認証中…</p>
+          <div
+            aria-hidden="true"
+            style={{
+              width: "36px",
+              height: "36px",
+              border: "3px solid var(--border-color)",
+              borderTopColor: "var(--primary)",
+              borderRadius: "50%",
+              animation: "spin 0.85s linear infinite",
+            }}
+          />
+        </>
+      )}
+    </div>
+  ) : null}
+<div id="actionToast" data-current-user-id={userId ?? ""} style={{top: isActionToastVisible ? "0" : "-150px", whiteSpace: "pre-line"}}>{actionToastText}</div>
 
   <div id="cuteToast" style={{right: isCuteToastVisible ? "0px" : "-250px"}}>
     <span id="cuteToastIcon" style={{fontSize: "16px", display: "inline-block", animation: isCuteToastIconAnimating ? "bounce-icon 1s infinite" : "none"}}>{cuteToastIcon}</span>
@@ -1794,7 +1911,7 @@ export default function Page() {
 
         {/* 💎 CTA 下部固定浮遊 */}
         <div className="sticky-submit" style={{pointerEvents: "auto"}}>
-          <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"} onClick={generateDiary} disabled={isGenerating} style={{pointerEvents: "auto"}}>{isGenerating ? "執筆中..." : "✨ AIで作成する"}</button>
+          <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"} onClick={generateDiary} disabled={isGenerating || !sessionReady} style={{pointerEvents: "auto"}}>{isGenerating ? "執筆中..." : "✨ AIで作成する"}</button>
         </div>
 
       </div>

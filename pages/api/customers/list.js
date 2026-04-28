@@ -1,7 +1,12 @@
 ﻿import { createClient } from '@supabase/supabase-js';
 import { requireResolvedUserId } from '../../../lib/validateUserId.js';
 
+/** Data route: always run on request; avoid stale caches for Supabase-backed list payloads. */
+export const dynamic = 'force-dynamic';
+
 function sendJson(res, status, payload) {
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
+  res.setHeader('Vary', 'Cookie');
   return res.status(status).json(payload);
 }
 

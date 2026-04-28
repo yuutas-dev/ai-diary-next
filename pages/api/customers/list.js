@@ -123,14 +123,15 @@ export default async function handler(req, res) {
       });
     }
 
-    const masterCustomers = masterRows.map(customer =>
+    /** 一覧は user が優先（レガシー取得でユーザー行が masters に混入してもユーザー側だけ残す） */
+    const userIdSetForDedupe = new Set((userRows || []).map(u => String(u.id)));
+    const masterCustomers = (masterRows || [])
+      .filter(m => !userIdSetForDedupe.has(String(m.id)))
+      .map(customer => customerRowToListPayload(customer, entriesByCustomerId, masterIdsSet));
+
+    const userCustomers = userRows.map(customer =>
       customerRowToListPayload(customer, entriesByCustomerId, masterIdsSet)
     );
-
-    /** ユーザー本人のレコードのみ（マスターダミーとは ID で重複させない） */
-    const userCustomers = userRows
-      .filter(u => !masterIdsSet.has(String(u.id)))
-      .map(customer => customerRowToListPayload(customer, entriesByCustomerId, masterIdsSet));
 
     return sendJson(res, 200, {
       success: true,

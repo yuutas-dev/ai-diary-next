@@ -1898,3 +1898,35 @@ input:checked + .slider:before { transform: translateX(18px); }
     margin: 4px 0 !important;
   }
 }
+
+/* モダンなリスト内セレクトボックス（iOS風） */
+.modern-select-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+.modern-select-wrapper:last-child {
+  border-bottom: none;
+}
+.modern-select-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.modern-select {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 13px;
+  text-align: right;
+  padding-right: 18px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23DF8A9B' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right center;
+  outline: none;
+}

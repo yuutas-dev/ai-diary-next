@@ -2501,81 +2501,35 @@ export default function Page() {
             <span className="settings-val" id="styleOverviewText">かわいい・カスタム・清楚</span>
           </div>
 
-          <div className="settings-pair-grid">
-            <div className="card settings-card settings-card-select">
-              <div className="setting-card-title">💎 アイコンテーマ</div>
-              <select id="icon-theme-select" className="input-field" value={iconTheme} onChange={(event) => setSelectedIconTheme(event.target.value as IconTheme)} style={{width: "100%", padding: "12px", fontWeight: "700"}}>
-                <option value="glass">🥂 グラス</option>
-                <option value="jewel">💎 ジュエル</option>
-                <option value="perfume">🧴 パフューム</option>
-                <option value="moon_star">🌙 ムーン＆スター</option>
-                <option value="flower">🌹 フラワー</option>
-                <option value="teacup">☕ ティーカップ</option>
-                <option value="symbol">♠️ カラーサークル</option>
-              </select>
+          <div className="card settings-card" style={{ marginTop: "6px" }}>
+            <div className="setting-card-title">📖 もっと使いこなすコツ</div>
+            <div style={{ fontSize: "12px", color: "var(--text-sub)", fontWeight: "600", lineHeight: 1.65, marginBottom: "12px" }}>
+              <p style={{ margin: "0 0 10px", color: "var(--text-main)", fontWeight: "700" }}>専属ライターがあなたの代わりにメッセージを考えるから、送る前の「どう書こう…」にさよならできるよ✍️✨</p>
+              <p style={{ margin: 0 }}>お気に入りに入れた文章は覚えていて、使うほどあなたの声に近づいていくよ📈</p>
             </div>
-            <div className="card settings-card settings-card-select">
-              <div className="setting-card-title">🏢 お店のジャンル</div>
-              <select className="input-field" id="businessType" data-original-change={"updateChipsAndSave()"} value={selectedBusinessType} onChange={(event) => setBusinessType(event.target.value as BusinessType)} style={{width: "100%", padding: "12px", fontSize: "13px", fontWeight: "700", marginBottom: 0}}>
-                <option value="cabaret">キャバクラ</option>
-                <option value="fuzoku">風俗・メンエス</option>
-                <option value="garuba">ガルバ</option>
-              </select>
-            </div>
+            <button
+              type="button"
+              data-original-click={"openHelpModal()"}
+              onClick={() => setActiveModal("help")}
+              style={{
+                width: "100%",
+                background: "var(--input-bg)",
+                color: "var(--text-main)",
+                border: "1px solid var(--border-color)",
+                padding: "12px 14px",
+                borderRadius: "14px",
+                fontWeight: "700",
+                fontSize: "12px",
+                cursor: "pointer",
+              }}
+            >
+              仕組みをくわしく見る（必読ガイド）▶
+            </button>
           </div>
 
-          <div className="card settings-card">
-            <div className="setting-card-title">🌈 テーマカラー</div>
-            <div className="settings-option-grid">
-              {APP_THEME_OPTIONS.map((option) => (
-                <button type="button" key={option.value} className={`settings-choice ${appTheme === option.value ? "active" : ""}`} onClick={() => setSelectedAppTheme(option.value)}>
-                  <b>{option.label}</b>
-                  <span>{option.description}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="card settings-card">
-            <div className="setting-card-title">🔤 フォント</div>
-            <div className="settings-option-grid">
-              {APP_FONT_OPTIONS.map((option) => (
-                <button type="button" key={option.value} className={`settings-choice ${appFont === option.value ? "active" : ""}`} onClick={() => setSelectedAppFont(option.value)}>
-                  <b>{option.label}</b>
-                  <span>{option.description}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="card settings-card" style={{ marginTop: "6px" }}>
-          <div className="setting-card-title">🧪 お試し用データの表示</div>
-          <p style={{ fontSize: "12px", color: "var(--text-sub)", fontWeight: "600", margin: "0 0 12px", lineHeight: 1.55 }}>
-            リストから消した「お試し用データ」を、まとめて再表示するよ。
-          </p>
-          <button
-            type="button"
-            onClick={resetHiddenDummyCustomers}
-            style={{
-              width: "100%",
-              background: "var(--primary-light)",
-              color: "var(--primary)",
-              border: "1px solid var(--primary-light)",
-              padding: "14px",
-              borderRadius: "16px",
-              fontWeight: "700",
-              fontSize: "13px",
-              cursor: "pointer",
-            }}
-          >
-            お試し用データをすべて再表示する
-          </button>
-        </div>
-
-        <div className="card settings-alert-card">
-          <div style={{color: "var(--alert-text)", fontWeight: "700", fontSize: "13px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px"}}>💌 そろそろ連絡？お知らせ設定</div>
-          <div style={{display: "flex", gap: "12px"}}>
+          <div className="card settings-alert-card">
+            <div style={{color: "var(--alert-text)", fontWeight: "700", fontSize: "13px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px"}}>💌 連絡時期のおしらせ設定</div>
+            <div style={{display: "flex", gap: "12px"}}>
             <div style={{flex: "1", textAlign: "center"}}>
               <div style={{fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}>🔰 新規</div>
               <input type="number" id="alert-new" className="input-field" style={{padding: "10px 0", textAlign: "center", fontSize: "15px", borderRadius: "12px", width: "100%", boxSizing: "border-box", background: "#FFF", border: "1px solid var(--border-color)"}} value="7" data-original-change={"saveAlertSettings()"} />
@@ -2589,16 +2543,56 @@ export default function Page() {
               <input type="number" id="alert-vip" className="input-field" style={{padding: "10px 0", textAlign: "center", fontSize: "15px", borderRadius: "12px", width: "100%", boxSizing: "border-box", background: "#FFF", border: "1px solid var(--border-color)"}} value="14" data-original-change={"saveAlertSettings()"} />
             </div>
           </div>
+          </div>
+
+          <div className="card settings-card" style={{ marginTop: "6px" }}>
+            <div className="setting-card-title">🎨 見た目の設定</div>
+            <div className="modern-select-wrapper">
+              <span className="modern-select-label">🏢 お店のジャンル</span>
+              <select className="modern-select" id="businessType" data-original-change={"updateChipsAndSave()"} value={selectedBusinessType} onChange={(event) => setBusinessType(event.target.value as BusinessType)} style={{ flex: "1", minWidth: 0 }}>
+                <option value="cabaret">キャバクラ</option>
+                <option value="fuzoku">風俗・メンエス</option>
+                <option value="garuba">ガルバ</option>
+              </select>
+            </div>
+            <div className="modern-select-wrapper">
+              <span className="modern-select-label">💎 アイコンテーマ</span>
+              <select id="icon-theme-select" className="modern-select" value={iconTheme} onChange={(event) => setSelectedIconTheme(event.target.value as IconTheme)} style={{ flex: "1", minWidth: 0 }}>
+                <option value="glass">🥂 グラス</option>
+                <option value="jewel">💎 ジュエル</option>
+                <option value="perfume">🧴 パフューム</option>
+                <option value="moon_star">🌙 ムーン＆スター</option>
+                <option value="flower">🌹 フラワー</option>
+                <option value="teacup">☕ ティーカップ</option>
+                <option value="symbol">♠️ カラーサークル</option>
+              </select>
+            </div>
+            <div className="modern-select-wrapper">
+              <span className="modern-select-label">🌈 テーマカラー</span>
+              <select className="modern-select" value={appTheme} onChange={(event) => setSelectedAppTheme(event.target.value as AppTheme)} style={{ flex: "1", minWidth: 0 }}>
+                {APP_THEME_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}（{option.description}）</option>
+                ))}
+              </select>
+            </div>
+            <div className="modern-select-wrapper">
+              <span className="modern-select-label">🔤 フォント</span>
+              <select className="modern-select" value={appFont} onChange={(event) => setSelectedAppFont(event.target.value as AppFont)} style={{ flex: "1", minWidth: 0 }}>
+                {APP_FONT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}（{option.description}）</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
         </div>
 
-        <div className="settings-list">
-          <div className="settings-item" data-original-click={"openHiddenListModal()"} onClick={() => setActiveModal("hidden")}><span>💤 非表示にしたお客様</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
-          <div className="settings-item" data-original-click={"openHelpModal()"} onClick={() => setActiveModal("help")}><span>📖 アプリの使い方と仕様（必読）</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
-        </div>
         <div className="settings-list" style={{marginBottom: "40px"}}>
-          <div className="settings-item" data-original-click={"alert('利用規約のページが開きます')"} onClick={() => showNotice("利用規約のページが開きます")}><span>📄 利用規約</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
-          <div className="settings-item" data-original-click={"alert('プライバシーポリシーのページが開きます')"} onClick={() => showNotice("プライバシーポリシーのページが開きます")}><span>🛡 プライバシーポリシー</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
-          <div className="settings-item"><span>ℹ️ バージョン</span><span className="settings-val">11.0.0 (Stable)</span></div>
+          <div className="settings-item" data-original-click={"openHiddenListModal()"} onClick={() => setActiveModal("hidden")}><span>💤 非表示にしたお客様</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
+          <div className="settings-item" data-original-click={"resetHiddenDummyCustomers()"} onClick={resetHiddenDummyCustomers}><span>🧪 お試し用データをすべて再表示</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
+          <div className="settings-item" data-original-click={"alert('利用規約のページが開きます')"} onClick={() => showNotice("利用規約のページが開きます")}><span>📄 アプリの利用規約</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
+          <div className="settings-item" data-original-click={"alert('プライバシーポリシーのページが開きます')"} onClick={() => showNotice("プライバシーポリシーのページが開きます")}><span>🛡 プライバシーの取り扱い</span><span style={{color: "var(--text-muted)"}}>▶</span></div>
+          <div className="settings-item"><span>ℹ️ バージョン情報</span><span className="settings-val">11.0.0 (Stable)</span></div>
         </div>
 
         <div data-original-click={"promptDevMode()"} onClick={() => showNotice("開発者モード")} style={{position: "absolute", bottom: "10px", right: "10px", fontSize: "11px", color: "var(--text-muted)", cursor: "pointer", userSelect: "none"}}>dev</div>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLiffAuth } from "../hooks/useLiffAuth";
+import { buildCustomersCreatePayload, buildCustomersUpdatePayload } from "../lib/buildCustomerApiPayload.js";
 import type { Dispatch, PointerEvent, SetStateAction } from "react";
 
 type ActiveTab = "create" | "data" | "settings";
@@ -57,7 +58,9 @@ interface Customer {
   tagsArray: string[];
   /** DB customers.business_type（未設定の旧データは undefined） */
   businessType?: BusinessType;
-  /** マスターのサンプル顧客（ユーザー編集対象外） */
+  /** マスタ／タグ由来のダミー（リスト取得後に装飾） */
+  isDummy?: boolean;
+  /** マスターダミー行のみ true */
   isMasterDummy?: boolean;
 }
 
@@ -221,6 +224,43 @@ function getTargetDummyTag(businessType: BusinessType) {
   return "キャバ客";
 }
 
+type CustomerSource = { masters: Customer[]; users: Customer[] };
+
+/**
+ * 取得→業態フィルター→ダミー間引き→マージ（一方通行）
+ * （customerSource が users / masters 分離済み・masters にはマスタのみ）
+ */
+function mergeCustomerDisplayPipeline(
+  source: CustomerSource,
+  businessType: BusinessType,
+  hiddenDummyIds: Set<string>,
+): Customer[] {
+  const targetDummyTag = getTargetDummyTag(businessType);
+
+  function passesIndustryReal(c: Customer): boolean {
+    const bt = parseCustomerBusinessType(c.businessType);
+    if (bt !== undefined && bt !== businessType) return false;
+    return true;
+  }
+
+  const mastersPassed = source.masters.filter((c) => {
+    if (c.tagsArray.includes("非表示")) return false;
+    if (!c.tagsArray.includes(targetDummyTag)) return false;
+    if (c.id && hiddenDummyIds.has(c.id)) return false;
+    return true;
+  });
+
+  const usersPassed = source.users.filter((c) => {
+    if (c.tagsArray.includes("非表示")) return false;
+    if (c.isDummy === true) {
+      return c.tagsArray.includes(targetDummyTag);
+    }
+    return passesIndustryReal(c);
+  });
+
+  return [...mastersPassed, ...usersPassed];
+}
+
 function getDaysSinceLastVisit(memoStr?: string) {
   const allMemos = parseMemoToJSON(memoStr);
   const visitMemos = allMemos.filter((memo) => !memo.type || memo.type === "visit" || memo.status === "legacy");
@@ -340,7 +380,7 @@ export default function Page() {
   const [visitStatus, setVisitStatus] = useState<VisitStatus>("yes");
   const [styleTab, setStyleTab] = useState<StyleTab>("cute");
   const [dataView, setDataView] = useState<DataView>("customer");
-  const [customerData, setCustomerData] = useState<Customer[]>([]);
+  const [customerSource, setCustomerSource] = useState<CustomerSource>({ masters: [], users: [] });
   const [hiddenDummyIds, setHiddenDummyIds] = useState<Set<string>>(() =>
     typeof window !== "undefined" ? readHiddenDummyIdsFromStorage() : new Set(),
   );
@@ -521,16 +561,43 @@ export default function Page() {
         body: JSON.stringify({ userId: targetUserId }),
       });
       const data = await res.json();
-      const customers = data.success && Array.isArray(data.customers)
-        ? data.customers.map(normalizeCustomer)
-        : [];
-      setCustomerData(customers);
+      if (!data.success) throw new Error("list failed");
+
+      let mastersRaw: Parameters<typeof normalizeCustomer>[0][] = [];
+      let usersRaw: Parameters<typeof normalizeCustomer>[0][] = [];
+      if (Array.isArray(data.masterCustomers) && Array.isArray(data.userCustomers)) {
+        mastersRaw = data.masterCustomers;
+        usersRaw = data.userCustomers;
+      } else if (Array.isArray(data.customers)) {
+        const flat = data.customers as Parameters<typeof normalizeCustomer>[0][];
+        mastersRaw = flat.filter((c) =>
+          Boolean(c && typeof c === "object" && ("is_master_dummy" in (c as object)) && Boolean((c as { is_master_dummy?: boolean }).is_master_dummy)));
+        usersRaw = flat.filter((c) =>
+          Boolean(!(c && typeof c === "object" && Boolean((c as { is_master_dummy?: boolean }).is_master_dummy))));
+      }
+
+      const masters: Customer[] = mastersRaw.map((raw) => ({
+        ...normalizeCustomer(raw),
+        isDummy: true,
+        isMasterDummy: true,
+      }));
+
+      const users: Customer[] = usersRaw.map((raw) => {
+        const normalized = normalizeCustomer(raw);
+        return {
+          ...normalized,
+          isDummy: normalized.tagsArray.includes("ダミー"),
+          isMasterDummy: false,
+        };
+      });
+
+      setCustomerSource({ masters, users });
       setCurrentFavoriteIds(Array.isArray(data.favoriteIds) ? data.favoriteIds.map((id: unknown) => String(id)).filter(Boolean) : []);
       setCurrentFavoriteTexts(Array.isArray(data.favoriteTexts) ? data.favoriteTexts.map((text: unknown) => String(text)).filter(Boolean) : []);
     } catch (error) {
       console.error("fetchCustomers Error:", error);
       if (showLoading) {
-        setCustomerData([]);
+        setCustomerSource({ masters: [], users: [] });
         setCurrentFavoriteIds([]);
         setCurrentFavoriteTexts([]);
       }
@@ -552,6 +619,11 @@ export default function Page() {
     }
     setHiddenDummyIds(new Set(next));
   }, []);
+
+  const customerData = useMemo(
+    () => mergeCustomerDisplayPipeline(customerSource, selectedBusinessType, hiddenDummyIds),
+    [customerSource, selectedBusinessType, hiddenDummyIds],
+  );
 
   useEffect(() => {
     const savedBusinessType = localStorage.getItem("businessType");
@@ -611,30 +683,7 @@ export default function Page() {
     }, 80);
   }, [activeTab, dataView, currentListFilter]);
 
-  const targetDummyTag = getTargetDummyTag(selectedBusinessType);
-  const baseVisibleCustomers = customerData.filter((customer) => {
-    if (customer.tagsArray.includes("非表示")) return false;
-    if (customer.isMasterDummy && customer.id && hiddenDummyIds.has(customer.id)) return false;
-    // マスターお試し: 現在の業態に対応するタグ（キャバ客／ガルバ客／風俗客など）のみ
-    if (customer.isMasterDummy && !customer.tagsArray.includes(targetDummyTag)) return false;
-    if (
-      !customer.isMasterDummy
-      && customer.tagsArray.includes("ダミー")
-      && !customer.tagsArray.includes(targetDummyTag)
-    ) {
-      return false;
-    }
-    // 実データのみ業態フィルター: businessType 未設定（旧データ）は常に表示し、設定済みは現在の業態と一致するものだけ
-    if (
-      !customer.isMasterDummy
-      && !customer.tagsArray.includes("ダミー")
-    ) {
-      const bt = parseCustomerBusinessType(customer.businessType);
-      if (bt !== undefined && bt !== selectedBusinessType) return false;
-    }
-    return true;
-  });
-  const quickAccessCustomers = baseVisibleCustomers
+  const quickAccessCustomers = customerData
     .sort((a, b) => {
       const statsA = getCustomerStats(a);
       const statsB = getCustomerStats(b);
@@ -644,7 +693,7 @@ export default function Page() {
     })
     .slice(0, 15);
 
-  const filteredCustomers = baseVisibleCustomers
+  const filteredCustomers = customerData
     .filter((customer) => {
       const normalizedSearchText = customerSearchText.trim().toLowerCase();
       if (normalizedSearchText) {
@@ -675,15 +724,14 @@ export default function Page() {
       if (!statsA.isVip && statsB.isVip) return 1;
       return statsB.count - statsA.count;
     });
-  const alertCount = baseVisibleCustomers.filter(isAlertCustomer).length;
+  const alertCount = customerData.filter(isAlertCustomer).length;
   const hiddenCustomers = customerData.filter((customer) => customer.tagsArray.includes("非表示"));
   const selectedCustomer = selectedCustomerId
     ? customerData.find((customer) => customer.id === selectedCustomerId) || null
     : null;
   const isEditingDummyCustomer =
     !isCreateCustomerMode &&
-    selectedCustomer != null &&
-    (selectedCustomer.isMasterDummy === true || selectedCustomer.tagsArray.includes("ダミー"));
+    selectedCustomer?.isDummy === true;
   const messageMode = createMode === "photo" ? "diary" : "line";
   const modeLabels = MODE_LABELS[selectedBusinessType] || MODE_LABELS.cabaret;
   const stylePlaceholder = STYLE_PLACEHOLDERS[selectedBusinessType] || STYLE_PLACEHOLDERS.cabaret;
@@ -817,11 +865,17 @@ export default function Page() {
   }
 
   function updateCustomerTagsOptimistically(customerId: string, nextTags: string[]) {
-    setCustomerData((current) => current.map((customer) => (
-      customer.id === customerId
-        ? { ...customer, tags: nextTags.join(", "), tagsArray: nextTags }
-        : customer
-    )));
+    setCustomerSource((prev) => {
+      const mapOne = (customer: Customer) => (
+        customer.id === customerId
+          ? { ...customer, tags: nextTags.join(", "), tagsArray: nextTags }
+          : customer
+      );
+      return {
+        masters: prev.masters.map(mapOne),
+        users: prev.users.map(mapOne),
+      };
+    });
   }
 
   async function persistCustomerTags(customer: Customer, nextTags: string[], previousTags: string[]) {
@@ -834,7 +888,12 @@ export default function Page() {
       const res = await fetch("/api/customers/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, customerId: customer.id, newName: customer.name, newTags: nextTags }),
+        body: JSON.stringify(buildCustomersUpdatePayload({
+          userId,
+          customerId: customer.id,
+          newName: customer.name,
+          newTags: nextTags,
+        })),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "更新に失敗しました");
@@ -848,7 +907,7 @@ export default function Page() {
 
   function toggleCustomerVip(customer: Customer) {
     if (!customer.id) return;
-    if (customer.isMasterDummy) return;
+    if (customer.isDummy) return;
     const customerId = customer.id;
     const previousTags = customer.tagsArray;
     const isFixedVip = previousTags.includes("一軍固定");
@@ -870,7 +929,7 @@ export default function Page() {
 
   function hideCustomerOptimistically(customer: Customer) {
     if (!customer.id) return;
-    if (customer.isMasterDummy) {
+    if (customer.isDummy && customer.isMasterDummy) {
       setActiveCustomerMenuId(null);
       persistHiddenDummyForCustomer(customer.id);
       showActionToast("サンプル顧客を非表示にしました");
@@ -897,7 +956,7 @@ export default function Page() {
   }
 
   function openHiddenDeleteConfirm() {
-    if (!selectedCustomer || selectedCustomer.isMasterDummy) return;
+    if (!selectedCustomer || selectedCustomer.isDummy) return;
     setDeleteTargetCustomer(selectedCustomer);
     setActiveModal("delete");
   }
@@ -909,8 +968,11 @@ export default function Page() {
       showActionToast("認証の完了を待ってから試してください");
       return;
     }
-    const previousCustomers = customerData;
-    setCustomerData((current) => current.filter((customer) => customer.id !== target.id));
+    const previousSource = customerSource;
+    setCustomerSource((prev) => ({
+      masters: prev.masters.filter((customer) => customer.id !== target.id),
+      users: prev.users.filter((customer) => customer.id !== target.id),
+    }));
     setActiveModal("hidden");
     setIsEditingHiddenCustomer(false);
     setDeleteTargetCustomer(null);
@@ -926,7 +988,7 @@ export default function Page() {
       if (!data.success) throw new Error(data.error || "削除に失敗しました");
     } catch (error) {
       console.error("executeDeleteCustomer Error:", error);
-      setCustomerData(previousCustomers);
+      setCustomerSource(previousSource);
       showActionToast("通信エラーのため元に戻しました");
     }
   }
@@ -1018,6 +1080,7 @@ export default function Page() {
   }
 
   function addCustomAttributeTag() {
+    if (isEditingDummyCustomer) return;
     const newTag = customAttrInput.trim();
     if (!newTag) return;
     setEditAttributeTags((current) => current.includes(newTag) ? current : [...current, newTag]);
@@ -1029,6 +1092,7 @@ export default function Page() {
   }
 
   function addNewMemoBlock() {
+    if (isEditingDummyCustomer) return;
     setMemoBlocks((current) => [...current, createMemoBlock({}, true)]);
   }
 
@@ -1185,14 +1249,20 @@ export default function Page() {
       return;
     }
 
-    setCustomerData((current) => current.map((customer) => ({
-      ...customer,
-      entries: customer.entries.map((entry) => (
-        String(entry.id || "") === targetId
-          ? { ...entry, finalSentText: newText, final_sent_text: newText }
-          : entry
-      )),
-    })));
+    setCustomerSource((prev) => {
+      const mapEntries = (customer: Customer) => ({
+        ...customer,
+        entries: customer.entries.map((entry) => (
+          String(entry.id || "") === targetId
+            ? { ...entry, finalSentText: newText, final_sent_text: newText }
+            : entry
+        )),
+      });
+      return {
+        masters: prev.masters.map(mapEntries),
+        users: prev.users.map(mapEntries),
+      };
+    });
 
     setCurrentFavoriteTexts((current) => (
       currentFavoriteIds.includes(targetId)
@@ -1345,12 +1415,9 @@ export default function Page() {
 
     const customerBeingEdited =
       !isCreateCustomerMode && selectedCustomerId
-        ? customerData.find((c) => c.id === selectedCustomerId) ?? null
+        ? [...customerSource.users, ...customerSource.masters].find((c) => c.id === selectedCustomerId) ?? null
         : null;
-    if (
-      customerBeingEdited &&
-      (customerBeingEdited.isMasterDummy === true || customerBeingEdited.tagsArray.includes("ダミー"))
-    ) {
+    if (customerBeingEdited?.isDummy === true) {
       return;
     }
 
@@ -1378,7 +1445,12 @@ export default function Page() {
           const res = await fetch("/api/customers/create", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId, newName, newTags, businessType: selectedBusinessType }),
+            body: JSON.stringify(buildCustomersCreatePayload({
+              userId,
+              newName,
+              newTags,
+              businessType: selectedBusinessType,
+            })),
           });
           const data = await res.json();
           if (!data.success) throw new Error(data.error || "顧客作成に失敗しました");
@@ -1387,13 +1459,13 @@ export default function Page() {
           const res = await fetch("/api/customers/update", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+            body: JSON.stringify(buildCustomersUpdatePayload({
               userId,
-              customerId: initialCustomerId,
+              customerId: initialCustomerId!,
               newName,
               newTags,
               businessType: selectedBusinessType,
-            }),
+            })),
           });
           const data = await res.json();
           if (!data.success) throw new Error(data.error || "顧客更新に失敗しました");
@@ -1655,9 +1727,9 @@ export default function Page() {
       <input type="hidden" id="editCustomerId" value={selectedCustomerId || ""} />
 
       <span className="label">名前</span>
-      <input type="text" id="editCustomerName" className="input-field" value={editCustomerName} onChange={(event) => setEditCustomerName(event.target.value)} style={{marginBottom: "16px", background: "#FFF", border: "1px solid var(--border-color)"}} />
+      <input readOnly={isEditingDummyCustomer} type="text" id="editCustomerName" className="input-field" value={editCustomerName} onChange={(event) => setEditCustomerName(event.target.value)} style={{marginBottom: "16px", background: "#FFF", border: "1px solid var(--border-color)", opacity: isEditingDummyCustomer ? 0.92 : 1}} />
 
-      <div className="accordion-header" data-original-click={"toggleTagAccordion()"} onClick={() => setIsTagAccordionOpen((isOpen) => !isOpen)}>
+      <div className="accordion-header" data-original-click={"toggleTagAccordion()"} onClick={() => { if (!isEditingDummyCustomer) setIsTagAccordionOpen((isOpen) => !isOpen); }}>
         <span>🏷️ 属性タグ</span><span id="tagAccordionIcon">{isTagAccordionOpen ? "▲" : "▼"}</span>
       </div>
       <div className={`accordion-content ${isTagAccordionOpen ? "open" : ""}`} id="tagAccordionContent">
@@ -1665,15 +1737,15 @@ export default function Page() {
           {editAttributeOptions.map((tag) => {
             const isSelected = editAttributeTags.includes(tag);
             return (
-              <div key={tag} className={`chip${isSelected ? " active" : ""}`} role="button" tabIndex={0} onClick={() => toggleStringValue(tag, setEditAttributeTags)} style={{background: isSelected ? "var(--primary)" : "#FFF", color: isSelected ? "#FFF" : "var(--text-main)", border: isSelected ? "1px solid transparent" : "1px solid var(--border-color)", boxShadow: isSelected ? "var(--shadow-sm)" : "none"}}>
+              <div key={tag} className={`chip${isSelected ? " active" : ""}`} role="button" tabIndex={0} onClick={() => { if (!isEditingDummyCustomer) toggleStringValue(tag, setEditAttributeTags); }} style={{opacity: isEditingDummyCustomer ? 0.85 : undefined, cursor: isEditingDummyCustomer ? "default" : "pointer", background: isSelected ? "var(--primary)" : "#FFF", color: isSelected ? "#FFF" : "var(--text-main)", border: isSelected ? "1px solid transparent" : "1px solid var(--border-color)", boxShadow: isSelected ? "var(--shadow-sm)" : "none"}}>
                 {tag}
               </div>
             );
           })}
         </div>
         <div style={{display: "flex", gap: "8px"}}>
-          <input type="text" id="customAttrInput" className="input-field" placeholder="オリジナルタグ..." value={customAttrInput} onChange={(event) => setCustomAttrInput(event.target.value)} style={{padding: "10px", fontSize: "12px", background: "#FFF", border: "1px solid var(--border-color)"}} />
-          <button id="addAttrBtn" data-original-click={"addCustomAttributeTag()"} onClick={addCustomAttributeTag} style={{background: "var(--primary)", color: "#FFF", border: "none", borderRadius: "10px", padding: "0 14px", fontWeight: "700", fontSize: "12px", whiteSpace: "nowrap"}}>追加</button>
+          <input readOnly={isEditingDummyCustomer} type="text" id="customAttrInput" className="input-field" placeholder="オリジナルタグ..." value={customAttrInput} onChange={(event) => setCustomAttrInput(event.target.value)} style={{padding: "10px", fontSize: "12px", background: "#FFF", border: "1px solid var(--border-color)"}} />
+          <button id="addAttrBtn" type="button" disabled={isEditingDummyCustomer} data-original-click={"addCustomAttributeTag()"} onClick={addCustomAttributeTag} style={{background: "var(--primary)", color: "#FFF", border: "none", borderRadius: "10px", padding: "0 14px", fontWeight: "700", fontSize: "12px", whiteSpace: "nowrap", opacity: isEditingDummyCustomer ? 0.5 : 1}}>追加</button>
         </div>
       </div>
 
@@ -1682,6 +1754,7 @@ export default function Page() {
         {memoBlocks.length === 0 ? (
           <p style={{textAlign: "center", color: "var(--text-muted)", fontWeight: "700", padding: "20px"}}>過去の記録がありません</p>
         ) : memoBlocks.map((block) => {
+          const memoReadOnly = block.isReadOnly || isEditingDummyCustomer;
           const tagsText = block.tags.length > 0 ? block.tags.map((tag) => `#${tag}`).join(" ") : "タグなし";
           const previewText = block.text ? block.text.split("\n")[0] : "本文なし";
           const typeBadge = block.type === "sales" ? <span style={{fontSize: "10px", background: "var(--sales-bg)", color: "var(--sales-text)", padding: "2px 6px", borderRadius: "4px", fontWeight: "700", marginRight: "4px"}}>📱営業</span> : null;
@@ -1698,10 +1771,10 @@ export default function Page() {
               </div>
               <div className="memo-detail" style={{display: block.isExpanded ? "block" : "none"}}>
                 <div style={{display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px", marginBottom: "8px"}}>
-                  <div style={{display: "flex", alignItems: "center"}}>{block.isReadOnly ? typeBadge : <input type="date" className="memo-date" value={block.date} onChange={(event) => updateMemoBlock(block.id, { date: event.target.value })} style={{width: "fit-content", flex: "0 1 auto", padding: "4px 0"}} />}</div>
+                  <div style={{display: "flex", alignItems: "center"}}>{block.isReadOnly ? typeBadge : memoReadOnly ? <span className="memo-date" style={{ fontSize: "12px", fontWeight: "700", color: "var(--text-sub)" }}>{block.date}</span> : <input type="date" className="memo-date" value={block.date} onChange={(event) => updateMemoBlock(block.id, { date: event.target.value })} style={{width: "fit-content", flex: "0 1 auto", padding: "4px 0"}} />}</div>
                   <div style={{position: "relative", zIndex: 10}}>{block.photoUrl ? <img src={block.photoUrl} style={{width: "40px", height: "40px", borderRadius: "8px", objectFit: "cover", border: "1px solid var(--border-color)", cursor: "pointer", pointerEvents: "auto"}} onClick={(event) => { event.stopPropagation(); setExpandedPhotoUrl(block.photoUrl || ""); setActiveModal("photo"); }} /> : <div style={{width: "40px", height: "40px", borderRadius: "8px", background: "var(--input-bg)", border: "1px dashed var(--text-muted)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", fontSize: "14px"}}>📷</div>}</div>
                 </div>
-                {block.isReadOnly ? (
+                {block.isReadOnly || memoReadOnly ? (
                   <div style={{fontSize: "14px", color: "var(--text-main)", lineHeight: 1.6, marginTop: "4px", padding: "12px", background: "var(--input-bg)", borderRadius: "12px"}}>{block.text || "（本文なし）"}</div>
                 ) : (
                   <textarea className="memo-text" rows={2} placeholder="エピソードを入力..." value={block.text} onChange={(event) => updateMemoBlock(block.id, { text: event.target.value })}></textarea>
@@ -1711,12 +1784,12 @@ export default function Page() {
                     {block.tags.map((tag) => (
                       <span key={`${block.id}-${tag}`} style={{background: "var(--primary-light)", color: "var(--primary)", fontSize: "10px", padding: "3px 8px", borderRadius: "12px", fontWeight: "700", display: "inline-flex", alignItems: "center", gap: "4px"}}>
                         {tag}
-                        {!block.isReadOnly ? <span onClick={() => removeMemoTag(block.id, tag)} style={{cursor: "pointer", fontWeight: "900", lineHeight: 1}}>×</span> : null}
+                        {!memoReadOnly ? <span onClick={() => removeMemoTag(block.id, tag)} style={{cursor: "pointer", fontWeight: "900", lineHeight: 1}}>×</span> : null}
                       </span>
                     ))}
                   </div>
-                  {!block.isReadOnly ? <button type="button" className="memo-add-tag-btn" onClick={() => updateMemoBlock(block.id, { isDropdownOpen: !block.isDropdownOpen })} style={{background: "var(--primary-light)", border: "none", color: "var(--primary)", fontSize: "11px", padding: "6px 12px", borderRadius: "14px", fontWeight: "700", cursor: "pointer", transition: "0.2s"}}>＋ エピソードタグを追加</button> : null}
-                  <div className="memo-tag-dropdown" style={{display: block.isDropdownOpen ? "block" : "none", background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)", border: "1px solid var(--border-color)", borderRadius: "16px", padding: "12px", marginTop: "10px", boxShadow: "var(--shadow-md)", position: "absolute", zIndex: 20, width: "100%"}}>
+                  {!memoReadOnly ? <button type="button" className="memo-add-tag-btn" onClick={() => updateMemoBlock(block.id, { isDropdownOpen: !block.isDropdownOpen })} style={{background: "var(--primary-light)", border: "none", color: "var(--primary)", fontSize: "11px", padding: "6px 12px", borderRadius: "14px", fontWeight: "700", cursor: "pointer", transition: "0.2s"}}>＋ エピソードタグを追加</button> : null}
+                  <div className="memo-tag-dropdown" style={{display: block.isDropdownOpen && !memoReadOnly ? "block" : "none", background: "rgba(255,255,255,0.95)", backdropFilter: "blur(10px)", border: "1px solid var(--border-color)", borderRadius: "16px", padding: "12px", marginTop: "10px", boxShadow: "var(--shadow-md)", position: "absolute", zIndex: 20, width: "100%"}}>
                     <div style={{position: "absolute", top: "-6px", left: "20px", width: "10px", height: "10px", background: "#FFF", borderTop: "1px solid var(--border-color)", borderLeft: "1px solid var(--border-color)", transform: "rotate(45deg)"}}></div>
                     <div className="memo-tag-dropdown-content" style={{display: "flex", flexWrap: "wrap", gap: "6px", maxHeight: "120px", overflowY: "auto"}}>
                       {lineFactTags.map((tag) => {
@@ -1729,24 +1802,21 @@ export default function Page() {
                     </div>
                   </div>
                 </div>
-                {!block.isReadOnly ? (
+                {!memoReadOnly ? (
                   <div className="memo-block__actions">
                     <button type="button" onClick={() => deleteMemoBlock(block.id)} style={{background: "var(--alert-bg)", color: "var(--alert-text)", border: "none", width: "36px", height: "36px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px"}}>🗑️</button>
                     <button
                       type="button"
-                      disabled={isEditingDummyCustomer}
                       onClick={() => updateMemoBlock(block.id, { isExpanded: false })}
                       style={{
-                        background: isEditingDummyCustomer ? "var(--input-bg)" : "var(--primary-gradient)",
-                        color: isEditingDummyCustomer ? "var(--text-muted)" : "#FFF",
+                        background: "var(--primary-gradient)",
+                        color: "#FFF",
                         border: "none",
                         padding: "10px 20px",
                         borderRadius: "20px",
                         fontWeight: "700",
                         fontSize: "13px",
-                        boxShadow: isEditingDummyCustomer ? "none" : "var(--shadow-sm)",
-                        opacity: isEditingDummyCustomer ? 0.55 : 1,
-                        cursor: isEditingDummyCustomer ? "not-allowed" : "pointer",
+                        boxShadow: "var(--shadow-sm)",
                       }}
                     >
                       💾 このまま保存
@@ -1759,34 +1829,35 @@ export default function Page() {
           );
         })}
       </div></div>
+      {!isEditingDummyCustomer ? (
       <div className="add-memo-btn" id="addMemoBtn" data-original-click={"addNewMemoBlock()"} onClick={addNewMemoBlock}>＋ 日付とエピソードを追加</div>
+      ) : null}
 
       </div>
       <div className="modal-content__footer">
       <div id="editActionArea" style={{display: "flex", gap: "10px"}}>
         <button type="button" data-original-click={"closeEditModal()"} onClick={closeEditModal} style={{flex: "1", background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", fontSize: "13px"}} id="cancelBtn">閉じる</button>
-        <button
-          type="button"
-          disabled={isEditingDummyCustomer}
-          data-original-click={"saveCustomerEdit()"}
-          id="saveCustomerBtn"
-          onClick={saveCustomerEdit}
-          style={{
-            flex: "1",
-            background: isEditingDummyCustomer ? "var(--input-bg)" : "var(--primary)",
-            color: isEditingDummyCustomer ? "var(--text-muted)" : "#FFF",
-            border: "none",
-            padding: "14px",
-            borderRadius: "20px",
-            fontWeight: "700",
-            fontSize: "13px",
-            boxShadow: isEditingDummyCustomer ? "none" : "var(--shadow-float)",
-            opacity: isEditingDummyCustomer ? 0.55 : 1,
-            cursor: isEditingDummyCustomer ? "not-allowed" : "pointer",
-          }}
-        >
-          保存する
-        </button>
+        {!isEditingDummyCustomer ? (
+          <button
+            type="button"
+            data-original-click={"saveCustomerEdit()"}
+            id="saveCustomerBtn"
+            onClick={saveCustomerEdit}
+            style={{
+              flex: "1",
+              background: "var(--primary)",
+              color: "#FFF",
+              border: "none",
+              padding: "14px",
+              borderRadius: "20px",
+              fontWeight: "700",
+              fontSize: "13px",
+              boxShadow: "var(--shadow-float)",
+            }}
+          >
+            保存する
+          </button>
+        ) : null}
       </div>
 
       <div id="readOnlyActionArea" style={{display: "none", gap: "10px", flexDirection: "column"}}>
@@ -2099,7 +2170,7 @@ export default function Page() {
                 <div className={cardClass} key={customer.id || customer.name} onPointerDown={(event) => startCustomerLongPress(customer, event)} onPointerUp={clearCustomerLongPress} onPointerCancel={clearCustomerLongPress} onPointerLeave={clearCustomerLongPress}>
                   {isMenuOpen ? (
                     <div className="customer-context-menu" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
-                      {!customer.isMasterDummy ? (
+                      {!customer.isDummy ? (
                         <button type="button" onClick={() => toggleCustomerVip(customer)}>{customer.tagsArray.includes("一軍固定") ? "👑 一軍解除" : "👑 一軍へ"}</button>
                       ) : null}
                       <button type="button" onClick={() => hideCustomerOptimistically(customer)}>👻 非表示</button>
@@ -2124,20 +2195,17 @@ export default function Page() {
                       </div>
                     </div>
                     <div className="card-actions" style={{display: "flex", flexDirection: "column", gap: "6px", flexShrink: "0", position: "relative", zIndex: "10"}}>
-                      <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); selectCustomer(customer); }} style={{background: "var(--primary-light)", color: "var(--primary)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>✏️</span><span className="action-text">{modeLabels.thanks}作成</span></button>
-                      <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); openEditCustomer(customer); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}>
-                        {customer.isMasterDummy || customer.tagsArray.includes("ダミー") ? (
-                          <>
-                            <span className="action-icon" style={{fontSize: "14px"}}>🔍</span>
-                            <span className="action-text">閲覧</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="action-icon" style={{fontSize: "14px"}}>⚙️</span>
-                            <span className="action-text">編集</span>
-                          </>
-                        )}
-                      </button>
+                      {!customer.isDummy ? (
+                        <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); selectCustomer(customer); }} style={{background: "var(--primary-light)", color: "var(--primary)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>✏️</span><span className="action-text">{modeLabels.thanks}作成</span></button>
+                      ) : null}
+                      {customer.isDummy ? (
+                        <>
+                          <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); hideCustomerOptimistically(customer); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>👻</span><span className="action-text">非表示</span></button>
+                          <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); openEditCustomer(customer); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>🔍</span><span className="action-text">閲覧</span></button>
+                        </>
+                      ) : (
+                        <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); openEditCustomer(customer); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>⚙️</span><span className="action-text">編集</span></button>
+                      )}
                     </div>
                   </div>
                 </div>

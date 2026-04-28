@@ -38,6 +38,34 @@ function mapEntriesToLegacyMemo(entries) {
   }));
 }
 
+/**
+ * rows: Supabase 行のみ。一覧用クライアント形へ変換。
+ * @param {*} customer DB行
+ * @param { Map<string | number, any[]> } entriesByCustomerId
+ * @param { Set<string> } masterIdsSet master の UUID セット
+ */
+function customerRowToListPayload(customer, entriesByCustomerId, masterIdsSet) {
+  const mappedEntries = mapEntriesToLegacyMemo(entriesByCustomerId.get(customer.id) || []);
+  const tagsJoin = normalizeTags(customer.tags).join(', ');
+  const isMasterDummy =
+    masterIdsSet.has(String(customer.id)) ||
+    customer.is_master_dummy === true ||
+    customer.is_master_dummy === 'true';
+  /** DBに存在する列のみリストに載せる */
+  const out = {
+    id: customer.id,
+    name: customer.name,
+    memo: JSON.stringify(mappedEntries),
+    tags: tagsJoin,
+    entries: mappedEntries,
+    is_master_dummy: isMasterDummy
+  };
+  if (customer.business_type != null && String(customer.business_type).trim()) {
+    out.business_type = String(customer.business_type).trim();
+  }
+  return out;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return sendJson(res, 405, { success: false, error: 'Method Not Allowed' });
 
@@ -49,26 +77,27 @@ export default async function handler(req, res) {
 
     const masterResult = await supabase.from('customers').select('*').eq('is_master_dummy', true);
 
-    let masterCustomers = [];
+    let masterRows = [];
     if (masterResult.error) {
       console.warn('[customers/list] is_master_dummy 取得フォールバック:', masterResult.error.message);
       const legacy = await supabase.from('customers').select('*').contains('tags', ['ダミー']);
-      if (!legacy.error) masterCustomers = (legacy.data || []).filter(c => normalizeTags(c.tags).includes('ダミー'));
+      if (!legacy.error) masterRows = (legacy.data || []).filter(c => normalizeTags(c.tags).includes('ダミー'));
     } else {
-      masterCustomers = masterResult.data || [];
+      masterRows = masterResult.data || [];
     }
 
-    const userCustomersResult = await supabase.from('customers').select('*').eq('user_id', userId);
-    if (userCustomersResult.error) throw new Error('Supabaseユーザーデータ取得エラー: ' + userCustomersResult.error.message);
+    const userRowsResult = await supabase.from('customers').select('*').eq('user_id', userId);
+    if (userRowsResult.error) throw new Error('Supabaseユーザーデータ取得エラー: ' + userRowsResult.error.message);
 
-    const masterCustomerIds = new Set((masterCustomers || []).map(c => String(c.id)));
+    const userRows = userRowsResult.data || [];
+    const masterIdsSet = new Set((masterRows || []).map(c => String(c.id)));
 
-    const combinedCustomerMap = new Map();
-    (masterCustomers || []).forEach(customer => combinedCustomerMap.set(customer.id, customer));
-    (userCustomersResult.data || []).forEach(customer => combinedCustomerMap.set(customer.id, customer));
+    /** エントリ取得用：ユーザー客とマスターをマージしない（両方独立）が ID は集合で取得 */
+    const allIdsMap = new Map();
+    (masterRows || []).forEach(c => allIdsMap.set(c.id, c.id));
+    (userRows || []).forEach(c => allIdsMap.set(c.id, c.id));
+    const unionIds = Array.from(allIdsMap.keys());
 
-    const customers = Array.from(combinedCustomerMap.values());
-    const customerIds = customers.map(customer => customer.id);
     const { data: favorites, error: favError } = await supabase
       .from('favorite_writing_samples')
       .select('source_entry_id, sample_text')
@@ -77,42 +106,39 @@ export default async function handler(req, res) {
     if (favError) console.error('Favorites fetch error:', favError);
     const favoriteIds = favorites ? favorites.map(f => f.source_entry_id) : [];
     const favoriteTexts = favorites ? favorites.map(f => f.sample_text) : [];
-    if (customerIds.length === 0) return sendJson(res, 200, { success: true, customers: [], favoriteIds, favoriteTexts });
 
-    const { data: entriesData, error: entriesError } = await supabase
-      .from('customer_entries')
-      .select('*')
-      .in('customer_id', customerIds)
-      .order('entry_date', { ascending: true })
-      .order('created_at', { ascending: true });
-    if (entriesError) throw new Error('エントリ取得エラー: ' + entriesError.message);
+    let entriesByCustomerId = new Map();
+    if (unionIds.length > 0) {
+      const { data: entriesData, error: entriesError } = await supabase
+        .from('customer_entries')
+        .select('*')
+        .in('customer_id', unionIds)
+        .order('entry_date', { ascending: true })
+        .order('created_at', { ascending: true });
+      if (entriesError) throw new Error('エントリ取得エラー: ' + entriesError.message);
 
-    const entriesByCustomerId = new Map();
-    (entriesData || []).forEach(entry => {
-      if (!entriesByCustomerId.has(entry.customer_id)) entriesByCustomerId.set(entry.customer_id, []);
-      entriesByCustomerId.get(entry.customer_id).push(entry);
+      (entriesData || []).forEach(entry => {
+        if (!entriesByCustomerId.has(entry.customer_id)) entriesByCustomerId.set(entry.customer_id, []);
+        entriesByCustomerId.get(entry.customer_id).push(entry);
+      });
+    }
+
+    const masterCustomers = masterRows.map(customer =>
+      customerRowToListPayload(customer, entriesByCustomerId, masterIdsSet)
+    );
+
+    /** ユーザー本人のレコードのみ（マスターダミーとは ID で重複させない） */
+    const userCustomers = userRows
+      .filter(u => !masterIdsSet.has(String(u.id)))
+      .map(customer => customerRowToListPayload(customer, entriesByCustomerId, masterIdsSet));
+
+    return sendJson(res, 200, {
+      success: true,
+      userCustomers,
+      masterCustomers,
+      favoriteIds,
+      favoriteTexts
     });
-
-    const responseCustomers = customers.map(customer => {
-      const mappedEntries = mapEntriesToLegacyMemo(entriesByCustomerId.get(customer.id) || []);
-      const tagsJoin = normalizeTags(customer.tags).join(', ');
-      const isMasterDummy =
-        masterCustomerIds.has(String(customer.id)) ||
-        customer.is_master_dummy === true ||
-        customer.is_master_dummy === 'true';
-      return {
-        id: customer.id,
-        name: customer.name,
-        memo: JSON.stringify(mappedEntries),
-        tags: tagsJoin,
-        entries: mappedEntries,
-        is_master_dummy: isMasterDummy,
-        ...(customer.business_type != null && String(customer.business_type).trim()
-          ? { business_type: String(customer.business_type).trim() }
-          : {})
-      };
-    });
-    return sendJson(res, 200, { success: true, customers: responseCustomers, favoriteIds, favoriteTexts });
   } catch (err) {
     console.error('バックエンド処理エラー:', err);
     return sendJson(res, 500, { success: false, error: err.message || 'Internal Server Error' });

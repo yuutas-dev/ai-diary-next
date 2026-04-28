@@ -59,18 +59,18 @@ export default async function handler(req, res) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    /** Supabase には customers テーブルに実在する列だけを明示的に渡す（フロント専用キー混入禁止） */
     const biz = normalizeBusinessTypeForDb(data?.businessType ?? data?.business_type);
-    /** Supabase はホワイトリストのみ（フロント専用プロパティを混入させない） */
-    const payload = {
+    const payloadForDb = {
       user_id: userId,
       name: newName,
       tags: tagsArray,
     };
-    if (biz) payload.business_type = biz;
+    if (biz) payloadForDb.business_type = biz;
 
     const { data: created, error } = await supabase
       .from('customers')
-      .insert(payload)
+      .insert(payloadForDb)
       .select('id, name, tags')
       .single();
 

@@ -88,23 +88,23 @@ export default async function handler(req, res) {
       });
     }
 
-    /** Supabase はホワイトリストのみ（フロント専用プロパティを混入させない） */
+    /** Supabase には実在カラムのみを明示 PATCH（混入禁止） */
     const biz = normalizeBusinessTypeForDb(data?.businessType ?? data?.business_type);
     const businessTypeProvided =
       Object.prototype.hasOwnProperty.call(data, 'businessType') ||
       Object.prototype.hasOwnProperty.call(data, 'business_type');
-    const patch = {
+    const patchForDb = {
       name: newName,
       tags: tagsArray,
       updated_at: new Date().toISOString(),
     };
     if (businessTypeProvided && biz) {
-      patch.business_type = biz;
+      patchForDb.business_type = biz;
     }
 
     const { data: updatedRows, error } = await supabase
       .from('customers')
-      .update(patch)
+      .update(patchForDb)
       .eq('user_id', userId)
       .eq('id', customerId)
       .select('id, name, tags');

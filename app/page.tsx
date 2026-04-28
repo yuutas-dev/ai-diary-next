@@ -600,7 +600,7 @@ export default function Page() {
     }
   }, []);
 
-  const { userId, liffAuthStatus, sessionReady } = useLiffAuth(fetchCustomers, flushLoadingOnAuthError);
+  const { userId, liffAuthStatus, sessionReady, authErrorDetail } = useLiffAuth(fetchCustomers, flushLoadingOnAuthError);
 
   /** 認証未完了または顧客データ取得中 — コンテンツ領域のみスケルトン（レイアウトシェルは常時表示） */
   const showCustomersDataSkeleton = !sessionReady || isCustomersLoading;
@@ -1897,7 +1897,11 @@ export default function Page() {
             boxShadow: "var(--shadow-sm)",
           }}
         >
-          <span>LINEログインに失敗しました。LINEアプリから開くか、再読み込みしてください。</span>
+          <span style={{ wordBreak: "break-word", minWidth: 0 }}>
+            {authErrorDetail?.trim()
+              ? authErrorDetail
+              : "LINEログインに失敗しました。LINEアプリから開くか、再読み込みしてください。"}
+          </span>
           <button
             type="button"
             onClick={() => {

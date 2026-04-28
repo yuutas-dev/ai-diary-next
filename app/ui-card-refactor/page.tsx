@@ -54,7 +54,7 @@ export default function UiCardRefactorPage() {
   return (
     <div className="fixed inset-0 z-[9999] overflow-y-auto bg-[#fceef0]">
       <main className="mx-auto min-h-dvh w-full max-w-[430px] px-3 pb-28 pt-4">
-        <p className="mb-3 text-[11px] font-bold text-[#8f7a80]">カードUIテスト中</p>
+        <p className="mb-3 text-[11px] font-bold text-[#8f7a80]">カードUIテスト中2</p>
 
         <div className="relative h-[560px]">
           <motion.section

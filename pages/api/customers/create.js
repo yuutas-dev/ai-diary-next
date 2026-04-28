@@ -1,4 +1,5 @@
 ﻿import { createClient } from '@supabase/supabase-js';
+import { normalizeBusinessTypeForDb } from '../../../lib/normalizeBusinessTypeDb.js';
 import { requireResolvedUserId } from '../../../lib/validateUserId.js';
 
 function sendJson(res, status, payload) {
@@ -58,13 +59,18 @@ export default async function handler(req, res) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    const biz = normalizeBusinessTypeForDb(data?.businessType ?? data?.business_type);
+    /** Supabase はホワイトリストのみ（フロント専用プロパティを混入させない） */
+    const payload = {
+      user_id: userId,
+      name: newName,
+      tags: tagsArray,
+    };
+    if (biz) payload.business_type = biz;
+
     const { data: created, error } = await supabase
       .from('customers')
-      .insert({
-        user_id: userId,
-        name: newName,
-        tags: tagsArray
-      })
+      .insert(payload)
       .select('id, name, tags')
       .single();
 

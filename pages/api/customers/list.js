@@ -106,7 +106,10 @@ export default async function handler(req, res) {
         memo: JSON.stringify(mappedEntries),
         tags: tagsJoin,
         entries: mappedEntries,
-        is_master_dummy: isMasterDummy
+        is_master_dummy: isMasterDummy,
+        ...(customer.business_type != null && String(customer.business_type).trim()
+          ? { business_type: String(customer.business_type).trim() }
+          : {})
       };
     });
     return sendJson(res, 200, { success: true, customers: responseCustomers, favoriteIds, favoriteTexts });

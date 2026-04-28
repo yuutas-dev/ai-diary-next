@@ -1,4 +1,5 @@
 ﻿import { createClient } from '@supabase/supabase-js';
+import { normalizeBusinessTypeForDb } from '../../../lib/normalizeBusinessTypeDb.js';
 import { requireResolvedUserId } from '../../../lib/validateUserId.js';
 
 function sendJson(res, status, payload) {
@@ -87,13 +88,23 @@ export default async function handler(req, res) {
       });
     }
 
+    /** Supabase はホワイトリストのみ（フロント専用プロパティを混入させない） */
+    const biz = normalizeBusinessTypeForDb(data?.businessType ?? data?.business_type);
+    const businessTypeProvided =
+      Object.prototype.hasOwnProperty.call(data, 'businessType') ||
+      Object.prototype.hasOwnProperty.call(data, 'business_type');
+    const patch = {
+      name: newName,
+      tags: tagsArray,
+      updated_at: new Date().toISOString(),
+    };
+    if (businessTypeProvided && biz) {
+      patch.business_type = biz;
+    }
+
     const { data: updatedRows, error } = await supabase
       .from('customers')
-      .update({
-        name: newName,
-        tags: tagsArray,
-        updated_at: new Date().toISOString()
-      })
+      .update(patch)
       .eq('user_id', userId)
       .eq('id', customerId)
       .select('id, name, tags');

@@ -55,8 +55,18 @@ interface Customer {
   tags?: string;
   entries: CustomerEntry[];
   tagsArray: string[];
+  /** DB customers.business_type（未設定の旧データは undefined） */
+  businessType?: BusinessType;
   /** マスターのサンプル顧客（ユーザー編集対象外） */
   isMasterDummy?: boolean;
+}
+
+function parseCustomerBusinessType(value: unknown): BusinessType | undefined {
+  if (value === undefined || value === null) return undefined;
+  const v = String(value).trim();
+  if (!v) return undefined;
+  if (v === "cabaret" || v === "fuzoku" || v === "garuba") return v;
+  return undefined;
 }
 
 const INDUSTRY_MOOD_CONFIGS: Record<BusinessType, string[]> = {
@@ -288,8 +298,12 @@ function normalizeCustomer(customer: {
   tags?: string;
   entries?: CustomerEntry[];
   is_master_dummy?: boolean;
+  business_type?: string | null;
+  businessType?: string;
+  [key: string]: unknown;
 }): Customer {
-  return {
+  const businessTypeParsed = parseCustomerBusinessType(customer.business_type ?? customer.businessType);
+  const normalized: Record<string, unknown> = {
     ...customer,
     id: customer.id || null,
     name: customer.name || "",
@@ -299,6 +313,14 @@ function normalizeCustomer(customer: {
     tagsArray: customer.tags ? customer.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : [],
     isMasterDummy: customer.is_master_dummy === true,
   };
+  Reflect.deleteProperty(normalized, "business_type");
+  if (businessTypeParsed !== undefined) {
+    normalized.businessType = businessTypeParsed;
+  } else {
+    Reflect.deleteProperty(normalized, "businessType");
+  }
+  Reflect.deleteProperty(normalized, "is_master_dummy");
+  return normalized as unknown as Customer;
 }
 
 function readHiddenDummyIdsFromStorage(): Set<string> {
@@ -601,6 +623,14 @@ export default function Page() {
       && !customer.tagsArray.includes(targetDummyTag)
     ) {
       return false;
+    }
+    // 実データのみ業態フィルター: businessType 未設定（旧データ）は常に表示し、設定済みは現在の業態と一致するものだけ
+    if (
+      !customer.isMasterDummy
+      && !customer.tagsArray.includes("ダミー")
+    ) {
+      const bt = parseCustomerBusinessType(customer.businessType);
+      if (bt !== undefined && bt !== selectedBusinessType) return false;
     }
     return true;
   });
@@ -1348,7 +1378,7 @@ export default function Page() {
           const res = await fetch("/api/customers/create", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId, newName, newTags }),
+            body: JSON.stringify({ userId, newName, newTags, businessType: selectedBusinessType }),
           });
           const data = await res.json();
           if (!data.success) throw new Error(data.error || "顧客作成に失敗しました");
@@ -1357,7 +1387,13 @@ export default function Page() {
           const res = await fetch("/api/customers/update", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId, customerId: initialCustomerId, newName, newTags }),
+            body: JSON.stringify({
+              userId,
+              customerId: initialCustomerId,
+              newName,
+              newTags,
+              businessType: selectedBusinessType,
+            }),
           });
           const data = await res.json();
           if (!data.success) throw new Error(data.error || "顧客更新に失敗しました");

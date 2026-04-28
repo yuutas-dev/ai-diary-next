@@ -42,7 +42,6 @@ export default async function handler(req, res) {
     const customerId = trimText(data?.customerId);
     const newName = trimText(data?.newName);
     const tagsArray = normalizeTags(data?.newTags);
-    const isDevMode = data?.isDevMode === true;
 
     if (!customerId) {
       return sendJson(res, 400, {
@@ -67,6 +66,27 @@ export default async function handler(req, res) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    const { data: preCustomer, error: preErr } = await supabase
+      .from('customers')
+      .select('id, is_master_dummy')
+      .eq('user_id', userId)
+      .eq('id', customerId)
+      .maybeSingle();
+
+    if (preErr || !preCustomer) {
+      return sendJson(res, 404, {
+        success: false,
+        error: '対象顧客が見つかりません'
+      });
+    }
+
+    if (preCustomer.is_master_dummy === true) {
+      return sendJson(res, 403, {
+        success: false,
+        error: 'サンプル顧客は編集できません'
+      });
+    }
+
     const { data: updatedRows, error } = await supabase
       .from('customers')
       .update({
@@ -82,41 +102,7 @@ export default async function handler(req, res) {
       throw new Error('Supabase更新エラー: ' + error.message);
     }
 
-    let updated = Array.isArray(updatedRows) ? updatedRows[0] : null;
-
-    if (!updated && isDevMode) {
-      const { data: dummyTarget, error: dummyTargetError } = await supabase
-        .from('customers')
-        .select('id, tags')
-        .eq('id', customerId)
-        .contains('tags', ['ダミー'])
-        .limit(1)
-        .maybeSingle();
-
-      if (dummyTargetError) {
-        throw new Error('ダミー顧客取得エラー: ' + dummyTargetError.message);
-      }
-
-      if (dummyTarget?.id) {
-        const mergedTags = Array.from(new Set([...normalizeTags(dummyTarget.tags), ...tagsArray]));
-        const { data: dummyUpdated, error: dummyUpdateError } = await supabase
-          .from('customers')
-          .update({
-            name: newName,
-            tags: mergedTags,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', dummyTarget.id)
-          .select('id, name, tags')
-          .single();
-
-        if (dummyUpdateError) {
-          throw new Error('ダミー顧客更新エラー: ' + dummyUpdateError.message);
-        }
-
-        updated = dummyUpdated;
-      }
-    }
+    const updated = Array.isArray(updatedRows) ? updatedRows[0] : null;
 
     if (!updated) {
       return sendJson(res, 404, {

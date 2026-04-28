@@ -46,22 +46,25 @@ export default async function handler(req, res) {
     const userId = requireResolvedUserId(data?.userId, res);
     if (!userId) return;
     const supabase = getSupabase();
-    const [userCustomersResult, dummyCustomersResult] = await Promise.all([
-      supabase.from('customers').select('*').eq('user_id', userId),
-      supabase.from('customers').select('*').contains('tags', ['ダミー'])
-    ]);
-    if (userCustomersResult.error) throw new Error('Supabaseユーザーデータ取得エラー: ' + userCustomersResult.error.message);
 
-    let dummyCustomers = dummyCustomersResult.data || [];
-    if (dummyCustomersResult.error) {
-      const fallbackResult = await supabase.from('customers').select('*').ilike('tags', '%ダミー%');
-      if (!fallbackResult.error) dummyCustomers = fallbackResult.data || [];
+    const masterResult = await supabase.from('customers').select('*').eq('is_master_dummy', true);
+
+    let masterCustomers = [];
+    if (masterResult.error) {
+      console.warn('[customers/list] is_master_dummy 取得フォールバック:', masterResult.error.message);
+      const legacy = await supabase.from('customers').select('*').contains('tags', ['ダミー']);
+      if (!legacy.error) masterCustomers = (legacy.data || []).filter(c => normalizeTags(c.tags).includes('ダミー'));
+    } else {
+      masterCustomers = masterResult.data || [];
     }
 
+    const userCustomersResult = await supabase.from('customers').select('*').eq('user_id', userId);
+    if (userCustomersResult.error) throw new Error('Supabaseユーザーデータ取得エラー: ' + userCustomersResult.error.message);
+
+    const masterCustomerIds = new Set((masterCustomers || []).map(c => String(c.id)));
+
     const combinedCustomerMap = new Map();
-    (dummyCustomers || []).forEach(customer => {
-      if (normalizeTags(customer.tags).includes('ダミー')) combinedCustomerMap.set(customer.id, customer);
-    });
+    (masterCustomers || []).forEach(customer => combinedCustomerMap.set(customer.id, customer));
     (userCustomersResult.data || []).forEach(customer => combinedCustomerMap.set(customer.id, customer));
 
     const customers = Array.from(combinedCustomerMap.values());
@@ -89,9 +92,22 @@ export default async function handler(req, res) {
       if (!entriesByCustomerId.has(entry.customer_id)) entriesByCustomerId.set(entry.customer_id, []);
       entriesByCustomerId.get(entry.customer_id).push(entry);
     });
+
     const responseCustomers = customers.map(customer => {
       const mappedEntries = mapEntriesToLegacyMemo(entriesByCustomerId.get(customer.id) || []);
-      return { id: customer.id, name: customer.name, memo: JSON.stringify(mappedEntries), tags: normalizeTags(customer.tags).join(', '), entries: mappedEntries };
+      const tagsJoin = normalizeTags(customer.tags).join(', ');
+      const isMasterDummy =
+        masterCustomerIds.has(String(customer.id)) ||
+        customer.is_master_dummy === true ||
+        customer.is_master_dummy === 'true';
+      return {
+        id: customer.id,
+        name: customer.name,
+        memo: JSON.stringify(mappedEntries),
+        tags: tagsJoin,
+        entries: mappedEntries,
+        is_master_dummy: isMasterDummy
+      };
     });
     return sendJson(res, 200, { success: true, customers: responseCustomers, favoriteIds, favoriteTexts });
   } catch (err) {

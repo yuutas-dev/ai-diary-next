@@ -42,6 +42,27 @@ export default async function handler(req, res) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    const { data: targetRow, error: fetchErr } = await supabase
+      .from('customers')
+      .select('id, is_master_dummy')
+      .eq('user_id', userId)
+      .eq('id', customerId)
+      .maybeSingle();
+
+    if (fetchErr || !targetRow) {
+      return sendJson(res, 404, {
+        success: false,
+        error: '対象顧客が見つかりません'
+      });
+    }
+
+    if (targetRow.is_master_dummy === true) {
+      return sendJson(res, 403, {
+        success: false,
+        error: 'サンプル顧客は削除できません'
+      });
+    }
+
     const { error } = await supabase
       .from('customers')
       .delete()

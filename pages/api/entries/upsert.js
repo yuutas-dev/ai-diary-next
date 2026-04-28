@@ -73,7 +73,6 @@ export default async function handler(req, res) {
     const customerId = trimText(data?.customerId);
     const entries = sanitizeEntries(data?.entries);
     const deletedEntryIds = sanitizeDeletedEntryIds(data?.deletedEntryIds);
-    const isDevMode = data?.isDevMode === true;
 
     if (!customerId) {
       return sendJson(res, 400, {
@@ -91,16 +90,12 @@ export default async function handler(req, res) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    let customerQuery = supabase
+    const { data: customer, error: customerError } = await supabase
       .from('customers')
-      .select('id, user_id, tags')
-      .eq('id', customerId);
-
-    if (!isDevMode) {
-      customerQuery = customerQuery.eq('user_id', userId);
-    }
-
-    const { data: customer, error: customerError } = await customerQuery.maybeSingle();
+      .select('id, user_id, tags, is_master_dummy')
+      .eq('id', customerId)
+      .eq('user_id', userId)
+      .maybeSingle();
 
     if (customerError || !customer) {
       return sendJson(res, 404, {
@@ -109,28 +104,21 @@ export default async function handler(req, res) {
       });
     }
 
-    const isDummyCustomer = normalizeTags(customer.tags).includes('ダミー');
-    const isOwnCustomer = customer.user_id === userId;
-
-    if (!isOwnCustomer && !(isDevMode && isDummyCustomer)) {
+    if (customer.is_master_dummy === true) {
       return sendJson(res, 403, {
         success: false,
-        error: 'この顧客データは更新できません'
+        error: 'サンプル顧客は編集できません'
       });
     }
 
     if (deletedEntryIds.length > 0) {
-      let deleteQuery = supabase
+      const { error: explicitDeleteError } = await supabase
         .from('customer_entries')
         .delete()
         .eq('customer_id', customerId)
+        .eq('user_id', userId)
         .in('id', deletedEntryIds);
 
-      if (!isDevMode) {
-        deleteQuery = deleteQuery.eq('user_id', userId);
-      }
-
-      const { error: explicitDeleteError } = await deleteQuery;
       if (explicitDeleteError) {
         throw new Error('削除対象エントリの削除エラー: ' + explicitDeleteError.message);
       }

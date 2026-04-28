@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLiffAuth } from "../hooks/useLiffAuth";
 import type { Dispatch, PointerEvent, SetStateAction } from "react";
 
 type ActiveTab = "create" | "data" | "settings";
@@ -28,12 +29,7 @@ interface MemoBlock {
   isDropdownOpen: boolean;
 }
 
-const LIFF_ID = "2009902106-W8zW5hJA";
-
-/** Desktop devのみ（NODE_ENV===development && !isInClient）でのローカルDB検証向けモック userId — LIFFブラウザでは使用しない */
-const DEV_BROWSER_MOCK_USER_ID = "test-user";
-
-type LiffAuthStatus = "initializing" | "ready" | "error";
+const HIDDEN_DUMMY_IDS_KEY = "hidden_dummy_customer_ids";
 
 interface CustomerEntry {
   id?: string | null;
@@ -59,6 +55,8 @@ interface Customer {
   tags?: string;
   entries: CustomerEntry[];
   tagsArray: string[];
+  /** マスターのサンプル顧客（ユーザー編集対象外） */
+  isMasterDummy?: boolean;
 }
 
 const INDUSTRY_MOOD_CONFIGS: Record<BusinessType, string[]> = {
@@ -289,6 +287,7 @@ function normalizeCustomer(customer: {
   memo?: string;
   tags?: string;
   entries?: CustomerEntry[];
+  is_master_dummy?: boolean;
 }): Customer {
   return {
     ...customer,
@@ -298,7 +297,19 @@ function normalizeCustomer(customer: {
     tags: customer.tags || "",
     entries: Array.isArray(customer.entries) ? customer.entries : [],
     tagsArray: customer.tags ? customer.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : [],
+    isMasterDummy: customer.is_master_dummy === true,
   };
+}
+
+function readHiddenDummyIdsFromStorage(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(HIDDEN_DUMMY_IDS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed.filter((id: unknown): id is string => typeof id === "string" && id.length > 0) : []);
+  } catch {
+    return new Set();
+  }
 }
 
 export default function Page() {
@@ -307,9 +318,10 @@ export default function Page() {
   const [visitStatus, setVisitStatus] = useState<VisitStatus>("yes");
   const [styleTab, setStyleTab] = useState<StyleTab>("cute");
   const [dataView, setDataView] = useState<DataView>("customer");
-  const [userId, setUserId] = useState<string | null>(null);
-  const [liffAuthStatus, setLiffAuthStatus] = useState<LiffAuthStatus>("initializing");
   const [customerData, setCustomerData] = useState<Customer[]>([]);
+  const [hiddenDummyIds, setHiddenDummyIds] = useState<Set<string>>(() =>
+    typeof window !== "undefined" ? readHiddenDummyIdsFromStorage() : new Set(),
+  );
   const [isCustomersLoading, setIsCustomersLoading] = useState(true);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [nameInputValue, setNameInputValue] = useState("");
@@ -475,6 +487,8 @@ export default function Page() {
     };
   }, []);
 
+  const flushLoadingOnAuthError = useCallback(() => setIsCustomersLoading(false), []);
+
   const fetchCustomers = useCallback(async (targetUserId: string, options: { showLoading?: boolean } = {}) => {
     const showLoading = options.showLoading !== false;
     if (showLoading) setIsCustomersLoading(true);
@@ -503,75 +517,16 @@ export default function Page() {
     }
   }, []);
 
-  /** LIFF と userId が確定するまで同期的なデータ操作や API で userId が空になる状態を防ぐ */
-  const sessionReady =
-    liffAuthStatus === "ready" && typeof userId === "string" && userId.length > 0;
+  const { userId, liffAuthStatus, sessionReady } = useLiffAuth(fetchCustomers, flushLoadingOnAuthError);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function initAndFetchCustomers() {
-      const params = new URLSearchParams(window.location.search);
-      const devUser = params.get("dev_user")?.trim();
-
-      if (devUser) {
-        if (!cancelled) {
-          setUserId(devUser);
-          await fetchCustomers(devUser);
-          setLiffAuthStatus("ready");
-        }
-        return;
-      }
-
-      let liff: typeof import("@line/liff").default | undefined;
-      try {
-        liff = (await import("@line/liff")).default;
-        await liff.init({ liffId: LIFF_ID });
-
-        if (!liff.isLoggedIn()) {
-          liff.login({ redirectUri: window.location.href });
-          return;
-        }
-
-        const profile = await liff.getProfile();
-        const profileUserId = profile.userId?.trim();
-        if (!profileUserId) {
-          throw new Error("LINE userId が取得できませんでした");
-        }
-
-        if (!cancelled) {
-          setUserId(profileUserId);
-          await fetchCustomers(profileUserId);
-          setLiffAuthStatus("ready");
-        }
-      } catch (error) {
-        console.error("LIFF init Error:", error);
-        const inLineClient =
-          typeof liff !== "undefined" && liff?.isInClient?.() === true;
-        const allowDevBrowserMock =
-          process.env.NODE_ENV === "development" && !inLineClient;
-
-        if (!cancelled && allowDevBrowserMock) {
-          setUserId(DEV_BROWSER_MOCK_USER_ID);
-          await fetchCustomers(DEV_BROWSER_MOCK_USER_ID);
-          setLiffAuthStatus("ready");
-          return;
-        }
-
-        if (!cancelled) {
-          setUserId(null);
-          setLiffAuthStatus("error");
-          setIsCustomersLoading(false);
-        }
-      }
+  const persistHiddenDummyIds = useCallback((next: Set<string>) => {
+    try {
+      localStorage.setItem(HIDDEN_DUMMY_IDS_KEY, JSON.stringify([...next]));
+    } catch {
+      /* noop */
     }
-
-    void initAndFetchCustomers();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchCustomers]);
+    setHiddenDummyIds(new Set(next));
+  }, []);
 
   useEffect(() => {
     const savedBusinessType = localStorage.getItem("businessType");
@@ -634,7 +589,14 @@ export default function Page() {
   const targetDummyTag = getTargetDummyTag(selectedBusinessType);
   const baseVisibleCustomers = customerData.filter((customer) => {
     if (customer.tagsArray.includes("非表示")) return false;
-    if (customer.tagsArray.includes("ダミー") && !customer.tagsArray.includes(targetDummyTag)) return false;
+    if (customer.isMasterDummy && customer.id && hiddenDummyIds.has(customer.id)) return false;
+    if (
+      !customer.isMasterDummy
+      && customer.tagsArray.includes("ダミー")
+      && !customer.tagsArray.includes(targetDummyTag)
+    ) {
+      return false;
+    }
     return true;
   });
   const quickAccessCustomers = baseVisibleCustomers
@@ -847,6 +809,7 @@ export default function Page() {
 
   function toggleCustomerVip(customer: Customer) {
     if (!customer.id) return;
+    if (customer.isMasterDummy) return;
     const customerId = customer.id;
     const previousTags = customer.tagsArray;
     const isFixedVip = previousTags.includes("一軍固定");
@@ -860,8 +823,20 @@ export default function Page() {
     void persistCustomerTags(customer, nextTags, previousTags);
   }
 
+  function persistHiddenDummyForCustomer(customerId: string) {
+    const next = new Set(hiddenDummyIds);
+    next.add(customerId);
+    persistHiddenDummyIds(next);
+  }
+
   function hideCustomerOptimistically(customer: Customer) {
     if (!customer.id) return;
+    if (customer.isMasterDummy) {
+      setActiveCustomerMenuId(null);
+      persistHiddenDummyForCustomer(customer.id);
+      showActionToast("サンプル顧客を非表示にしました");
+      return;
+    }
     const customerId = customer.id;
     const previousTags = customer.tagsArray;
     const nextTags = previousTags.includes("非表示") ? previousTags : [...previousTags, "非表示"];
@@ -883,7 +858,7 @@ export default function Page() {
   }
 
   function openHiddenDeleteConfirm() {
-    if (!selectedCustomer) return;
+    if (!selectedCustomer || selectedCustomer.isMasterDummy) return;
     setDeleteTargetCustomer(selectedCustomer);
     setActiveModal("delete");
   }
@@ -931,6 +906,10 @@ export default function Page() {
   }
 
   function openEditCustomer(customer: Customer, fromHiddenList = false) {
+    if (customer.isMasterDummy) {
+      showActionToast("お試しサンプルは編集できません");
+      return;
+    }
     const memos = getPastMemos(customer);
     setIsCreateCustomerMode(false);
     setIsEditingHiddenCustomer(fromHiddenList);
@@ -996,6 +975,11 @@ export default function Page() {
       localStorage.setItem("isCompactMode", String(!current));
       return !current;
     });
+  }
+
+  function resetHiddenDummyCustomers() {
+    persistHiddenDummyIds(new Set());
+    showActionToast("サンプル顧客の非表示をリセットしました");
   }
 
   function addCustomAttributeTag() {
@@ -2041,7 +2025,9 @@ export default function Page() {
                 <div className={cardClass} key={customer.id || customer.name} onPointerDown={(event) => startCustomerLongPress(customer, event)} onPointerUp={clearCustomerLongPress} onPointerCancel={clearCustomerLongPress} onPointerLeave={clearCustomerLongPress}>
                   {isMenuOpen ? (
                     <div className="customer-context-menu" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
-                      <button type="button" onClick={() => toggleCustomerVip(customer)}>{customer.tagsArray.includes("一軍固定") ? "👑 一軍解除" : "👑 一軍へ"}</button>
+                      {!customer.isMasterDummy ? (
+                        <button type="button" onClick={() => toggleCustomerVip(customer)}>{customer.tagsArray.includes("一軍固定") ? "👑 一軍解除" : "👑 一軍へ"}</button>
+                      ) : null}
                       <button type="button" onClick={() => hideCustomerOptimistically(customer)}>👻 非表示</button>
                     </div>
                   ) : null}
@@ -2065,7 +2051,9 @@ export default function Page() {
                     </div>
                     <div className="card-actions" style={{display: "flex", flexDirection: "column", gap: "6px", flexShrink: "0", position: "relative", zIndex: "10"}}>
                       <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); selectCustomer(customer); }} style={{background: "var(--primary-light)", color: "var(--primary)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>✏️</span><span className="action-text">{modeLabels.thanks}作成</span></button>
-                      <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); openEditCustomer(customer); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>⚙️</span><span className="action-text">編集</span></button>
+                      {!customer.isMasterDummy ? (
+                        <button type="button" className="action-btn" onClick={(event) => { event.stopPropagation(); openEditCustomer(customer); }} style={{background: "var(--input-bg)", color: "var(--text-sub)", border: "none", padding: "8px 12px", borderRadius: "8px", fontWeight: "700", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", transition: "0.2s"}}><span className="action-icon" style={{fontSize: "14px"}}>⚙️</span><span className="action-text">編集</span></button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -2181,6 +2169,30 @@ export default function Page() {
               ))}
             </div>
           </div>
+        </div>
+
+        <div className="card settings-card" style={{ marginTop: "6px" }}>
+          <div className="setting-card-title">🧪 サンプル顧客の表示</div>
+          <p style={{ fontSize: "12px", color: "var(--text-sub)", fontWeight: "600", margin: "0 0 12px", lineHeight: 1.55 }}>
+            リストから非表示にしたお試しサンプルのみ、まとめて再表示します。
+          </p>
+          <button
+            type="button"
+            onClick={resetHiddenDummyCustomers}
+            style={{
+              width: "100%",
+              background: "var(--primary-light)",
+              color: "var(--primary)",
+              border: "1px solid var(--primary-light)",
+              padding: "14px",
+              borderRadius: "16px",
+              fontWeight: "700",
+              fontSize: "13px",
+              cursor: "pointer",
+            }}
+          >
+            サンプル顧客の非表示をリセット（すべて再表示）
+          </button>
         </div>
 
         <div className="card settings-alert-card">

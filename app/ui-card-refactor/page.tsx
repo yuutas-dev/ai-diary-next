@@ -53,23 +53,23 @@ export default function UiCardRefactorPage() {
   const customerFront = frontMode === "customer";
 
   return (
-    <div className="fixed inset-0 z-[9999] overflow-y-auto bg-[#fceef0]">
-      <main className="mx-auto min-h-dvh w-full max-w-[430px] px-3 pb-28 pt-5">
+    <div className="fixed inset-0 z-[9999] bg-[#fceef0]">
+      <main className="mx-auto flex h-screen w-full max-w-[430px] flex-col px-3 pb-28 pt-5">
         <div className="mx-auto mb-3 w-fit rounded-full bg-white/70 px-3 py-1 text-[11px] font-bold text-[#9b7883]">
           カードUIテスト中2
         </div>
 
-        <div className="relative h-[590px]">
+        <div className="relative mx-auto h-[80%] w-full">
           {/* Back card: photo mode */}
           <motion.section
             animate={
               customerFront
-                ? { y: 34, scale: 0.95, rotateX: 5, opacity: 0.72 }
-                : { y: 0, scale: 1, rotateX: 0, opacity: 1 }
+                ? { x: -20, y: -10, scale: 0.94, rotateX: 6, opacity: 0.7 }
+                : { x: 0, y: 0, scale: 1, rotateX: 0, opacity: 1 }
             }
-            transition={{ type: "spring", stiffness: 220, damping: 26 }}
+            transition={{ type: "spring", stiffness: 100, damping: 15 }}
             className="absolute inset-x-2 top-7 bottom-0 rounded-[28px] border border-[#f0dde5] bg-gradient-to-b from-white to-[#fff9fc] p-4 pt-8 shadow-[0_20px_40px_rgba(188,138,151,0.22)]"
-            style={{ zIndex: customerFront ? 10 : 30, transformOrigin: "center top" }}
+            style={{ zIndex: customerFront ? 10 : 30, transformOrigin: "center top", boxShadow: "0 30px 60px rgba(176, 108, 131, 0.35)" }}
           >
             <button
               type="button"
@@ -93,17 +93,17 @@ export default function UiCardRefactorPage() {
           <motion.section
             animate={
               customerFront
-                ? { y: 0, scale: 1, rotateX: 0, opacity: 1 }
-                : { y: 22, scale: 0.965, rotateX: 4, opacity: 0.76 }
+                ? { x: 0, y: 0, scale: 1, rotateX: 0, opacity: 1 }
+                : { x: 18, y: 14, scale: 0.965, rotateX: 4, opacity: 0.8 }
             }
-            transition={{ type: "spring", stiffness: 210, damping: 24 }}
+            transition={{ type: "spring", stiffness: 100, damping: 15 }}
             className="absolute inset-0 rounded-[28px] border border-[#f1dde6] bg-white p-4 shadow-[0_24px_45px_rgba(198,134,151,0.2)]"
             style={{ zIndex: customerFront ? 30 : 10, transformOrigin: "center top" }}
-            drag={customerFront ? "y" : false}
-            dragConstraints={{ top: 0, bottom: 160 }}
-            dragElastic={0.08}
+            drag={customerFront ? "x" : false}
+            dragConstraints={{ left: -140, right: 140 }}
+            dragElastic={0.12}
             onDragEnd={(_, info) => {
-              if (customerFront && info.offset.y > 80) swapCards();
+              if (customerFront && Math.abs(info.offset.x) > 70) swapCards();
             }}
           >
             <h2 className="mb-3 text-[18px] font-black text-[#4a3f43]">👤 誰に送る？</h2>
@@ -172,6 +172,11 @@ export default function UiCardRefactorPage() {
           >
             ✨ AIで作成する
           </button>
+          <div className="mt-2.5 grid grid-cols-3 rounded-2xl border border-[#f0dce5] bg-white/85 px-2 py-2 text-center text-[12px] font-bold text-[#7b666d] shadow-[0_8px_18px_rgba(190,137,153,0.14)]">
+            <div>📝 作成</div>
+            <div>📖 顧客</div>
+            <div>⚙️ 設定</div>
+          </div>
         </div>
       </div>
     </div>

@@ -30,6 +30,7 @@ interface MemoBlock {
   isDropdownOpen: boolean;
 }
 
+/** サンプル（マスタ）ダミーを一覧から隠す ID のみ LS。memo/名前の差分マージは行わず API の値を表示 */
 const HIDDEN_DUMMY_IDS_KEY = "hidden_dummy_customer_ids";
 
 interface CustomerEntry {

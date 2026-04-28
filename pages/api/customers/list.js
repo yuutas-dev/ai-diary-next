@@ -39,25 +39,59 @@ function mapEntriesToLegacyMemo(entries) {
 }
 
 /**
+ * customer_entries が空のとき、Supabase customers.memo（JSON 配列）をそのまま一覧用に載せる。
+ * 管理画面などで memo のみ更新されたケースでも最新が反映される。
+ */
+function legacyMemoFromCustomerColumn(memo) {
+  if (memo == null) return [];
+  let arr;
+  if (Array.isArray(memo)) {
+    arr = memo;
+  } else if (typeof memo === 'string' && memo.trim()) {
+    try {
+      const parsed = JSON.parse(memo);
+      arr = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  } else {
+    return [];
+  }
+  return arr.map((m, index) => ({
+    id: m.id,
+    date: m.date ?? m.entry_date ?? '',
+    text: m.text ?? m.input_memo ?? m.inputMemo ?? '',
+    aiGeneratedText: m.ai_generated_text ?? m.aiGeneratedText ?? '',
+    finalSentText: m.final_sent_text ?? m.finalSentText ?? '',
+    tags: Array.isArray(m.tags) ? m.tags : (m.input_tags ?? []),
+    photoUrl: m.photo_url ?? m.photoUrl ?? undefined,
+    type: m.type ?? m.entry_type ?? 'visit',
+    status: m.status ?? m.delivery_status ?? ''
+  }));
+}
+
+/**
  * rows: Supabase 行のみ。一覧用クライアント形へ変換。
  * @param {*} customer DB行
  * @param { Map<string | number, any[]> } entriesByCustomerId
  * @param { Set<string> } masterIdsSet master の UUID セット
  */
 function customerRowToListPayload(customer, entriesByCustomerId, masterIdsSet) {
-  const mappedEntries = mapEntriesToLegacyMemo(entriesByCustomerId.get(customer.id) || []);
+  const fromEntries = mapEntriesToLegacyMemo(entriesByCustomerId.get(customer.id) || []);
+  const fromMemoColumn = legacyMemoFromCustomerColumn(customer.memo);
+  const canonicalEntries = fromEntries.length > 0 ? fromEntries : fromMemoColumn;
   const tagsJoin = normalizeTags(customer.tags).join(', ');
   const isMasterDummy =
     masterIdsSet.has(String(customer.id)) ||
     customer.is_master_dummy === true ||
     customer.is_master_dummy === 'true';
-  /** DBに存在する列のみリストに載せる */
+  /** DBに存在する列のみリストに載せる（memo は customer_entries 優先・無ければ customers.memo のみ） */
   const out = {
     id: customer.id,
     name: customer.name,
-    memo: JSON.stringify(mappedEntries),
+    memo: JSON.stringify(canonicalEntries),
     tags: tagsJoin,
-    entries: mappedEntries,
+    entries: canonicalEntries,
     is_master_dummy: isMasterDummy
   };
   if (customer.business_type != null && String(customer.business_type).trim()) {

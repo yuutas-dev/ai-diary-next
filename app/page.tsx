@@ -142,13 +142,16 @@ const MODE_LABELS: Record<BusinessType, { main: string; thanks: string }> = {
 const STYLE_MODAL_TEXTS = {
   cute: "🎀 可愛らしく、絵文字を多用した親しみやすい文体。",
   neat: "💎 上品で丁寧な言葉遣い。落ち着いた大人っぽい文体。",
-  custom: "⚙️ 過去の文章を貼り付けると、AIがあなたの口調を学習します。",
+  custom: "⚙️ AIへの細かいルール・NG設定　AIに守ってほしい口調のルールや、NGワードを自由に指定できます。",
 };
 
 const STYLE_PLACEHOLDERS: Record<BusinessType, string> = {
-  cabaret: "（例）昨日はお店来てくれて本当にありがとう🥺✨\n久しぶりに〇〇くんの顔見れて、めちゃくちゃ楽しかったよ💗",
-  fuzoku: "（例）今日は指名してくれてありがとう🧸💓\n〇〇さんと一緒にいる時間、すごく落ち着くし癒されちゃった🛁✨",
-  garuba: "（例）今日はお店来てくれてありがとな🍾✨\n最近会えてなかったから、〇〇の顔見れて普通にテンション上がったわ😎",
+  cabaret:
+    "（例）\n・語尾に「〜だよね」は使わないで\n・「お客様」じゃなくて「〇〇さん」って呼んで\n・絵文字は基本的にハート（💕✨）だけにして",
+  fuzoku:
+    "（例）\n・語尾に「〜だよね」は使わないで\n・「お客様」じゃなくて「〇〇さん」って呼んで\n・絵文字は基本的にハート（💕✨）だけにして",
+  garuba:
+    "（例）\n・語尾に「〜だよね」は使わないで\n・「お客様」じゃなくて「〇〇さん」って呼んで\n・絵文字は基本的にハート（💕✨）だけにして",
 };
 
 const STYLE_DEFAULTS: Record<BusinessType, { tension: string; emoji: string }> = {
@@ -1699,7 +1702,7 @@ export default function Page() {
       <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}}>🎨 AI口調・スタイル設定</h2>
       <div className="style-selector">
         <label htmlFor="style-cute" className="style-btn btn-cute">かわいい</label>
-        <label htmlFor="style-custom" className="style-btn btn-custom">カスタム</label>
+        <label htmlFor="style-custom" className="style-btn btn-custom">⚙️ AIへの細かいルール・NG設定</label>
         <label htmlFor="style-neat" className="style-btn btn-neat">清楚</label>
       </div>
       <div className="style-content-wrapper">

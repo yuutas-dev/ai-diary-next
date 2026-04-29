@@ -4,8 +4,9 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 
 export default function UiCardRefactorPage() {
-  const [activeCard, setActiveCard] = useState<"customer" | "photo">("customer");
-  const isCustomerFront = activeCard === "customer";
+  const [activeCard, setActiveCard] = useState<"front" | "back">("front");
+  const isFrontActive = activeCard === "front";
+  const SWIPE_THRESHOLD = 90;
 
   return (
     <div className="fixed inset-0 z-[9999] bg-[#fdeef4]">
@@ -13,32 +14,23 @@ export default function UiCardRefactorPage() {
         <div className="relative mx-auto mt-2 h-[55vh] w-[85vw] max-w-[370px]">
           <motion.section
             animate={
-              isCustomerFront
-                ? { y: -40, scale: 0.85, opacity: 0.92 }
-                : { y: 0, scale: 1, opacity: 1 }
+              isFrontActive
+                ? { x: 0, y: -30, scale: 0.85, opacity: 0.92 }
+                : { x: 0, y: 0, scale: 1, opacity: 1 }
             }
-            transition={{ type: "spring", stiffness: 100, damping: 15, mass: 0.95 }}
-            className="absolute inset-0 rounded-[30px] border border-[#f5dfea] bg-white shadow-2xl"
-            style={{ zIndex: isCustomerFront ? 0 : 10 }}
-            onClick={() => {
-              if (isCustomerFront) setActiveCard("photo");
-            }}
-            drag={!isCustomerFront ? "x" : false}
-            dragConstraints={{ left: -120, right: 120 }}
-            dragElastic={0.15}
+            transition={{ type: "spring", stiffness: 120, damping: 20 }}
+            className="absolute inset-0 rounded-[30px] border border-[#f5dfea] bg-white shadow-xl"
+            style={{ zIndex: isFrontActive ? 0 : 10 }}
+            drag={!isFrontActive ? "x" : false}
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.18}
+            whileDrag={{ scale: 0.98 }}
             onDragEnd={(_, info) => {
-              if (!isCustomerFront && Math.abs(info.offset.x) > 70) {
-                setActiveCard("customer");
+              if (!isFrontActive && Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
+                setActiveCard("front");
               }
             }}
           >
-            <div
-              className={`absolute -top-5 right-6 rounded-2xl border border-[#f7deea] bg-white px-4 py-2 text-[12px] font-black text-[#de86a1] shadow-[0_10px_18px_rgba(232,153,182,0.3)] ${
-                isCustomerFront ? "pointer-events-auto" : "pointer-events-none"
-              }`}
-            >
-              📷 写メ
-            </div>
             <div className="grid h-full place-items-center rounded-[30px] text-center">
               <p className="text-xl font-black text-[#cb7f95]">背面カード</p>
             </div>
@@ -46,32 +38,23 @@ export default function UiCardRefactorPage() {
 
           <motion.section
             animate={
-              isCustomerFront
-                ? { y: 0, scale: 1, opacity: 1 }
-                : { y: -40, scale: 0.85, opacity: 0.92 }
+              isFrontActive
+                ? { x: 0, y: 0, scale: 1, opacity: 1 }
+                : { x: 0, y: -30, scale: 0.85, opacity: 0.92 }
             }
-            transition={{ type: "spring", stiffness: 100, damping: 15, mass: 0.95 }}
+            transition={{ type: "spring", stiffness: 120, damping: 20 }}
             className="absolute inset-0 rounded-[30px] border border-[#f3dce8] bg-white shadow-2xl"
-            style={{ zIndex: isCustomerFront ? 10 : 0 }}
-            onClick={() => {
-              if (!isCustomerFront) setActiveCard("customer");
-            }}
-            drag={isCustomerFront ? "x" : false}
-            dragConstraints={{ left: -120, right: 120 }}
-            dragElastic={0.15}
+            style={{ zIndex: isFrontActive ? 10 : 0 }}
+            drag={isFrontActive ? "x" : false}
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.18}
+            whileDrag={{ scale: 0.98 }}
             onDragEnd={(_, info) => {
-              if (isCustomerFront && Math.abs(info.offset.x) > 70) {
-                setActiveCard("photo");
+              if (isFrontActive && Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
+                setActiveCard("back");
               }
             }}
           >
-            <div
-              className={`absolute -top-5 left-6 rounded-2xl border border-[#f7deea] bg-white px-4 py-2 text-[12px] font-black text-[#de86a1] shadow-[0_10px_18px_rgba(232,153,182,0.3)] ${
-                isCustomerFront ? "pointer-events-none" : "pointer-events-auto"
-              }`}
-            >
-              👤 顧客
-            </div>
             <div className="grid h-full place-items-center rounded-[30px] text-center">
               <p className="text-xl font-black text-[#cb7f95]">前面カード</p>
             </div>

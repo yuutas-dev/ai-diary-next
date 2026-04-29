@@ -102,6 +102,11 @@ export default function UiCardRefactorPage() {
                     <p>10/12: 「シャンパン 嬉しい」</p>
                     <p>10/08: 「ゴルフの話。少し疲れた」</p>
                     <p>10/01: 「初指名。大人しい人」</p>
+                    <p>09/26: 「週末は来店むずかしいかも」</p>
+                    <p>09/20: 「軽めの一言だと返しやすい」</p>
+                    <p>09/12: 「次は金曜に会えそう」</p>
+                    <p>09/05: 「ワインが好きらしい」</p>
+                    <p>08/30: 「犬を飼っている」</p>
                   </div>
                 </div>
 
@@ -121,20 +126,31 @@ export default function UiCardRefactorPage() {
 
       <div className="fixed inset-x-0 bottom-0 bg-gradient-to-b from-transparent via-[#fff9fcf0] to-[#fff9fc] px-3 pb-[calc(max(10px,env(safe-area-inset-bottom))+8px)] pt-2.5">
         <div className="mx-auto max-w-[430px]">
-          <div className="mb-2 flex items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsVisitMode((v) => !v)}
-              className={`relative h-6 w-10 rounded-full transition-colors ${isVisitMode ? "bg-[#df8a9b]" : "bg-gray-300"}`}
-              aria-label="来店トグル"
-            >
-              <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${isVisitMode ? "translate-x-[18px]" : "translate-x-[2px]"}`}
-              />
-            </button>
-            <span className="text-[12px] font-semibold text-[#7b666d]">
-              {isVisitMode ? "ありがとうをつたえる" : "きてほしいをつたえる"}
-            </span>
+          <div className="mb-2 rounded-full bg-gray-100 p-1">
+            <div className="grid grid-cols-2 gap-1 text-[12px] font-semibold">
+              <button
+                type="button"
+                onClick={() => setIsVisitMode(true)}
+                className={`rounded-full px-3 py-2 transition-all ${
+                  isVisitMode
+                    ? "bg-pink-300 text-white shadow-sm"
+                    : "bg-transparent text-gray-500"
+                }`}
+              >
+                ありがとうをつたえる
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsVisitMode(false)}
+                className={`rounded-full px-3 py-2 transition-all ${
+                  !isVisitMode
+                    ? "bg-pink-300 text-white shadow-sm"
+                    : "bg-transparent text-gray-500"
+                }`}
+              >
+                きてほしいをつたえる
+              </button>
+            </div>
           </div>
           <button
             type="button"

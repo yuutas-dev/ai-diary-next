@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 const MOCK_AVATARS = [
   { id: "a1", name: "たかし", emoji: "🧑🏻" },
@@ -11,12 +11,22 @@ const MOCK_AVATARS = [
   { id: "a5", name: "りな", emoji: "👩🏼" },
 ];
 
+function formatTodayJa() {
+  return new Intl.DateTimeFormat("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+  }).format(new Date());
+}
+
 export default function UiCardRefactorPage() {
   const [activeCard, setActiveCard] = useState<"front" | "back">("front");
   const [isVisitMode, setIsVisitMode] = useState(true);
   const [selectedCustomerId, setSelectedCustomerId] = useState(MOCK_AVATARS[0].id);
+  const [isVoiceInputActive, setIsVoiceInputActive] = useState(false);
   const isFrontActive = activeCard === "front";
   const SWIPE_THRESHOLD = 90;
+  const todayLabel = useMemo(() => formatTodayJa(), []);
 
   const selectedCustomer = MOCK_AVATARS.find((a) => a.id === selectedCustomerId) ?? MOCK_AVATARS[0];
   const createButtonLabel = isVisitMode
@@ -36,12 +46,12 @@ export default function UiCardRefactorPage() {
             transition={{ type: "spring", stiffness: 120, damping: 20 }}
             className="absolute inset-0 rounded-[30px] border border-[#f5dfea] bg-white shadow-xl"
             style={{ zIndex: isFrontActive ? 0 : 10 }}
-            drag={!isFrontActive ? "x" : false}
+            drag={!isFrontActive && !isVoiceInputActive ? "x" : false}
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.18}
             whileDrag={{ scale: 0.98 }}
             onDragEnd={(_, info) => {
-              if (!isFrontActive && Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
+              if (!isFrontActive && !isVoiceInputActive && Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
                 setActiveCard("front");
               }
             }}
@@ -60,12 +70,12 @@ export default function UiCardRefactorPage() {
             transition={{ type: "spring", stiffness: 120, damping: 20 }}
             className="absolute inset-0 rounded-[30px] border border-[#f3dce8] bg-white shadow-2xl"
             style={{ zIndex: isFrontActive ? 10 : 0 }}
-            drag={isFrontActive ? "x" : false}
+            drag={isFrontActive && !isVoiceInputActive ? "x" : false}
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.18}
             whileDrag={{ scale: 0.98 }}
             onDragEnd={(_, info) => {
-              if (isFrontActive && Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
+              if (isFrontActive && !isVoiceInputActive && Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
                 setActiveCard("back");
               }
             }}
@@ -116,7 +126,11 @@ export default function UiCardRefactorPage() {
                 </div>
 
                 <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <div className="space-y-3 pb-16 text-sm text-gray-600">
+                  <motion.div
+                    className="space-y-3 pb-16 text-sm text-gray-600"
+                    animate={{ y: isVoiceInputActive ? -52 : 0 }}
+                    transition={{ type: "spring", stiffness: 280, damping: 32 }}
+                  >
                     <p>10/12: 「シャンパン 嬉しい」</p>
                     <p>10/08: 「ゴルフの話。少し疲れた」</p>
                     <p>10/01: 「初指名。大人しい人」</p>
@@ -125,17 +139,24 @@ export default function UiCardRefactorPage() {
                     <p>09/12: 「次は金曜に会えそう」</p>
                     <p>09/05: 「ワインが好きらしい」</p>
                     <p>08/30: 「犬を飼っている」</p>
-                  </div>
+                  </motion.div>
                 </div>
 
-                <button
-                  type="button"
-                  className="absolute bottom-1 right-1 flex items-center rounded-full border border-white/70 bg-white/60 px-1.5 py-1 text-[13px] text-[#8f6f7a] backdrop-blur-md"
-                >
-                  <span className="px-2 font-bold">＋</span>
-                  <span className="h-4 w-px bg-[#e8dce3]" />
-                  <span className="px-2">🎙️</span>
-                </button>
+                <div className="absolute bottom-1 right-1 flex items-center overflow-hidden rounded-full border border-white/70 bg-white/60 text-[13px] text-[#8f6f7a] backdrop-blur-md">
+                  <button type="button" className="border-none bg-transparent px-2 py-1 font-bold">
+                    ＋
+                  </button>
+                  <span className="h-4 w-px shrink-0 bg-[#e8dce3]" aria-hidden />
+                  <button
+                    type="button"
+                    aria-label="音声入力"
+                    onPointerDown={(e) => e.preventDefault()}
+                    onClick={() => setIsVoiceInputActive(true)}
+                    className="border-none bg-transparent px-2 py-1"
+                  >
+                    🎤
+                  </button>
+                </div>
               </div>
             </div>
           </motion.section>
@@ -185,6 +206,56 @@ export default function UiCardRefactorPage() {
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {isVoiceInputActive ? (
+          <>
+            <motion.button
+              key="voice-dismiss-layer"
+              type="button"
+              aria-label="音声入力を終了"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed inset-0 z-[10000] cursor-default border-none bg-black/25 p-0 backdrop-blur-md"
+              onPointerDown={() => setIsVoiceInputActive(false)}
+            />
+            <motion.button
+              key="voice-highlight"
+              type="button"
+              aria-label="音声入力を終了"
+              initial={{ opacity: 0, y: 28, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.96 }}
+              transition={{ type: "spring", stiffness: 320, damping: 28 }}
+              onPointerDown={() => setIsVoiceInputActive(false)}
+              className="pointer-events-auto fixed left-1/2 z-[10001] w-[min(92vw,380px)] -translate-x-1/2 rounded-[22px] border border-white/90 bg-white px-4 py-3.5 text-left shadow-[0_18px_40px_rgba(40,20,30,0.14),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-8px_24px_rgba(180,140,155,0.12)]"
+              style={{ bottom: "max(32%, calc(env(safe-area-inset-bottom) + 200px))" }}
+            >
+              <div className="text-[11px] font-semibold tracking-wide text-[#b8a0a8]">{todayLabel}</div>
+              <div className="mt-2 flex items-center gap-3">
+                <div className="flex h-8 items-end gap-1">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <motion.span
+                      key={i}
+                      className="block h-5 w-1 origin-bottom rounded-full bg-[#d4c2c8]"
+                      animate={{ scaleY: [0.35, 1, 0.45, 0.92, 0.4, 0.78, 0.35] }}
+                      transition={{
+                        duration: 1.1,
+                        repeat: Infinity,
+                        delay: i * 0.08,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  ))}
+                </div>
+                <p className="text-[14px] font-medium text-gray-400">ききとりちゅう....</p>
+              </div>
+            </motion.button>
+          </>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

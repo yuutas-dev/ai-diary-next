@@ -63,8 +63,8 @@ export default function UiCardRefactorPage() {
               }
             }}
           >
-            <div className="h-full rounded-[30px] p-4">
-              <div className="h-1/2 rounded-[24px] bg-[#fff7fb] p-3 shadow-inner shadow-[#efdae4]">
+            <div className="flex h-full min-h-0 flex-col rounded-[30px] p-4">
+              <div className="rounded-[24px] bg-[#fff7fb] p-3 shadow-inner shadow-[#efdae4]">
                 <div className="w-full rounded-xl bg-[#f7eaf1] px-3 py-2 text-[12px] text-[#b08a98] shadow-inner shadow-[#e7d4dd]">
                   検索...
                 </div>
@@ -81,8 +81,37 @@ export default function UiCardRefactorPage() {
                   </div>
                 </div>
               </div>
-              <div className="grid h-1/2 place-items-center text-center">
-                <p className="text-xl font-black text-[#cb7f95]">前面カード</p>
+
+              <div className="mt-4 h-px bg-[#f0e6eb]" />
+
+              <div className="relative mt-3 flex min-h-0 flex-1 flex-col">
+                <div className="flex flex-wrap gap-2">
+                  {["ドンペリ好き", "毎週金曜", "長文NG", "辛口シャンパン派"].map((tag) => (
+                    <span key={tag} className="rounded-full bg-[#f5f3f6] px-2.5 py-1 text-[10px] font-medium text-gray-500">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-2 text-sm text-gray-600 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="space-y-3 pb-16">
+                    <p>10/12: 「シャンパン 嬉しい」</p>
+                    <p>10/08: 「ゴルフの話。少し疲れた」</p>
+                    <p>10/01: 「初指名。大人しい人」</p>
+                    <p>09/26: 「週末は来店むずかしいかも」</p>
+                    <p>09/20: 「軽めの一言だと返しやすい」</p>
+                    <p>09/12: 「次は金曜に会えそう」</p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="absolute bottom-1 right-1 flex items-center rounded-full bg-white/75 px-1.5 py-1 text-[13px] text-[#8f6f7a] backdrop-blur-md"
+                >
+                  <span className="px-2">＋</span>
+                  <span className="h-4 w-px bg-[#e8dce3]" />
+                  <span className="px-2">🎤</span>
+                </button>
               </div>
             </div>
           </motion.section>

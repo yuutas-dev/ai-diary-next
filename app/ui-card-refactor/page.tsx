@@ -165,31 +165,31 @@ export default function UiCardRefactorPage() {
 
       <div className="fixed inset-x-0 bottom-0 bg-gradient-to-b from-transparent via-[#fff9fcf0] to-[#fff9fc] px-3 pb-[calc(max(10px,env(safe-area-inset-bottom))+8px)] pt-2.5">
         <div className="mx-auto max-w-[430px]">
-          <div className="mb-2 rounded-full border border-gray-100 bg-white p-1">
-            <div className="grid grid-cols-2 gap-1">
+          <div className="mx-auto mb-2 w-[240px] max-w-full rounded-full border border-gray-100 bg-white p-0.5">
+            <div className="grid grid-cols-2 gap-0 overflow-hidden rounded-full">
               <button
                 type="button"
                 onClick={() => setIsVisitMode(true)}
                 aria-label="来店あり（ありがとう）"
-                className={`flex items-center justify-center rounded-full py-2.5 transition-all ${
+                className={`min-w-0 px-1 py-1.5 text-center text-[10px] font-bold leading-tight transition-all ${
                   isVisitMode
-                    ? "bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] shadow-sm"
-                    : "bg-transparent"
+                    ? "bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] text-white shadow-sm"
+                    : "bg-transparent text-gray-500"
                 }`}
               >
-                <span className={`h-2.5 w-2.5 rounded-full ${isVisitMode ? "bg-white" : "bg-gray-300"}`} />
+                ありがとうをつたえる
               </button>
               <button
                 type="button"
                 onClick={() => setIsVisitMode(false)}
                 aria-label="来店なし（きてほしい）"
-                className={`flex items-center justify-center rounded-full py-2.5 transition-all ${
+                className={`min-w-0 px-1 py-1.5 text-center text-[10px] font-bold leading-tight transition-all ${
                   !isVisitMode
-                    ? "bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] shadow-sm"
-                    : "bg-transparent"
+                    ? "bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] text-white shadow-sm"
+                    : "bg-transparent text-gray-500"
                 }`}
               >
-                <span className={`h-2.5 w-2.5 rounded-full ${!isVisitMode ? "bg-white" : "bg-gray-300"}`} />
+                きてほしいをつたえる
               </button>
             </div>
           </div>

@@ -98,11 +98,14 @@ export default function UiCardRefactorPage() {
   const [isResultFlipped, setIsResultFlipped] = useState(false);
   const [generatedMessage, setGeneratedMessage] = useState("");
   const [showSavedToast, setShowSavedToast] = useState(false);
+  const [showWritingToast, setShowWritingToast] = useState(false);
+  const [generatedResultsByCustomer, setGeneratedResultsByCustomer] = useState<Record<string, string>>({});
   const episodeScrollRef = useRef<HTMLDivElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
   const generateTimeoutRef = useRef<number | null>(null);
   const doneTimeoutRef = useRef<number | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
+  const writingToastTimeoutRef = useRef<number | null>(null);
   const isFrontActive = activeCard === "front";
   const SWIPE_THRESHOLD = 90;
   const todayLabel = useMemo(() => formatTodayJa(), []);
@@ -128,6 +131,14 @@ export default function UiCardRefactorPage() {
       .slice(0, 6),
     [todayLabel, selectedProfile.profileTags, latestHintWord],
   );
+
+  useEffect(() => {
+    const stored = generatedResultsByCustomer[selectedCustomerId];
+    if (stored) {
+      setGeneratedMessage(stored);
+    }
+    setIsResultFlipped(false);
+  }, [selectedCustomerId, generatedResultsByCustomer]);
 
   useEffect(() => {
     if (!isEpisodeComposerOpen) return;
@@ -181,6 +192,9 @@ export default function UiCardRefactorPage() {
       ? `${selectedCustomer.name}さん、今日はありがとうございました！シャンパン最高でしたね。${hints}`.trim()
       : `${selectedCustomer.name}さん、お疲れさまです。また近いうちに顔を見せてもらえたら嬉しいです。${hints}`.trim();
     setGeneratedMessage(message);
+    setGeneratedResultsByCustomer((prev) => ({ ...prev, [selectedCustomerId]: message }));
+    setShowWritingToast(true);
+    if (writingToastTimeoutRef.current) window.clearTimeout(writingToastTimeoutRef.current);
 
     doneTimeoutRef.current = window.setTimeout(() => {
       setWritingLabel("done");
@@ -191,6 +205,9 @@ export default function UiCardRefactorPage() {
       setShowSavedToast(true);
       toastTimeoutRef.current = window.setTimeout(() => setShowSavedToast(false), 1800);
     }, 2000);
+    writingToastTimeoutRef.current = window.setTimeout(() => {
+      setShowWritingToast(false);
+    }, 2000);
   };
 
   useEffect(() => {
@@ -198,6 +215,7 @@ export default function UiCardRefactorPage() {
       if (generateTimeoutRef.current) window.clearTimeout(generateTimeoutRef.current);
       if (doneTimeoutRef.current) window.clearTimeout(doneTimeoutRef.current);
       if (toastTimeoutRef.current) window.clearTimeout(toastTimeoutRef.current);
+      if (writingToastTimeoutRef.current) window.clearTimeout(writingToastTimeoutRef.current);
     };
   }, []);
 
@@ -263,6 +281,11 @@ export default function UiCardRefactorPage() {
               transition={{ type: "spring", stiffness: 180, damping: 24 }}
               className="relative h-full w-full rounded-[30px]"
               style={{ transformStyle: "preserve-3d" }}
+              onClick={() => {
+                const hasResult = Boolean(generatedResultsByCustomer[selectedCustomerId]);
+                if (!hasResult || isGenerating || isVoiceInputActive || isEpisodeComposerOpen) return;
+                setIsResultFlipped((prev) => !prev);
+              }}
             >
               <div className="absolute inset-0 flex min-h-0 flex-col rounded-[30px] p-4 [backface-visibility:hidden]">
                 <div className="rounded-[24px] p-1">
@@ -339,7 +362,7 @@ export default function UiCardRefactorPage() {
                   </div>
                   <div
                     ref={episodeScrollRef}
-                    className="mt-3 min-h-0 flex-1 overflow-y-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    className="mt-3 min-h-0 flex-1 overflow-y-auto pr-2 scrollbar-hide [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   >
                     <motion.div
                       key={selectedCustomerId}
@@ -431,6 +454,20 @@ export default function UiCardRefactorPage() {
               <button type="button" className="border-none bg-transparent">✏️ 編集</button>
             </div>
           ) : null}
+          <AnimatePresence>
+            {showWritingToast && (
+              <motion.div
+                initial={{ opacity: 0, x: 16 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 16 }}
+                transition={{ duration: 0.18 }}
+                className="mb-1 ml-auto inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1 text-[11px] font-medium text-[#7f6a73] shadow-[0_4px_12px_rgba(20,20,20,0.12)]"
+              >
+                <span className="text-xs">✍️</span>
+                <span>{writingLabel === "writing" ? "執筆中だよ..." : "できたよ！"}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <button
             type="button"
             onClick={handleGenerate}

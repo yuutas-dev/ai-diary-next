@@ -27,7 +27,7 @@ export default function UiCardRefactorPage() {
                 : { x: 0, y: 0, scale: 1, opacity: 1, filter: "brightness(1)" }
             }
             transition={{ type: "spring", stiffness: 120, damping: 20 }}
-            className="absolute inset-0 rounded-[30px] border border-[#f5dfea] bg-pink-50 shadow-xl"
+            className="absolute inset-0 rounded-[30px] border border-[#f5dfea] bg-white shadow-xl"
             style={{ zIndex: isFrontActive ? 0 : 10 }}
             drag={!isFrontActive ? "x" : false}
             dragConstraints={{ left: 0, right: 0 }}
@@ -64,15 +64,15 @@ export default function UiCardRefactorPage() {
             }}
           >
             <div className="flex h-full min-h-0 flex-col rounded-[30px] p-4">
-              <div className="rounded-[24px] bg-[#fff7fb] p-3 shadow-inner shadow-[#efdae4]">
-                <div className="w-full rounded-xl bg-[#f7eaf1] px-3 py-2 text-[12px] text-[#b08a98] shadow-inner shadow-[#e7d4dd]">
+              <div className="rounded-[24px] p-1">
+                <div className="w-full rounded-xl bg-gray-100/50 px-3 py-2 text-[12px] text-[#b08a98]">
                   検索...
                 </div>
-                <div className="mt-3 rounded-2xl bg-[#f8ecf3] px-2 py-2 shadow-inner shadow-[#e7d5de]">
+                <div className="mt-3 px-1 py-1">
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {MOCK_AVATARS.map((avatar) => (
                       <div key={avatar.id} className="flex min-w-[58px] flex-col items-center">
-                        <div className="grid h-11 w-11 place-items-center rounded-full bg-[#efe0e8] text-[20px] shadow-inner shadow-[#dcc7d2]">
+                        <div className="grid h-11 w-11 place-items-center rounded-full bg-[#f3e6ed] text-[20px]">
                           {avatar.emoji}
                         </div>
                         <div className="mt-1 text-[10px] font-bold text-[#9f7887]">{avatar.name}</div>
@@ -82,35 +82,18 @@ export default function UiCardRefactorPage() {
                 </div>
               </div>
 
-              <div className="mt-4 h-px bg-[#f0e6eb]" />
+              <div className="mt-3 h-[1px] w-[90%] self-center bg-gray-100" />
 
               <div className="relative mt-3 flex min-h-0 flex-1 flex-col">
-                <div className="flex flex-wrap gap-2">
-                  {["ドンペリ好き", "毎週金曜", "長文NG", "辛口シャンパン派"].map((tag) => (
-                    <span key={tag} className="rounded-full bg-[#f5f3f6] px-2.5 py-1 text-[10px] font-medium text-gray-500">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-2 text-sm text-gray-600 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <div className="space-y-3 pb-16">
-                    <p>10/12: 「シャンパン 嬉しい」</p>
-                    <p>10/08: 「ゴルフの話。少し疲れた」</p>
-                    <p>10/01: 「初指名。大人しい人」</p>
-                    <p>09/26: 「週末は来店むずかしいかも」</p>
-                    <p>09/20: 「軽めの一言だと返しやすい」</p>
-                    <p>09/12: 「次は金曜に会えそう」</p>
-                  </div>
-                </div>
+                <div className="min-h-0 flex-1" />
 
                 <button
                   type="button"
-                  className="absolute bottom-1 right-1 flex items-center rounded-full bg-white/75 px-1.5 py-1 text-[13px] text-[#8f6f7a] backdrop-blur-md"
+                  className="absolute bottom-1 right-1 flex items-center rounded-full border border-white/70 bg-white/50 px-1.5 py-1 text-[13px] text-[#8f6f7a] backdrop-blur-xl"
                 >
-                  <span className="px-2">＋</span>
+                  <span className="px-2 font-bold">＋</span>
                   <span className="h-4 w-px bg-[#e8dce3]" />
-                  <span className="px-2">🎤</span>
+                  <span className="px-2">🎙️</span>
                 </button>
               </div>
             </div>

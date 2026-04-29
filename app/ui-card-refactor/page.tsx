@@ -13,6 +13,7 @@ const MOCK_AVATARS = [
 
 export default function UiCardRefactorPage() {
   const [activeCard, setActiveCard] = useState<"front" | "back">("front");
+  const [isVisitMode, setIsVisitMode] = useState(true);
   const isFrontActive = activeCard === "front";
   const SWIPE_THRESHOLD = 90;
 
@@ -85,11 +86,28 @@ export default function UiCardRefactorPage() {
               <div className="mt-3 h-[1px] w-[90%] self-center bg-gray-100" />
 
               <div className="relative mt-3 flex min-h-0 flex-1 flex-col">
-                <div className="min-h-0 flex-1" />
+                <div className="shrink-0">
+                  <div className="mb-2 text-[10px] font-semibold tracking-wide text-gray-400">プロフィールサマリー</div>
+                  <div className="flex flex-wrap gap-2">
+                    {["ドンペリ好き", "毎週金曜", "長文NG"].map((tag) => (
+                      <span key={tag} className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-medium text-gray-500">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="space-y-3 pb-16 text-sm text-gray-600">
+                    <p>10/12: 「シャンパン 嬉しい」</p>
+                    <p>10/08: 「ゴルフの話。少し疲れた」</p>
+                    <p>10/01: 「初指名。大人しい人」</p>
+                  </div>
+                </div>
 
                 <button
                   type="button"
-                  className="absolute bottom-1 right-1 flex items-center rounded-full border border-white/70 bg-white/50 px-1.5 py-1 text-[13px] text-[#8f6f7a] backdrop-blur-xl"
+                  className="absolute bottom-1 right-1 flex items-center rounded-full border border-white/70 bg-white/60 px-1.5 py-1 text-[13px] text-[#8f6f7a] backdrop-blur-md"
                 >
                   <span className="px-2 font-bold">＋</span>
                   <span className="h-4 w-px bg-[#e8dce3]" />
@@ -103,6 +121,21 @@ export default function UiCardRefactorPage() {
 
       <div className="fixed inset-x-0 bottom-0 bg-gradient-to-b from-transparent via-[#fff9fcf0] to-[#fff9fc] px-3 pb-[calc(max(10px,env(safe-area-inset-bottom))+8px)] pt-2.5">
         <div className="mx-auto max-w-[430px]">
+          <div className="mb-2 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsVisitMode((v) => !v)}
+              className={`relative h-6 w-10 rounded-full transition-colors ${isVisitMode ? "bg-[#df8a9b]" : "bg-gray-300"}`}
+              aria-label="来店トグル"
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${isVisitMode ? "translate-x-[18px]" : "translate-x-[2px]"}`}
+              />
+            </button>
+            <span className="text-[12px] font-semibold text-[#7b666d]">
+              {isVisitMode ? "ありがとうをつたえる" : "きてほしいをつたえる"}
+            </span>
+          </div>
           <button
             type="button"
             className="w-full rounded-full border-none bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] px-4 py-3 text-[15px] font-extrabold text-white shadow-[0_14px_24px_rgba(223,138,155,0.34)]"

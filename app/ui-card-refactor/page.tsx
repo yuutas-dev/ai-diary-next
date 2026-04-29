@@ -55,6 +55,9 @@ export default function UiCardRefactorPage() {
   return (
     <div className="fixed inset-0 z-[9999] bg-gradient-to-b from-[#ffeef5] via-[#fff3f8] to-[#fff9fc]">
       <main className="mx-auto flex h-screen w-full max-w-[430px] flex-col px-3 pb-28 pt-5">
+        <div className="text-center font-bold text-red-500 py-4">
+          【バージョン3：奥行きスタック＆雲UI テスト中】
+        </div>
         <div className="mx-auto mb-3 w-fit rounded-full bg-white/80 px-3 py-1 text-[11px] font-bold text-[#b98795]">
           カードUIテスト中2
         </div>

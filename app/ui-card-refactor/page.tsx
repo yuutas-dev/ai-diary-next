@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 
+const MOCK_AVATARS = [
+  { id: "a1", name: "たかし", emoji: "🧑🏻" },
+  { id: "a2", name: "ゆうすけ", emoji: "👨🏼" },
+  { id: "a3", name: "まなみ", emoji: "👩🏻" },
+  { id: "a4", name: "あや", emoji: "👩🏽" },
+  { id: "a5", name: "りな", emoji: "👩🏼" },
+];
+
 export default function UiCardRefactorPage() {
   const [activeCard, setActiveCard] = useState<"front" | "back">("front");
   const isFrontActive = activeCard === "front";
@@ -55,8 +63,27 @@ export default function UiCardRefactorPage() {
               }
             }}
           >
-            <div className="grid h-full place-items-center rounded-[30px] text-center">
-              <p className="text-xl font-black text-[#cb7f95]">前面カード</p>
+            <div className="h-full rounded-[30px] p-4">
+              <div className="h-1/2 rounded-[24px] bg-[#fff7fb] p-3 shadow-inner shadow-[#efdae4]">
+                <div className="w-full rounded-xl bg-[#f7eaf1] px-3 py-2 text-[12px] text-[#b08a98] shadow-inner shadow-[#e7d4dd]">
+                  検索...
+                </div>
+                <div className="mt-3 rounded-2xl bg-[#f8ecf3] px-2 py-2 shadow-inner shadow-[#e7d5de]">
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {MOCK_AVATARS.map((avatar) => (
+                      <div key={avatar.id} className="flex min-w-[58px] flex-col items-center">
+                        <div className="grid h-11 w-11 place-items-center rounded-full bg-[#efe0e8] text-[20px] shadow-inner shadow-[#dcc7d2]">
+                          {avatar.emoji}
+                        </div>
+                        <div className="mt-1 text-[10px] font-bold text-[#9f7887]">{avatar.name}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="grid h-1/2 place-items-center text-center">
+                <p className="text-xl font-black text-[#cb7f95]">前面カード</p>
+              </div>
             </div>
           </motion.section>
         </div>

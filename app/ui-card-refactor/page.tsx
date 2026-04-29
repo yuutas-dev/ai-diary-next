@@ -25,7 +25,16 @@ const MOCK_CUSTOMER_PROFILES: Record<string, CustomerMockProfile> = {
     customerId: "a1",
     profileTags: ["ドンペリ好き"],
     episodes: [
+      { id: "a1-e0", dateLabel: "09/18", body: "店内の音楽が好き" },
+      { id: "a1-e0-2", dateLabel: "09/21", body: "赤ワインに興味あり" },
+      { id: "a1-e0-3", dateLabel: "09/24", body: "仕事終わりに一杯" },
+      { id: "a1-e0-4", dateLabel: "09/27", body: "静かな席を希望" },
+      { id: "a1-e0-5", dateLabel: "09/30", body: "週末は混みやすい" },
+      { id: "a1-e0-6", dateLabel: "10/02", body: "シャンパンの話題で盛り上がる" },
+      { id: "a1-e0-7", dateLabel: "10/04", body: "次回は同伴検討" },
+      { id: "a1-e0-8", dateLabel: "10/06", body: "出張帰りで少し疲れ気味" },
       { id: "a1-e1", dateLabel: "10/08", body: "ゴルフの話" },
+      { id: "a1-e1-2", dateLabel: "10/10", body: "軽めの連絡だと反応よい" },
       { id: "a1-e2", dateLabel: "10/12", body: "シャンパン 嬉しい" },
     ],
   },
@@ -93,10 +102,7 @@ export default function UiCardRefactorPage() {
   const selectedProfile =
     MOCK_CUSTOMER_PROFILES[selectedCustomerId] ?? MOCK_CUSTOMER_PROFILES[MOCK_AVATARS[0].id];
   const userExtraEpisodes = userEpisodesByCustomer[selectedCustomerId] ?? [];
-  const displayedEpisodes = useMemo(
-    () => [...selectedProfile.episodes, ...userExtraEpisodes],
-    [selectedProfile.episodes, userExtraEpisodes],
-  );
+  const displayedEpisodes = useMemo(() => [...selectedProfile.episodes, ...userExtraEpisodes], [selectedProfile.episodes, userExtraEpisodes]);
 
   const isThankYouMode = mode === "thankYou";
   const createButtonLabel = isThankYouMode
@@ -116,7 +122,7 @@ export default function UiCardRefactorPage() {
     if (!body) return;
     const newEp: MockEpisode = {
       id: `user-${selectedCustomerId}-${Date.now()}`,
-      dateLabel: formatEpisodeDateLabel(),
+      dateLabel: isThankYouMode ? formatEpisodeDateLabel() : "つたえたいこと",
       body,
     };
     setUserEpisodesByCustomer((prev) => ({
@@ -268,10 +274,6 @@ export default function UiCardRefactorPage() {
                     ))}
                   </div>
                 </div>
-                <div className="mt-2 text-[11px] font-medium text-[#ad96a0]">
-                  {isThankYouMode ? "今日のエピソード（任意）" : "伝えたいこと・きっかけ（任意）"}
-                </div>
-
                 <div
                   ref={episodeScrollRef}
                   className="mt-3 min-h-0 flex-1 overflow-y-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -282,23 +284,37 @@ export default function UiCardRefactorPage() {
                     animate={{ y: isVoiceInputActive ? -52 : 0 }}
                     transition={{ type: "spring", stiffness: 280, damping: 32 }}
                   >
-                    {!isThankYouMode ? (
+                    {isThankYouMode ? null : (
                       <div className="space-y-1 pb-2 text-[11px] text-[#9c8790]">
                         <p>最終来店：24日前（10/05）</p>
                         <p>前回の話題：ゴルフ、出張の話</p>
                       </div>
-                    ) : null}
-                    {displayedEpisodes.map((ep) => (
-                      <motion.p
-                        key={ep.id}
-                        initial={ep.id.startsWith("user-") ? { opacity: 0, y: 10 } : false}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                        className="border-none bg-transparent text-left text-sm font-normal text-gray-600 shadow-none"
-                      >
-                        {ep.dateLabel}: 「{ep.body}」
-                      </motion.p>
-                    ))}
+                    )}
+                    {isThankYouMode
+                      ? displayedEpisodes.map((ep) => (
+                          <motion.p
+                            key={ep.id}
+                            initial={ep.id.startsWith("user-") ? { opacity: 0, y: 10 } : false}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                            className="border-none bg-transparent text-left text-sm font-normal text-gray-600 shadow-none"
+                          >
+                            {ep.dateLabel}: 「{ep.body}」
+                          </motion.p>
+                        ))
+                      : userExtraEpisodes.length > 0
+                        ? userExtraEpisodes.map((ep) => (
+                            <motion.p
+                              key={ep.id}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                              className="pt-2 border-none bg-transparent text-left text-sm font-normal text-gray-600 shadow-none"
+                            >
+                              つたえたいこと: 「{ep.body}」
+                            </motion.p>
+                          ))
+                        : <div className="h-[46%]" />}
                   </motion.div>
                 </div>
 
@@ -377,7 +393,7 @@ export default function UiCardRefactorPage() {
                   rows={3}
                   enterKeyHint="send"
                   inputMode="text"
-                  placeholder="エピソードを入力..."
+                  placeholder={isThankYouMode ? "エピソードを入力..." : "つたえたいことを入力..."}
                   className="min-h-[88px] w-full resize-none border-none bg-transparent text-[15px] leading-relaxed text-gray-800 outline-none ring-0 placeholder:text-gray-400"
                 />
                 <div className="mt-2 flex items-center justify-end gap-2">

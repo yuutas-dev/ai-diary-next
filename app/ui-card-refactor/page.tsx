@@ -11,15 +11,15 @@ export default function UiCardRefactorPage() {
   return (
     <div className="fixed inset-0 z-[9999] bg-[#fdeef4]">
       <main className="mx-auto flex h-screen w-full max-w-[430px] flex-col px-3 pt-6">
-        <div className="relative mx-auto mt-2 h-[55vh] w-[85vw] max-w-[370px]">
+        <div className="relative mx-auto mt-8 h-[65vh] w-[85vw] max-w-[370px]">
           <motion.section
             animate={
               isFrontActive
-                ? { x: 0, y: -30, scale: 0.85, opacity: 0.92 }
-                : { x: 0, y: 0, scale: 1, opacity: 1 }
+                ? { x: 0, y: -65, scale: 0.9, opacity: 0.92, filter: "brightness(0.95)" }
+                : { x: 0, y: 0, scale: 1, opacity: 1, filter: "brightness(1)" }
             }
             transition={{ type: "spring", stiffness: 120, damping: 20 }}
-            className="absolute inset-0 rounded-[30px] border border-[#f5dfea] bg-white shadow-xl"
+            className="absolute inset-0 rounded-[30px] border border-[#f5dfea] bg-pink-50 shadow-xl"
             style={{ zIndex: isFrontActive ? 0 : 10 }}
             drag={!isFrontActive ? "x" : false}
             dragConstraints={{ left: 0, right: 0 }}
@@ -39,8 +39,8 @@ export default function UiCardRefactorPage() {
           <motion.section
             animate={
               isFrontActive
-                ? { x: 0, y: 0, scale: 1, opacity: 1 }
-                : { x: 0, y: -30, scale: 0.85, opacity: 0.92 }
+                ? { x: 0, y: 0, scale: 1, opacity: 1, filter: "brightness(1)" }
+                : { x: 0, y: -65, scale: 0.9, opacity: 0.92, filter: "brightness(0.95)" }
             }
             transition={{ type: "spring", stiffness: 120, damping: 20 }}
             className="absolute inset-0 rounded-[30px] border border-[#f3dce8] bg-white shadow-2xl"

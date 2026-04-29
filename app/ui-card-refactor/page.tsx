@@ -14,8 +14,14 @@ const MOCK_AVATARS = [
 export default function UiCardRefactorPage() {
   const [activeCard, setActiveCard] = useState<"front" | "back">("front");
   const [isVisitMode, setIsVisitMode] = useState(true);
+  const [selectedCustomerId, setSelectedCustomerId] = useState(MOCK_AVATARS[0].id);
   const isFrontActive = activeCard === "front";
   const SWIPE_THRESHOLD = 90;
+
+  const selectedCustomer = MOCK_AVATARS.find((a) => a.id === selectedCustomerId) ?? MOCK_AVATARS[0];
+  const createButtonLabel = isVisitMode
+    ? `${selectedCustomer.name}さんにありがとうを伝える（AI）`
+    : `${selectedCustomer.name}さんにきてほしいと伝える（AI）`;
 
   return (
     <div className="fixed inset-0 z-[9999] bg-[#fdeef4]">
@@ -71,14 +77,26 @@ export default function UiCardRefactorPage() {
                 </div>
                 <div className="mt-3 px-1 py-1">
                   <div className="flex gap-2 overflow-x-auto pb-1">
-                    {MOCK_AVATARS.map((avatar) => (
-                      <div key={avatar.id} className="flex min-w-[58px] flex-col items-center">
-                        <div className="grid h-11 w-11 place-items-center rounded-full bg-[#f3e6ed] text-[20px]">
-                          {avatar.emoji}
-                        </div>
-                        <div className="mt-1 text-[10px] font-bold text-[#9f7887]">{avatar.name}</div>
-                      </div>
-                    ))}
+                    {MOCK_AVATARS.map((avatar) => {
+                      const isSelected = selectedCustomerId === avatar.id;
+                      return (
+                        <button
+                          key={avatar.id}
+                          type="button"
+                          onClick={() => setSelectedCustomerId(avatar.id)}
+                          className="flex min-w-[58px] flex-col items-center border-none bg-transparent p-0"
+                        >
+                          <div
+                            className={`grid h-11 w-11 place-items-center rounded-full text-[20px] ${
+                              isSelected ? "bg-[#f0d6e3]" : "bg-[#f3e6ed]"
+                            }`}
+                          >
+                            {avatar.emoji}
+                          </div>
+                          <div className="mt-1 text-[10px] font-bold text-[#9f7887]">{avatar.name}</div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -126,29 +144,31 @@ export default function UiCardRefactorPage() {
 
       <div className="fixed inset-x-0 bottom-0 bg-gradient-to-b from-transparent via-[#fff9fcf0] to-[#fff9fc] px-3 pb-[calc(max(10px,env(safe-area-inset-bottom))+8px)] pt-2.5">
         <div className="mx-auto max-w-[430px]">
-          <div className="mb-2 rounded-full bg-gray-100 p-1">
-            <div className="grid grid-cols-2 gap-1 text-[12px] font-semibold">
+          <div className="mb-2 rounded-full border border-gray-100 bg-white p-1">
+            <div className="grid grid-cols-2 gap-1">
               <button
                 type="button"
                 onClick={() => setIsVisitMode(true)}
-                className={`rounded-full px-3 py-2 transition-all ${
+                aria-label="来店あり（ありがとう）"
+                className={`flex items-center justify-center rounded-full py-2.5 transition-all ${
                   isVisitMode
-                    ? "bg-pink-300 text-white shadow-sm"
-                    : "bg-transparent text-gray-500"
+                    ? "bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] shadow-sm"
+                    : "bg-transparent"
                 }`}
               >
-                ありがとうをつたえる
+                <span className={`h-2.5 w-2.5 rounded-full ${isVisitMode ? "bg-white" : "bg-gray-300"}`} />
               </button>
               <button
                 type="button"
                 onClick={() => setIsVisitMode(false)}
-                className={`rounded-full px-3 py-2 transition-all ${
+                aria-label="来店なし（きてほしい）"
+                className={`flex items-center justify-center rounded-full py-2.5 transition-all ${
                   !isVisitMode
-                    ? "bg-pink-300 text-white shadow-sm"
-                    : "bg-transparent text-gray-500"
+                    ? "bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] shadow-sm"
+                    : "bg-transparent"
                 }`}
               >
-                きてほしいをつたえる
+                <span className={`h-2.5 w-2.5 rounded-full ${!isVisitMode ? "bg-white" : "bg-gray-300"}`} />
               </button>
             </div>
           </div>
@@ -156,7 +176,7 @@ export default function UiCardRefactorPage() {
             type="button"
             className="w-full rounded-full border-none bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] px-4 py-3 text-[15px] font-extrabold text-white shadow-[0_14px_24px_rgba(223,138,155,0.34)]"
           >
-            ✨ AIで作成（お手紙）
+            {createButtonLabel}
           </button>
           <div className="mt-2.5 grid grid-cols-3 rounded-2xl border border-[#f0dce5] bg-white/85 px-2 py-4 text-center text-[13px] font-bold text-[#7b666d] shadow-[0_8px_18px_rgba(190,137,153,0.14)]">
             <div>📝 作成</div>

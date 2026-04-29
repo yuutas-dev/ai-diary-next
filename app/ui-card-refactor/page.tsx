@@ -77,7 +77,7 @@ function formatTodayJa() {
 
 export default function UiCardRefactorPage() {
   const [activeCard, setActiveCard] = useState<"front" | "back">("front");
-  const [isVisitMode, setIsVisitMode] = useState(true);
+  const [mode, setMode] = useState<"thankYou" | "sales">("thankYou");
   const [selectedCustomerId, setSelectedCustomerId] = useState(MOCK_AVATARS[0].id);
   const [isVoiceInputActive, setIsVoiceInputActive] = useState(false);
   const [isEpisodeComposerOpen, setIsEpisodeComposerOpen] = useState(false);
@@ -98,9 +98,10 @@ export default function UiCardRefactorPage() {
     [selectedProfile.episodes, userExtraEpisodes],
   );
 
-  const createButtonLabel = isVisitMode
-    ? `${selectedCustomer.name}さんにありがとうを伝える（AI）`
-    : `${selectedCustomer.name}さんにきてほしいと伝える（AI）`;
+  const isThankYouMode = mode === "thankYou";
+  const createButtonLabel = isThankYouMode
+    ? `✨ ${selectedCustomer.name}さんにお礼を伝える（AI）`
+    : `✨ ${selectedCustomer.name}さんに営業を送る（AI）`;
 
   useEffect(() => {
     if (!isEpisodeComposerOpen) return;
@@ -199,7 +200,36 @@ export default function UiCardRefactorPage() {
                 <div className="w-full rounded-xl bg-gray-100/50 px-3 py-2 text-[12px] text-[#b08a98]">
                   検索...
                 </div>
-                <div className="mt-3 px-1 py-1">
+                <div className="mt-3 rounded-[11px] bg-gray-100/70 p-0.5">
+                  <div className="relative grid grid-cols-2 text-[12px] font-semibold text-[#8f6f7a]">
+                    <motion.div
+                      layoutId="mode-tab-indicator"
+                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                      className={`absolute inset-y-0 w-1/2 rounded-[9px] bg-white shadow-[0_1px_4px_rgba(20,20,20,0.08)] ${
+                        isThankYouMode ? "left-0" : "left-1/2"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMode("thankYou")}
+                      className={`relative z-[1] rounded-[9px] px-2 py-1.5 transition-colors ${
+                        isThankYouMode ? "text-[#6f5a62]" : "text-[#9f8891]"
+                      }`}
+                    >
+                      お礼メッセージ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode("sales")}
+                      className={`relative z-[1] rounded-[9px] px-2 py-1.5 transition-colors ${
+                        !isThankYouMode ? "text-[#6f5a62]" : "text-[#9f8891]"
+                      }`}
+                    >
+                      営業・ご機嫌伺い
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-2 px-1 py-1">
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {MOCK_AVATARS.map((avatar) => {
                       const isSelected = selectedCustomerId === avatar.id;
@@ -238,6 +268,9 @@ export default function UiCardRefactorPage() {
                     ))}
                   </div>
                 </div>
+                <div className="mt-2 text-[11px] font-medium text-[#ad96a0]">
+                  {isThankYouMode ? "今日のエピソード（任意）" : "伝えたいこと・きっかけ（任意）"}
+                </div>
 
                 <div
                   ref={episodeScrollRef}
@@ -249,6 +282,12 @@ export default function UiCardRefactorPage() {
                     animate={{ y: isVoiceInputActive ? -52 : 0 }}
                     transition={{ type: "spring", stiffness: 280, damping: 32 }}
                   >
+                    {!isThankYouMode ? (
+                      <div className="space-y-1 pb-2 text-[11px] text-[#9c8790]">
+                        <p>最終来店：24日前（10/05）</p>
+                        <p>前回の話題：ゴルフ、出張の話</p>
+                      </div>
+                    ) : null}
                     {displayedEpisodes.map((ep) => (
                       <motion.p
                         key={ep.id}
@@ -291,34 +330,6 @@ export default function UiCardRefactorPage() {
 
       <div className="fixed inset-x-0 bottom-0 bg-gradient-to-b from-transparent via-[#fff9fcf0] to-[#fff9fc] px-3 pb-[calc(max(10px,env(safe-area-inset-bottom))+8px)] pt-2.5">
         <div className="mx-auto max-w-[430px]">
-          <div className="mx-auto mb-2 w-[240px] max-w-full rounded-full border border-gray-100 bg-white p-0.5">
-            <div className="grid grid-cols-2 gap-0 overflow-hidden rounded-full">
-              <button
-                type="button"
-                onClick={() => setIsVisitMode(true)}
-                aria-label="来店あり（ありがとう）"
-                className={`min-w-0 px-1 py-1.5 text-center text-[10px] font-bold leading-tight transition-all ${
-                  isVisitMode
-                    ? "bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] text-white shadow-sm"
-                    : "bg-transparent text-gray-500"
-                }`}
-              >
-                ありがとうをつたえる
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsVisitMode(false)}
-                aria-label="来店なし（きてほしい）"
-                className={`min-w-0 px-1 py-1.5 text-center text-[10px] font-bold leading-tight transition-all ${
-                  !isVisitMode
-                    ? "bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] text-white shadow-sm"
-                    : "bg-transparent text-gray-500"
-                }`}
-              >
-                きてほしいをつたえる
-              </button>
-            </div>
-          </div>
           <button
             type="button"
             className="w-full rounded-full border-none bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] px-4 py-3 text-[15px] font-extrabold text-white shadow-[0_14px_24px_rgba(223,138,155,0.34)]"

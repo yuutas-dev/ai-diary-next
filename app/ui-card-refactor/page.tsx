@@ -4,32 +4,41 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 
 export default function UiCardRefactorPage() {
-  const [frontMode, setFrontMode] = useState<"front" | "back">("front");
-  const swapCards = () => setFrontMode((v) => (v === "front" ? "back" : "front"));
-  const isFrontCardOnTop = frontMode === "front";
+  const [activeCard, setActiveCard] = useState<"customer" | "photo">("customer");
+  const isCustomerFront = activeCard === "customer";
 
   return (
     <div className="fixed inset-0 z-[9999] bg-[#fdeef4]">
       <main className="mx-auto flex h-screen w-full max-w-[430px] flex-col px-3 pt-6">
-        <div className="relative mx-auto h-[80%] w-[90vw] max-w-[390px]">
+        <div className="relative mx-auto mt-2 h-[55vh] w-[85vw] max-w-[370px]">
           <motion.section
             animate={
-              isFrontCardOnTop
-                ? { x: 0, y: -18, scale: 0.95, opacity: 0.92 }
-                : { x: 0, y: 0, scale: 1, opacity: 1 }
+              isCustomerFront
+                ? { y: -40, scale: 0.85, opacity: 0.92 }
+                : { y: 0, scale: 1, opacity: 1 }
             }
-            transition={{ type: "spring", stiffness: 110, damping: 16, mass: 0.9 }}
-            className="absolute inset-0 rounded-[30px] border border-[#f5dfea] bg-white shadow-[0_28px_52px_rgba(230,159,185,0.35)]"
-            style={{ zIndex: isFrontCardOnTop ? 0 : 10 }}
+            transition={{ type: "spring", stiffness: 100, damping: 15, mass: 0.95 }}
+            className="absolute inset-0 rounded-[30px] border border-[#f5dfea] bg-white shadow-2xl"
+            style={{ zIndex: isCustomerFront ? 0 : 10 }}
+            onClick={() => {
+              if (isCustomerFront) setActiveCard("photo");
+            }}
+            drag={!isCustomerFront ? "x" : false}
+            dragConstraints={{ left: -120, right: 120 }}
+            dragElastic={0.15}
+            onDragEnd={(_, info) => {
+              if (!isCustomerFront && Math.abs(info.offset.x) > 70) {
+                setActiveCard("customer");
+              }
+            }}
           >
-            <button
-              type="button"
-              onClick={swapCards}
-              className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full border border-[#f7deea] bg-white px-5 py-1.5 text-base font-black text-[#de86a1] shadow-[0_10px_18px_rgba(232,153,182,0.3)]"
-              aria-label="背面カードを前面へ"
+            <div
+              className={`absolute -top-5 right-6 rounded-2xl border border-[#f7deea] bg-white px-4 py-2 text-[12px] font-black text-[#de86a1] shadow-[0_10px_18px_rgba(232,153,182,0.3)] ${
+                isCustomerFront ? "pointer-events-auto" : "pointer-events-none"
+              }`}
             >
-              📷
-            </button>
+              📷 写メ
+            </div>
             <div className="grid h-full place-items-center rounded-[30px] text-center">
               <p className="text-xl font-black text-[#cb7f95]">背面カード</p>
             </div>
@@ -37,22 +46,32 @@ export default function UiCardRefactorPage() {
 
           <motion.section
             animate={
-              isFrontCardOnTop
-                ? { x: 0, y: 0, scale: 1, opacity: 1 }
-                : { x: 0, y: 14, scale: 0.97, opacity: 0.78 }
+              isCustomerFront
+                ? { y: 0, scale: 1, opacity: 1 }
+                : { y: -40, scale: 0.85, opacity: 0.92 }
             }
-            transition={{ type: "spring", stiffness: 110, damping: 16, mass: 0.9 }}
-            className="absolute inset-0 rounded-[30px] border border-[#f3dce8] bg-white shadow-[0_24px_45px_rgba(223,138,165,0.25)]"
-            style={{ zIndex: isFrontCardOnTop ? 10 : 0 }}
-            drag={isFrontCardOnTop ? "x" : false}
-            dragConstraints={{ left: -140, right: 140 }}
-            dragElastic={0.14}
+            transition={{ type: "spring", stiffness: 100, damping: 15, mass: 0.95 }}
+            className="absolute inset-0 rounded-[30px] border border-[#f3dce8] bg-white shadow-2xl"
+            style={{ zIndex: isCustomerFront ? 10 : 0 }}
+            onClick={() => {
+              if (!isCustomerFront) setActiveCard("customer");
+            }}
+            drag={isCustomerFront ? "x" : false}
+            dragConstraints={{ left: -120, right: 120 }}
+            dragElastic={0.15}
             onDragEnd={(_, info) => {
-              if (isFrontCardOnTop && Math.abs(info.offset.x) > 70) {
-                setFrontMode("back");
+              if (isCustomerFront && Math.abs(info.offset.x) > 70) {
+                setActiveCard("photo");
               }
             }}
           >
+            <div
+              className={`absolute -top-5 left-6 rounded-2xl border border-[#f7deea] bg-white px-4 py-2 text-[12px] font-black text-[#de86a1] shadow-[0_10px_18px_rgba(232,153,182,0.3)] ${
+                isCustomerFront ? "pointer-events-none" : "pointer-events-auto"
+              }`}
+            >
+              👤 顧客
+            </div>
             <div className="grid h-full place-items-center rounded-[30px] text-center">
               <p className="text-xl font-black text-[#cb7f95]">前面カード</p>
             </div>
@@ -68,7 +87,7 @@ export default function UiCardRefactorPage() {
           >
             ✨ AIで作成（お手紙）
           </button>
-          <div className="mt-2.5 grid grid-cols-3 rounded-2xl border border-[#f0dce5] bg-white/85 px-2 py-2 text-center text-[12px] font-bold text-[#7b666d] shadow-[0_8px_18px_rgba(190,137,153,0.14)]">
+          <div className="mt-2.5 grid grid-cols-3 rounded-2xl border border-[#f0dce5] bg-white/85 px-2 py-4 text-center text-[13px] font-bold text-[#7b666d] shadow-[0_8px_18px_rgba(190,137,153,0.14)]">
             <div>📝 作成</div>
             <div>📖 顧客</div>
             <div>⚙️ 設定</div>

@@ -91,9 +91,18 @@ export default function UiCardRefactorPage() {
   const [isVoiceInputActive, setIsVoiceInputActive] = useState(false);
   const [isEpisodeComposerOpen, setIsEpisodeComposerOpen] = useState(false);
   const [composerText, setComposerText] = useState("");
-  const [userEpisodesByCustomer, setUserEpisodesByCustomer] = useState<Record<string, MockEpisode[]>>({});
+  const [thankYouEpisodesByCustomer, setThankYouEpisodesByCustomer] = useState<Record<string, MockEpisode[]>>({});
+  const [salesDirectivesByCustomer, setSalesDirectivesByCustomer] = useState<Record<string, MockEpisode[]>>({});
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [writingLabel, setWritingLabel] = useState<"writing" | "done">("writing");
+  const [isResultFlipped, setIsResultFlipped] = useState(false);
+  const [generatedMessage, setGeneratedMessage] = useState("");
+  const [showSavedToast, setShowSavedToast] = useState(false);
   const episodeScrollRef = useRef<HTMLDivElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
+  const generateTimeoutRef = useRef<number | null>(null);
+  const doneTimeoutRef = useRef<number | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
   const isFrontActive = activeCard === "front";
   const SWIPE_THRESHOLD = 90;
   const todayLabel = useMemo(() => formatTodayJa(), []);
@@ -101,13 +110,24 @@ export default function UiCardRefactorPage() {
   const selectedCustomer = MOCK_AVATARS.find((a) => a.id === selectedCustomerId) ?? MOCK_AVATARS[0];
   const selectedProfile =
     MOCK_CUSTOMER_PROFILES[selectedCustomerId] ?? MOCK_CUSTOMER_PROFILES[MOCK_AVATARS[0].id];
-  const userExtraEpisodes = userEpisodesByCustomer[selectedCustomerId] ?? [];
-  const displayedEpisodes = useMemo(() => [...selectedProfile.episodes, ...userExtraEpisodes], [selectedProfile.episodes, userExtraEpisodes]);
+  const confirmedThankYouEpisodes = thankYouEpisodesByCustomer[selectedCustomerId] ?? [];
+  const displayedEpisodes = useMemo(
+    () => [...selectedProfile.episodes, ...confirmedThankYouEpisodes],
+    [selectedProfile.episodes, confirmedThankYouEpisodes],
+  );
+  const salesDirectives = salesDirectivesByCustomer[selectedCustomerId] ?? [];
 
   const isThankYouMode = mode === "thankYou";
   const createButtonLabel = isThankYouMode
     ? `✨ ${selectedCustomer.name}さんにお礼を伝える（AI）`
     : `✨ ${selectedCustomer.name}さんに営業を送る（AI）`;
+  const latestHintWord = (isThankYouMode ? confirmedThankYouEpisodes : salesDirectives).at(-1)?.body ?? composerText.trim();
+  const hintChips = useMemo(
+    () => [todayLabel.split("(")[0], todayLabel.match(/\(.+\)/)?.[0]?.replace(/[()]/g, "") ?? "", ...selectedProfile.profileTags, latestHintWord]
+      .filter(Boolean)
+      .slice(0, 6),
+    [todayLabel, selectedProfile.profileTags, latestHintWord],
+  );
 
   useEffect(() => {
     if (!isEpisodeComposerOpen) return;
@@ -125,10 +145,17 @@ export default function UiCardRefactorPage() {
       dateLabel: isThankYouMode ? formatEpisodeDateLabel() : "つたえたいこと",
       body,
     };
-    setUserEpisodesByCustomer((prev) => ({
-      ...prev,
-      [selectedCustomerId]: [...(prev[selectedCustomerId] ?? []), newEp],
-    }));
+    if (isThankYouMode) {
+      setThankYouEpisodesByCustomer((prev) => ({
+        ...prev,
+        [selectedCustomerId]: [...(prev[selectedCustomerId] ?? []), newEp],
+      }));
+    } else {
+      setSalesDirectivesByCustomer((prev) => ({
+        ...prev,
+        [selectedCustomerId]: [...(prev[selectedCustomerId] ?? []), newEp],
+      }));
+    }
     setComposerText("");
     setIsEpisodeComposerOpen(false);
     composerInputRef.current?.blur();
@@ -140,9 +167,39 @@ export default function UiCardRefactorPage() {
 
   const closeComposer = () => {
     setIsEpisodeComposerOpen(false);
-    setComposerText("");
     composerInputRef.current?.blur();
   };
+
+  const handleGenerate = () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    setWritingLabel("writing");
+    const latestInput =
+      (isThankYouMode ? confirmedThankYouEpisodes : salesDirectives).at(-1)?.body ?? composerText.trim() ?? "";
+    const hints = latestInput ? ` ${latestInput}` : "";
+    const message = isThankYouMode
+      ? `${selectedCustomer.name}さん、今日はありがとうございました！シャンパン最高でしたね。${hints}`.trim()
+      : `${selectedCustomer.name}さん、お疲れさまです。また近いうちに顔を見せてもらえたら嬉しいです。${hints}`.trim();
+    setGeneratedMessage(message);
+
+    doneTimeoutRef.current = window.setTimeout(() => {
+      setWritingLabel("done");
+    }, 1600);
+    generateTimeoutRef.current = window.setTimeout(() => {
+      setIsGenerating(false);
+      setIsResultFlipped(true);
+      setShowSavedToast(true);
+      toastTimeoutRef.current = window.setTimeout(() => setShowSavedToast(false), 1800);
+    }, 2000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (generateTimeoutRef.current) window.clearTimeout(generateTimeoutRef.current);
+      if (doneTimeoutRef.current) window.clearTimeout(doneTimeoutRef.current);
+      if (toastTimeoutRef.current) window.clearTimeout(toastTimeoutRef.current);
+    };
+  }, []);
 
   return (
     <div className="fixed inset-0 z-[9999] bg-[#fdeef4]">
@@ -185,7 +242,6 @@ export default function UiCardRefactorPage() {
             }
             transition={{ type: "spring", stiffness: 120, damping: 20 }}
             className="absolute inset-0 rounded-[30px] border border-[#f3dce8] bg-white shadow-2xl"
-            style={{ zIndex: isFrontActive ? 10 : 0 }}
             drag={isFrontActive && !isVoiceInputActive && !isEpisodeComposerOpen ? "x" : false}
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.18}
@@ -200,157 +256,188 @@ export default function UiCardRefactorPage() {
                 setActiveCard("back");
               }
             }}
+            style={{ zIndex: isFrontActive ? 10 : 0, perspective: 1600 }}
           >
-            <div className="flex h-full min-h-0 flex-col rounded-[30px] p-4">
-              <div className="rounded-[24px] p-1">
-                <div className="w-full rounded-xl bg-gray-100/50 px-3 py-2 text-[12px] text-[#b08a98]">
-                  検索...
-                </div>
-                <div className="mt-3 rounded-[11px] bg-gray-100/70 p-0.5">
-                  <div className="relative grid grid-cols-2 text-[12px] font-semibold text-[#8f6f7a]">
-                    <motion.div
-                      layoutId="mode-tab-indicator"
-                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                      className={`absolute inset-y-0 w-1/2 rounded-[9px] bg-white shadow-[0_1px_4px_rgba(20,20,20,0.08)] ${
-                        isThankYouMode ? "left-0" : "left-1/2"
-                      }`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setMode("thankYou")}
-                      className={`relative z-[1] rounded-[9px] px-2 py-1.5 transition-colors ${
-                        isThankYouMode ? "text-[#6f5a62]" : "text-[#9f8891]"
-                      }`}
-                    >
-                      お礼メッセージ
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMode("sales")}
-                      className={`relative z-[1] rounded-[9px] px-2 py-1.5 transition-colors ${
-                        !isThankYouMode ? "text-[#6f5a62]" : "text-[#9f8891]"
-                      }`}
-                    >
-                      営業・ご機嫌伺い
-                    </button>
+            <motion.div
+              animate={{ rotateY: isResultFlipped ? 180 : 0 }}
+              transition={{ type: "spring", stiffness: 180, damping: 24 }}
+              className="relative h-full w-full rounded-[30px]"
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              <div className="absolute inset-0 flex min-h-0 flex-col rounded-[30px] p-4 [backface-visibility:hidden]">
+                <div className="rounded-[24px] p-1">
+                  <div className="w-full rounded-xl bg-gray-100/50 px-3 py-2 text-[12px] text-[#b08a98]">
+                    検索...
                   </div>
-                </div>
-                <div className="mt-2 px-1 py-1">
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {MOCK_AVATARS.map((avatar) => {
-                      const isSelected = selectedCustomerId === avatar.id;
-                      return (
-                        <button
-                          key={avatar.id}
-                          type="button"
-                          onClick={() => setSelectedCustomerId(avatar.id)}
-                          className="flex min-w-[58px] flex-col items-center border-none bg-transparent p-0"
-                        >
-                          <div
-                            className={`grid h-11 w-11 place-items-center rounded-full text-[20px] ${
-                              isSelected ? "bg-[#f0d6e3]" : "bg-[#f3e6ed]"
-                            }`}
+                  <div className="mt-3 rounded-[11px] bg-gray-100/70 p-0.5">
+                    <div className="relative grid grid-cols-2 text-[12px] font-semibold text-[#8f6f7a]">
+                      <motion.div
+                        layoutId="mode-tab-indicator"
+                        transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                        className={`absolute inset-y-0 w-1/2 rounded-[9px] bg-white shadow-[0_1px_4px_rgba(20,20,20,0.08)] ${
+                          isThankYouMode ? "left-0" : "left-1/2"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setMode("thankYou")}
+                        className={`relative z-[1] rounded-[9px] px-2 py-1.5 transition-colors ${
+                          isThankYouMode ? "text-[#6f5a62]" : "text-[#9f8891]"
+                        }`}
+                      >
+                        お礼メッセージ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMode("sales")}
+                        className={`relative z-[1] rounded-[9px] px-2 py-1.5 transition-colors ${
+                          !isThankYouMode ? "text-[#6f5a62]" : "text-[#9f8891]"
+                        }`}
+                      >
+                        営業・ご機嫌伺い
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-2 px-1 py-1">
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {MOCK_AVATARS.map((avatar) => {
+                        const isSelected = selectedCustomerId === avatar.id;
+                        return (
+                          <button
+                            key={avatar.id}
+                            type="button"
+                            onClick={() => setSelectedCustomerId(avatar.id)}
+                            className="flex min-w-[58px] flex-col items-center border-none bg-transparent p-0"
                           >
-                            {avatar.emoji}
-                          </div>
-                          <div className="mt-1 text-[10px] font-bold text-[#9f7887]">{avatar.name}</div>
-                        </button>
-                      );
-                    })}
+                            <div
+                              className={`grid h-11 w-11 place-items-center rounded-full text-[20px] ${
+                                isSelected ? "bg-[#f0d6e3]" : "bg-[#f3e6ed]"
+                              }`}
+                            >
+                              {avatar.emoji}
+                            </div>
+                            <div className="mt-1 text-[10px] font-bold text-[#9f7887]">{avatar.name}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="mt-3 h-[1px] w-[90%] self-center bg-gray-100" />
+                <div className="mt-3 h-[1px] w-[90%] self-center bg-gray-100" />
 
-              <div className="relative mt-3 flex min-h-0 flex-1 flex-col">
-                <div className="shrink-0">
-                  <div className="mb-2 text-[10px] font-semibold tracking-wide text-gray-400">プロフィールサマリー</div>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedProfile.profileTags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-medium text-gray-500">
-                        {tag}
-                      </span>
-                    ))}
+                <div className="relative mt-3 flex min-h-0 flex-1 flex-col">
+                  <div className="shrink-0">
+                    <div className="mb-2 text-[10px] font-semibold tracking-wide text-gray-400">プロフィールサマリー</div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedProfile.profileTags.map((tag) => (
+                        <span key={tag} className="rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-medium text-gray-500">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div
-                  ref={episodeScrollRef}
-                  className="mt-3 min-h-0 flex-1 overflow-y-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                >
-                  <motion.div
-                    key={selectedCustomerId}
-                    className="space-y-3 pb-16 text-sm text-gray-600"
-                    animate={{ y: isVoiceInputActive ? -52 : 0 }}
-                    transition={{ type: "spring", stiffness: 280, damping: 32 }}
+                  <div
+                    ref={episodeScrollRef}
+                    className="mt-3 min-h-0 flex-1 overflow-y-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   >
-                    {isThankYouMode ? null : (
-                      <div className="space-y-1 pb-2 text-[11px] text-[#9c8790]">
-                        <p>最終来店：24日前（10/05）</p>
-                        <p>前回の話題：ゴルフ、出張の話</p>
-                      </div>
-                    )}
-                    {isThankYouMode
-                      ? displayedEpisodes.map((ep) => (
-                          <motion.p
-                            key={ep.id}
-                            initial={ep.id.startsWith("user-") ? { opacity: 0, y: 10 } : false}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                            className="border-none bg-transparent text-left text-sm font-normal text-gray-600 shadow-none"
-                          >
-                            {ep.dateLabel}: 「{ep.body}」
-                          </motion.p>
-                        ))
-                      : userExtraEpisodes.length > 0
-                        ? userExtraEpisodes.map((ep) => (
+                    <motion.div
+                      key={selectedCustomerId}
+                      className="space-y-3 pb-16 text-sm text-gray-600"
+                      animate={{ y: isVoiceInputActive ? -52 : 0 }}
+                      transition={{ type: "spring", stiffness: 280, damping: 32 }}
+                    >
+                      {isThankYouMode ? null : (
+                        <div className="space-y-1 pb-2 text-[11px] text-[#9c8790]">
+                          <p>最終来店：24日前（10/05）</p>
+                          <p>前回の話題：ゴルフ、出張の話</p>
+                        </div>
+                      )}
+                      {isThankYouMode
+                        ? displayedEpisodes.map((ep) => (
                             <motion.p
                               key={ep.id}
-                              initial={{ opacity: 0, y: 10 }}
+                              initial={ep.id.startsWith("user-") ? { opacity: 0, y: 10 } : false}
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                              className="pt-2 border-none bg-transparent text-left text-sm font-normal text-gray-600 shadow-none"
+                              className="border-none bg-transparent text-left text-sm font-normal text-gray-600 shadow-none"
                             >
-                              つたえたいこと: 「{ep.body}」
+                              {ep.dateLabel}: 「{ep.body}」
                             </motion.p>
                           ))
-                        : <div className="h-[46%]" />}
-                  </motion.div>
-                </div>
+                        : salesDirectives.length > 0
+                          ? salesDirectives.map((ep) => (
+                              <motion.p
+                                key={ep.id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                                className="pt-2 border-none bg-transparent text-left text-sm font-normal text-gray-600 shadow-none"
+                              >
+                                つたえたいこと: 「{ep.body}」
+                              </motion.p>
+                            ))
+                          : <div className="h-[46%]" />}
+                    </motion.div>
+                  </div>
 
-                <div className="absolute bottom-1 right-1 flex items-center overflow-hidden rounded-full border border-white/70 bg-white/60 text-[13px] text-[#8f6f7a] backdrop-blur-md">
-                  <button
-                    type="button"
-                    className="border-none bg-transparent px-2 py-1 font-bold"
-                    aria-label="エピソードを追加"
-                    onClick={() => setIsEpisodeComposerOpen(true)}
-                  >
-                    ＋
-                  </button>
-                  <span className="h-4 w-px shrink-0 bg-[#e8dce3]" aria-hidden />
-                  <button
-                    type="button"
-                    aria-label="音声入力"
-                    onPointerDown={(e) => e.preventDefault()}
-                    onClick={() => setIsVoiceInputActive(true)}
-                    className="border-none bg-transparent px-2 py-1"
-                  >
-                    🎤
-                  </button>
+                  <div className="absolute bottom-1 right-1 flex items-center overflow-hidden rounded-full border border-white/70 bg-white/60 text-[13px] text-[#8f6f7a] backdrop-blur-md">
+                    <button
+                      type="button"
+                      className="border-none bg-transparent px-2 py-1 font-bold"
+                      aria-label="エピソードを追加"
+                      onClick={() => setIsEpisodeComposerOpen(true)}
+                    >
+                      ＋
+                    </button>
+                    <span className="h-4 w-px shrink-0 bg-[#e8dce3]" aria-hidden />
+                    <button
+                      type="button"
+                      aria-label="音声入力"
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={() => setIsVoiceInputActive(true)}
+                      className="border-none bg-transparent px-2 py-1"
+                    >
+                      🎤
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+              <button
+                type="button"
+                onClick={() => setIsResultFlipped(false)}
+                className="absolute inset-0 flex min-h-0 flex-col rounded-[30px] bg-white p-4 text-left [backface-visibility:hidden]"
+                style={{ transform: "rotateY(180deg)" }}
+              >
+                <div className="flex flex-wrap gap-1 text-[10px] text-[#a8949c]">
+                  {hintChips.map((chip) => (
+                    <span key={chip} className="rounded-full bg-gray-100/80 px-2 py-0.5">
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-5 text-[15px] leading-7 text-[#6f5a62]">{generatedMessage}</div>
+              </button>
+            </motion.div>
           </motion.section>
         </div>
       </main>
 
       <div className="fixed inset-x-0 bottom-0 bg-gradient-to-b from-transparent via-[#fff9fcf0] to-[#fff9fc] px-3 pb-[calc(max(10px,env(safe-area-inset-bottom))+8px)] pt-2.5">
         <div className="mx-auto max-w-[430px]">
+          {isResultFlipped ? (
+            <div className="mb-2 flex items-center justify-center gap-4 text-[13px] text-[#8b737d]">
+              <button type="button" className="border-none bg-transparent">📋 コピー</button>
+              <button type="button" className="border-none bg-transparent">✏️ 編集</button>
+            </div>
+          ) : null}
           <button
             type="button"
-            className="w-full rounded-full border-none bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] px-4 py-3 text-[15px] font-extrabold text-white shadow-[0_14px_24px_rgba(223,138,155,0.34)]"
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className="w-full rounded-full border-none bg-gradient-to-br from-[#df8a9b] to-[#ec9aae] px-4 py-3 text-[15px] font-extrabold text-white shadow-[0_14px_24px_rgba(223,138,155,0.34)] disabled:opacity-95"
           >
-            {createButtonLabel}
+            {isGenerating ? (writingLabel === "writing" ? "執筆中だよ..." : "できたよ！") : createButtonLabel}
           </button>
           <div className="mt-2.5 grid grid-cols-3 rounded-2xl border border-[#f0dce5] bg-white/85 px-2 py-4 text-center text-[13px] font-bold text-[#7b666d] shadow-[0_8px_18px_rgba(190,137,153,0.14)]">
             <div>📝 作成</div>
@@ -359,6 +446,19 @@ export default function UiCardRefactorPage() {
           </div>
         </div>
       </div>
+      <AnimatePresence>
+        {showSavedToast ? (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="fixed right-3 top-3 z-[10070] rounded-full bg-white/95 px-3 py-1.5 text-[12px] text-[#7f6a73] shadow-[0_4px_14px_rgba(20,20,20,0.12)]"
+          >
+            履歴に保存しました
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isEpisodeComposerOpen ? (

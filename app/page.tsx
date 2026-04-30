@@ -88,34 +88,37 @@ export default function Page() {
       return;
     }
 
-    const recognition = new Recognition();
-    recognition.lang = "ja-JP";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    let recognition = recognitionRef.current;
+    if (!recognition) {
+      recognition = new Recognition();
+      recognition.lang = "ja-JP";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
 
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
 
-    recognition.onresult = (event) => {
-      const transcript = event.results[0]?.[0]?.transcript ?? "";
-      const text = transcript.trim();
-      if (text) {
-        setDailyMemos((prev) => [...prev, text]);
-      }
-      setIsListening(false);
-    };
+      recognition.onresult = (event) => {
+        const transcript = event.results[0]?.[0]?.transcript ?? "";
+        const text = transcript.trim();
+        if (text) {
+          setDailyMemos((prev) => [...prev, text]);
+        }
+        setIsListening(false);
+      };
 
-    recognition.onerror = () => {
-      setIsListening(false);
-    };
+      recognition.onerror = () => {
+        setIsListening(false);
+      };
 
-    recognition.onend = () => {
-      setIsListening(false);
-      recognitionRef.current = null;
-    };
+      recognition.onend = () => {
+        setIsListening(false);
+      };
 
-    recognitionRef.current = recognition;
+      recognitionRef.current = recognition;
+    }
+
     recognition.start();
   }, [handleCancelListening, isListening]);
 
@@ -191,22 +194,33 @@ export default function Page() {
           borderTop: "1px solid #eee",
           padding: "16px",
           paddingBottom: "max(16px, env(safe-area-inset-bottom))",
-          zIndex: 1000,
+          zIndex: 2000,
           pointerEvents: "auto",
         }}
       >
-        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+        <div style={{ display: "flex", gap: "8px", marginBottom: "16px", pointerEvents: "auto" }}>
           <button
             type="button"
             onClick={handleToggleVoiceInput}
             style={{
-              padding: "10px",
+              width: "48px",
+              height: "48px",
+              minWidth: "48px",
+              minHeight: "48px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 0,
               background: isListening ? "#fee2e2" : "#f3f4f6",
-              borderRadius: "50%",
+              borderRadius: "9999px",
               border: "none",
-              fontSize: "20px",
+              fontSize: "22px",
               touchAction: "manipulation",
               cursor: "pointer",
+              position: "relative",
+              zIndex: 2001,
+              pointerEvents: "auto",
+              WebkitTapHighlightColor: "transparent",
             }}
           >
             {isListening ? "🔴" : "🎤"}
@@ -266,7 +280,7 @@ export default function Page() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 999,
+            zIndex: 1999,
           }}
         >
           <div

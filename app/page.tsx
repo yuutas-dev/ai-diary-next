@@ -104,7 +104,7 @@ export default function Page() {
   }, [dailyMemos]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", backgroundColor: "#f9fafb" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", backgroundColor: "#f9fafb", position: "relative" }}>
       <style>{`
         @keyframes listeningPulse {
           0% { transform: scale(1); opacity: 0.9; }
@@ -146,6 +146,8 @@ export default function Page() {
           borderTop: "1px solid #eee",
           padding: "16px",
           paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+          zIndex: 1000,
+          pointerEvents: "auto",
         }}
       >
         <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
@@ -158,6 +160,8 @@ export default function Page() {
               borderRadius: "50%",
               border: "none",
               fontSize: "20px",
+              touchAction: "manipulation",
+              cursor: "pointer",
             }}
           >
             {isListening ? "🔴" : "🎤"}
@@ -179,6 +183,8 @@ export default function Page() {
               borderRadius: "8px",
               border: "none",
               fontWeight: "bold",
+              touchAction: "manipulation",
+              cursor: "pointer",
             }}
           >
             追加
@@ -196,6 +202,8 @@ export default function Page() {
             fontWeight: "bold",
             fontSize: "16px",
             boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+            touchAction: "manipulation",
+            cursor: "pointer",
           }}
           onClick={handleGenerateSummary}
         >
@@ -227,6 +235,22 @@ export default function Page() {
           >
             <div style={{ fontSize: "84px", animation: "listeningPulse 1.2s ease-in-out infinite" }}>🎤</div>
             <div style={{ color: "#fff", fontSize: "20px", fontWeight: "bold" }}>ききとりちゅう...</div>
+            <button
+              type="button"
+              onClick={handleCancelListening}
+              style={{
+                marginTop: "8px",
+                padding: "8px 14px",
+                borderRadius: "999px",
+                border: "1px solid rgba(255,255,255,0.5)",
+                background: "rgba(255,255,255,0.12)",
+                color: "#fff",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              閉じる
+            </button>
           </div>
         </div>
       ) : null}

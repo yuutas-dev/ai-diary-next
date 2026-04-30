@@ -187,15 +187,10 @@ export default function Page() {
 
       <div
         style={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          background: "#fff",
-          borderTop: "1px solid #eee",
+          position: "relative",
+          background: "transparent",
           padding: "16px",
           paddingBottom: "max(16px, env(safe-area-inset-bottom))",
-          zIndex: 2000,
           pointerEvents: "auto",
         }}
       >

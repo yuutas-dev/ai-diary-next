@@ -222,9 +222,10 @@ export default function Page() {
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "16px" }}>
           
-          {/* マイクボタン（単独で大きく配置） */}
-          <div style={{ display: "flex", justifyContent: "center", marginTop: "-40px" }}>
+       {/* マイクボタン（単独で大きく配置） */}
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "-40px", position: "relative", zIndex: 999 }}>
             <button
+              type="button"
               onClick={handleStartListening}
               style={{
                 width: "64px",
@@ -237,6 +238,8 @@ export default function Page() {
                 boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
                 cursor: "pointer",
                 touchAction: "manipulation",
+                position: "relative",
+                zIndex: 1000,
               }}
             >
               🎤

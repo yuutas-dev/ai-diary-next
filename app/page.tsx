@@ -14,7 +14,7 @@ type BusinessType = "cabaret" | "fuzoku" | "garuba";
 type ListFilter = "alert" | "all" | "vip" | "new" | "second" | "regular";
 type IconTheme = "glass" | "jewel" | "perfume" | "moon_star" | "flower" | "teacup" | "symbol";
 type AppTheme = "pink" | "blue";
-type AppFont = "standard" | "maru" | "mincho";
+type AppFont = "standard" | "maru" | "mincho"; 
 
 interface MemoBlock {
   id: string;

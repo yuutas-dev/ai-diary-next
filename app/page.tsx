@@ -215,6 +215,37 @@ export default function Page() {
             pointerEvents: "auto",
           }}
         >
+          <div
+            style={{
+              pointerEvents: "none",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                console.log("VOICE BUTTON CLICKED");
+                handleToggleVoiceInput();
+              }}
+              onPointerDown={() => console.log("pointer down")}
+              onTouchStart={() => console.log("touch start")}
+              style={{
+                width: "56px",
+                height: "56px",
+                borderRadius: "9999px",
+                border: "none",
+                background: isListening ? "#ef4444" : "#111827",
+                color: "white",
+                fontSize: "24px",
+                cursor: "pointer",
+                pointerEvents: "auto",
+                touchAction: "manipulation",
+                WebkitTapHighlightColor: "transparent",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+              }}
+            >
+              {isListening ? "🔴" : "🎤"}
+            </button>
+          </div>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <input
               type="text"
@@ -259,41 +290,6 @@ export default function Page() {
           onClick={handleGenerateSummary}
         >
           ✨ 今日のまとめ日記をAIで作成
-        </button>
-      </div>
-      <div
-        style={{
-          position: "fixed",
-          right: "20px",
-          bottom: "110px",
-          zIndex: 999999,
-          pointerEvents: "none",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => {
-            console.log("VOICE BUTTON CLICKED");
-            handleToggleVoiceInput();
-          }}
-          onPointerDown={() => console.log("pointer down")}
-          onTouchStart={() => console.log("touch start")}
-          style={{
-            width: "56px",
-            height: "56px",
-            borderRadius: "9999px",
-            border: "none",
-            background: isListening ? "#ef4444" : "#111827",
-            color: "white",
-            fontSize: "24px",
-            cursor: "pointer",
-            pointerEvents: "auto",
-            touchAction: "manipulation",
-            WebkitTapHighlightColor: "transparent",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-          }}
-        >
-          {isListening ? "🔴" : "🎤"}
         </button>
       </div>
       {isListening ? (

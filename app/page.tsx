@@ -424,9 +424,6 @@ export default function Page() {
   const [isTagAccordionOpen, setIsTagAccordionOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<null | "style" | "help" | "hidden" | "photo" | "edit" | "delete">(null);
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState("");
-  const [dailyMemos, setDailyMemos] = useState<string[]>([]);
-  const [dailyMemoInput, setDailyMemoInput] = useState("");
-  const [isSpeechRecording, setIsSpeechRecording] = useState(false);
   const [selectedBusinessType, setSelectedBusinessType] = useState<BusinessType>("cabaret");
   const [iconTheme, setIconTheme] = useState<IconTheme>("glass");
   const [appTheme, setAppTheme] = useState<AppTheme>("pink");
@@ -1714,119 +1711,6 @@ export default function Page() {
     })();
   }
 
-  const appendDailyMemo = (rawMemo: string) => {
-    const memo = rawMemo.trim();
-    if (!memo) return;
-    setDailyMemos((prev) => [...prev, memo]);
-  };
-
-  const handleAddDailyMemo = () => {
-    appendDailyMemo(dailyMemoInput);
-    setDailyMemoInput("");
-  };
-
-  const handleSpeechMemoAdd = () => {
-    if (typeof window === "undefined") return;
-    const SpeechRecognitionCtor =
-      (window as typeof window & { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any })
-        .SpeechRecognition ??
-      (window as typeof window & { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any })
-        .webkitSpeechRecognition;
-    if (!SpeechRecognitionCtor) {
-      alert("このブラウザは音声入力に対応していません");
-      return;
-    }
-    const recognition = new SpeechRecognitionCtor();
-    recognition.lang = "ja-JP";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    recognition.onstart = () => setIsSpeechRecording(true);
-    recognition.onend = () => setIsSpeechRecording(false);
-    recognition.onerror = () => setIsSpeechRecording(false);
-    recognition.onresult = (event: { results?: ArrayLike<ArrayLike<{ transcript?: string }>> }) => {
-      const transcript = event.results?.[0]?.[0]?.transcript ?? "";
-      appendDailyMemo(transcript);
-    };
-    recognition.start();
-  };
-
-  const handleGenerateDailyBlogMock = () => {
-    if (dailyMemos.length === 0) {
-      alert("メモがまだありません。まずは1件追加してください。");
-      return;
-    }
-    const joinedMemos = dailyMemos.join("\n");
-    const mockBlog = `【今日のまとめ日記（AIモック）】
-
-今日は次のメモをもとに1日を振り返りました。
-${joinedMemos}
-
---- ダミー本文 ---
-朝から夜までの出来事を小さく積み上げることで、1日の流れがはっきり見えました。
-気になったこと、感じたこと、やったことを材料に、明日につながる一日にしていきます。`;
-    alert(mockBlog);
-  };
-
-  const showDailyBoardPrototype = true;
-  if (showDailyBoardPrototype) {
-    return (
-      <div style={{minHeight: "100vh", background: "#fff7fc", color: "#222", paddingBottom: "220px"}}>
-        <div style={{padding: "20px 16px 12px", maxWidth: "760px", margin: "0 auto"}}>
-          <h1 style={{fontSize: "22px", margin: "0 0 6px", fontWeight: 800}}>本日のメモボード</h1>
-          <p style={{margin: 0, color: "#666", fontSize: "13px"}}>喋って（打って）放り込む -> リストに溜める -> 最後に一括生成</p>
-        </div>
-
-        <div style={{maxWidth: "760px", margin: "0 auto", padding: "0 16px"}}>
-          {dailyMemos.length === 0 ? (
-            <div style={{background: "#fff", border: "1px dashed #e6a9c9", borderRadius: "14px", padding: "24px", color: "#a06b88", fontSize: "14px"}}>
-              ここに今日のメモが溜まります
-            </div>
-          ) : (
-            <div style={{display: "flex", flexDirection: "column", gap: "10px"}}>
-              {dailyMemos.map((memo, index) => (
-                <div key={`${memo}-${index}`} style={{background: "#fff", border: "1px solid #f0d4e3", borderRadius: "12px", padding: "12px 14px", boxShadow: "0 4px 12px rgba(240, 140, 190, 0.12)"}}>
-                  <div style={{fontSize: "11px", color: "#a06b88", marginBottom: "4px"}}>#{index + 1}</div>
-                  <div style={{whiteSpace: "pre-wrap", lineHeight: 1.55}}>{memo}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div style={{position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 1000, borderTop: "1px solid #f2c9de", background: "#fff", boxShadow: "0 -6px 20px rgba(0,0,0,0.06)"}}>
-          <div style={{maxWidth: "760px", margin: "0 auto", padding: "12px 16px 16px", display: "flex", flexDirection: "column", gap: "10px"}}>
-            <div style={{display: "flex", gap: "8px"}}>
-              <input
-                type="text"
-                value={dailyMemoInput}
-                onChange={(event) => setDailyMemoInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleAddDailyMemo();
-                  }
-                }}
-                placeholder="今の気づき・出来事を入力"
-                style={{flex: 1, border: "1px solid #e0bfd0", borderRadius: "10px", padding: "10px 12px", fontSize: "14px"}}
-              />
-              <button type="button" onClick={handleAddDailyMemo} style={{border: "none", background: "#e85ca3", color: "#fff", borderRadius: "10px", padding: "0 16px", fontWeight: 700, cursor: "pointer"}}>
-                追加
-              </button>
-            </div>
-
-            <button type="button" onClick={handleSpeechMemoAdd} style={{border: "1px solid #d7b4c6", background: isSpeechRecording ? "#fff0f6" : "#fff", color: "#333", borderRadius: "10px", padding: "10px 12px", fontWeight: 700, cursor: "pointer"}}>
-              {isSpeechRecording ? "録音中... もう一度押すと終了できます" : "🎤 音声でメモを追加"}
-            </button>
-
-            <button type="button" onClick={handleGenerateDailyBlogMock} style={{border: "none", background: "linear-gradient(135deg, #ff5fa2 0%, #ff8a5f 100%)", color: "#fff", borderRadius: "12px", padding: "12px 14px", fontWeight: 800, fontSize: "15px", cursor: "pointer"}}>
-              ✨ 今日のまとめ日記をAIで作成
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
 <div id="actionToast" data-current-user-id={userId ?? ""} style={{top: isActionToastVisible ? "0" : "-150px", whiteSpace: "pre-line"}}>{actionToastText}</div>
@@ -1852,7 +1736,7 @@ ${joinedMemos}
 
   <div id="photoModal" className="modal-overlay" style={{zIndex: "10008", display: activeModal === "photo" ? "flex" : "none"}} data-original-click={"closePhotoModal(event)"} onClick={closeModal}>
     <div style={{position: "relative", maxWidth: "90%", maxHeight: "90%", margin: "auto", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center"}} data-original-click={"event.stopPropagation()"} onClick={(event) => event.stopPropagation()}>
-      <img id="expandedPhoto" src={expandedPhotoUrl || undefined} style={{width: "100%", height: "auto", maxHeight: "80vh", objectFit: "contain", borderRadius: "16px", boxShadow: "0 10px 40px rgba(0,0,0,0.3)"}} />
+      <img id="expandedPhoto" src={expandedPhotoUrl} style={{width: "100%", height: "auto", maxHeight: "80vh", objectFit: "contain", borderRadius: "16px", boxShadow: "0 10px 40px rgba(0,0,0,0.3)"}} />
       <div data-original-click={"closePhotoModal(event)"} onClick={closeModal} style={{position: "absolute", top: "-12px", right: "-12px", background: "#FFF", width: "32px", height: "32px", borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center", fontWeight: "700", fontSize: "16px", color: "var(--text-main)", cursor: "pointer", boxShadow: "var(--shadow-sm)"}}>×</div>
     </div>
   </div>
@@ -2648,15 +2532,15 @@ ${joinedMemos}
             <div style={{display: "flex", gap: "12px"}}>
             <div style={{flex: "1", textAlign: "center"}}>
               <div style={{fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}>🔰 新規</div>
-              <input type="number" id="alert-new" className="input-field" style={{padding: "10px 0", textAlign: "center", fontSize: "15px", borderRadius: "12px", width: "100%", boxSizing: "border-box", background: "#FFF", border: "1px solid var(--border-color)"}} defaultValue="7" data-original-change={"saveAlertSettings()"} />
+              <input type="number" id="alert-new" className="input-field" style={{padding: "10px 0", textAlign: "center", fontSize: "15px", borderRadius: "12px", width: "100%", boxSizing: "border-box", background: "#FFF", border: "1px solid var(--border-color)"}} value="7" data-original-change={"saveAlertSettings()"} />
             </div>
             <div style={{flex: "1", textAlign: "center"}}>
               <div style={{fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}>👑 常連</div>
-              <input type="number" id="alert-regular" className="input-field" style={{padding: "10px 0", textAlign: "center", fontSize: "15px", borderRadius: "12px", width: "100%", boxSizing: "border-box", background: "#FFF", border: "1px solid var(--border-color)"}} defaultValue="30" data-original-change={"saveAlertSettings()"} />
+              <input type="number" id="alert-regular" className="input-field" style={{padding: "10px 0", textAlign: "center", fontSize: "15px", borderRadius: "12px", width: "100%", boxSizing: "border-box", background: "#FFF", border: "1px solid var(--border-color)"}} value="30" data-original-change={"saveAlertSettings()"} />
             </div>
             <div style={{flex: "1", textAlign: "center"}}>
               <div style={{fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}>💎 VIP</div>
-              <input type="number" id="alert-vip" className="input-field" style={{padding: "10px 0", textAlign: "center", fontSize: "15px", borderRadius: "12px", width: "100%", boxSizing: "border-box", background: "#FFF", border: "1px solid var(--border-color)"}} defaultValue="14" data-original-change={"saveAlertSettings()"} />
+              <input type="number" id="alert-vip" className="input-field" style={{padding: "10px 0", textAlign: "center", fontSize: "15px", borderRadius: "12px", width: "100%", boxSizing: "border-box", background: "#FFF", border: "1px solid var(--border-color)"}} value="14" data-original-change={"saveAlertSettings()"} />
             </div>
           </div>
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import ReactDOM from "react-dom";
 
 type SpeechRecognitionResultLike = { transcript?: string };
 type SpeechRecognitionEventLike = { results: ArrayLike<ArrayLike<SpeechRecognitionResultLike>> };
@@ -215,37 +216,6 @@ export default function Page() {
             pointerEvents: "auto",
           }}
         >
-          <div
-            style={{
-              pointerEvents: "none",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                console.log("VOICE BUTTON CLICKED");
-                handleToggleVoiceInput();
-              }}
-              onPointerDown={() => console.log("pointer down")}
-              onTouchStart={() => console.log("touch start")}
-              style={{
-                width: "56px",
-                height: "56px",
-                borderRadius: "9999px",
-                border: "none",
-                background: isListening ? "#ef4444" : "#111827",
-                color: "white",
-                fontSize: "24px",
-                cursor: "pointer",
-                pointerEvents: "auto",
-                touchAction: "manipulation",
-                WebkitTapHighlightColor: "transparent",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-              }}
-            >
-              {isListening ? "🔴" : "🎤"}
-            </button>
-          </div>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <input
               type="text"
@@ -292,6 +262,49 @@ export default function Page() {
           ✨ 今日のまとめ日記をAIで作成
         </button>
       </div>
+      {typeof window !== "undefined" &&
+        ReactDOM.createPortal(
+          <div
+            style={{
+              position: "fixed",
+              right: "20px",
+              bottom: "110px",
+              zIndex: 2147483647,
+              pointerEvents: "none",
+              isolation: "isolate",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                console.log("VOICE BUTTON CLICKED");
+                alert("VOICE BUTTON CLICKED");
+                handleToggleVoiceInput();
+              }}
+              onPointerDown={() => console.log("pointer down")}
+              onTouchStart={() => console.log("touch start")}
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "9999px",
+                border: "none",
+                background: isListening ? "#ef4444" : "#111827",
+                color: "white",
+                fontSize: "28px",
+                cursor: "pointer",
+                pointerEvents: "auto",
+                touchAction: "manipulation",
+                WebkitTapHighlightColor: "transparent",
+                boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
+                position: "relative",
+                zIndex: 2147483647,
+              }}
+            >
+              {isListening ? "🔴" : "🎤"}
+            </button>
+          </div>,
+          document.body,
+        )}
       {isListening ? (
         <div
           onClick={handleCancelListening}

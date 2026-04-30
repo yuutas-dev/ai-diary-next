@@ -130,7 +130,7 @@ export default function Page() {
     };
 
     recognition.onerror = () => {
-      console.error("Speech recognition error", );
+      console.error("Speech recognition error");
       setIsListening(false);
     };
 
@@ -222,32 +222,22 @@ export default function Page() {
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "16px" }}>
           
-       {/* マイクボタン（単独で大きく配置） */}
-          <div style={{ display: "flex", justifyContent: "center", marginTop: "-40px", position: "relative", zIndex: 999 }}>
-            <button
-              type="button"
+          {/* 検証用：マイクボタンを他のボタンと同じ扱いで配置 */}
+          <div style={{ display: "flex", gap: "8px" }}>
+             <button
               onClick={handleStartListening}
               style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "50%",
-                border: "none",
+                padding: "0 20px",
                 background: "#111827",
                 color: "#fff",
-                fontSize: "28px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-                cursor: "pointer",
-                touchAction: "manipulation",
-                position: "relative",
-                zIndex: 1000,
+                borderRadius: "8px",
+                border: "none",
+                fontWeight: "bold",
+                fontSize: "20px"
               }}
             >
               🎤
             </button>
-          </div>
-
-          {/* テキスト入力エリア */}
-          <div style={{ display: "flex", gap: "8px" }}>
             <input
               type="text"
               value={inputText}

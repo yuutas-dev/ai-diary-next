@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-// Web Speech APIの型定義
 type SpeechRecognitionResultLike = { transcript?: string };
 type SpeechRecognitionEventLike = { results: ArrayLike<ArrayLike<SpeechRecognitionResultLike>> };
 type SpeechRecognitionInstance = {
@@ -13,7 +12,7 @@ type SpeechRecognitionInstance = {
   stop: () => void;
   onstart: (() => void) | null;
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: any) => void) | null;
   onend: (() => void) | null;
 };
 type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
@@ -30,28 +29,27 @@ export default function Page() {
   const [inputText, setInputText] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
+  
+  // ★ デバッグ用の状態を追加
+  const [debugLog, setDebugLog] = useState<string>("待機中...");
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
-  // 1. LocalStorageからの復元のみ（マイクの事前準備は削除）
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const stored = window.localStorage.getItem("fuzoku_daily_memos");
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setDailyMemos(parsed.filter((item): item is string => typeof item === "string"));
-        }
+        if (Array.isArray(parsed)) setDailyMemos(parsed);
       }
     } catch (e) {
-      console.error("LocalStorage error", e);
+      console.error(e);
     } finally {
       setIsHydrated(true);
     }
   }, []);
 
-  // 2. データ保存
   useEffect(() => {
     if (!isHydrated || typeof window === "undefined") return;
     window.localStorage.setItem("fuzoku_daily_memos", JSON.stringify(dailyMemos));
@@ -72,29 +70,26 @@ export default function Page() {
     setDailyMemos((prev) => prev.filter((_, idx) => idx !== index));
   }, []);
 
-  // 3. 【完全修正】マイク起動ロジック
+  // ★ ログ出力付きのマイク起動ロジック
   const handleStartListening = useCallback(() => {
-    // 【検証用】物理的にタップできているかを絶対に証明するアラート
-    // 動くことが確認できたら、この行は消してください
-    console.log("マイクボタンがタップされました");
-
     if (typeof window === "undefined") return;
+    setDebugLog("1. マイクボタンが押されました");
 
-    // すでに起動中なら止める
     if (isListening && recognitionRef.current) {
       recognitionRef.current.stop();
       setIsListening(false);
+      setDebugLog("録音を停止しました");
       return;
     }
 
-    // ★重要：タップされた瞬間に初めてインスタンスを作る（スマホ対策）
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     
     if (!SpeechRecognition) {
-      // http://192.168... でアクセスしている場合や、未対応ブラウザの場合はここに入ります
-      alert("【エラー】マイクが使えません。\nスマホの場合は http://192... ではなく、VercelのURL（https://〜）を開いてください。");
+      setDebugLog("【致命的エラー】SpeechRecognitionAPIが存在しません。考えられる原因: iOSのChrome、LINE内ブラウザ、またはIframe(Vercelダッシュボード)内でのアクセスです。Safariで直接開いてください。");
       return;
     }
+
+    setDebugLog("2. APIを検知。インスタンスを作成中...");
 
     try {
       const recognition = new SpeechRecognition();
@@ -103,39 +98,39 @@ export default function Page() {
       recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
+        setDebugLog("3. マイク起動成功！録音を開始しました");
         setIsListening(true);
       };
 
       recognition.onresult = (event) => {
         const transcript = event.results[0]?.[0]?.transcript || "";
+        setDebugLog(`4. 認識成功: ${transcript}`);
         addMemo(transcript);
         setIsListening(false);
       };
 
-      recognition.onerror = () => {
-        console.error("Speech recognition error");
+      recognition.onerror = (e) => {
+        // e.error に具体的なエラー理由（not-allowed等）が入ります
+        setDebugLog(`【エラー発生】原因: ${e?.error || "不明"}`);
         setIsListening(false);
       };
 
       recognition.onend = () => {
+        if (isListening) setDebugLog("5. 録音が自動終了しました");
         setIsListening(false);
       };
 
       recognitionRef.current = recognition;
       recognition.start();
 
-    } catch (e) {
-      console.error(e);
-      alert("マイクの起動に失敗しました。ブラウザのマイク権限を確認してください。");
+    } catch (e: any) {
+      setDebugLog(`【例外エラー】起動時にクラッシュ: ${e?.message || e}`);
       setIsListening(false);
     }
   }, [isListening, addMemo]);
 
   const handleGenerateSummary = useCallback(() => {
-    if (dailyMemos.length === 0) {
-      alert("メモがありません。まずはメモを追加してください。");
-      return;
-    }
+    if (dailyMemos.length === 0) return alert("メモがありません。");
     alert(`【ダミー生成】\n\n${dailyMemos.join("\n")}`);
   }, [dailyMemos]);
 
@@ -143,39 +138,27 @@ export default function Page() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", backgroundColor: "#f9fafb" }}>
-      <style>{`
-        @keyframes listeningPulse {
-          0% { transform: scale(1); opacity: 0.8; }
-          50% { transform: scale(1.1); opacity: 1; }
-          100% { transform: scale(1); opacity: 0.8; }
-        }
-      `}</style>
-
-      {/* --- 上部：メモボードエリア --- */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px", paddingBottom: "180px", WebkitOverflowScrolling: "touch" }}>
-        <h2 style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "16px", color: "#333" }}>📝 今日のメモボード</h2>
-        {dailyMemos.length === 0 ? (
-          <p style={{ textAlign: "center", color: "#999", marginTop: "40px" }}>ここに今日の接客メモが溜まります</p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {dailyMemos.map((memo, idx) => (
-              <div key={idx} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", background: "#fff", padding: "12px", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
-                <span style={{ color: "#333", whiteSpace: "pre-wrap", wordBreak: "break-word", flex: 1 }}>{memo}</span>
-                <button onClick={() => handleDeleteMemo(idx)} style={{ background: "none", border: "none", color: "#ccc", fontSize: "20px", padding: "0 4px", cursor: "pointer" }}>×</button>
-              </div>
-            ))}
-          </div>
-        )}
+      
+      {/* ★ デバッグログ表示エリア（最上部に固定表示） */}
+      <div style={{ background: "#333", color: "#0f0", padding: "10px", fontSize: "12px", fontFamily: "monospace", zIndex: 9999 }}>
+        [LOG]: {debugLog}
       </div>
 
-      {/* --- 下部：入力エリア --- */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px", paddingBottom: "180px", WebkitOverflowScrolling: "touch" }}>
+        <h2 style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "16px", color: "#333" }}>📝 今日のメモボード</h2>
+        {dailyMemos.map((memo, idx) => (
+          <div key={idx} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", background: "#fff", padding: "12px", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", marginBottom: "10px" }}>
+            <span style={{ color: "#333", whiteSpace: "pre-wrap", wordBreak: "break-word", flex: 1 }}>{memo}</span>
+            <button onClick={() => handleDeleteMemo(idx)} style={{ background: "none", border: "none", color: "#ccc", fontSize: "20px", padding: "0 4px" }}>×</button>
+          </div>
+        ))}
+      </div>
+
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "1px solid #eee", padding: "16px", paddingBottom: "max(16px, env(safe-area-inset-bottom))", zIndex: 10 }}>
-        
-        {/* 今回は重なり検証のため、すべてのボタンを横一列に並べました */}
         <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
           <button
             onClick={handleStartListening}
-            style={{ padding: "0 20px", background: "#111827", color: "#fff", borderRadius: "8px", border: "none", fontWeight: "bold", fontSize: "20px", cursor: "pointer" }}
+            style={{ padding: "0 20px", background: "#111827", color: "#fff", borderRadius: "8px", border: "none", fontWeight: "bold", fontSize: "20px" }}
           >
             🎤
           </button>
@@ -185,22 +168,15 @@ export default function Page() {
             onChange={(e) => setInputText(e.target.value)}
             placeholder="手入力..."
             style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "16px" }}
-            onKeyDown={(e) => e.key === "Enter" && handleAddTypedMemo()}
           />
-          <button onClick={handleAddTypedMemo} style={{ padding: "0 20px", background: "#3b82f6", color: "#fff", borderRadius: "8px", border: "none", fontWeight: "bold" }}>
-            追加
-          </button>
+          <button onClick={handleAddTypedMemo} style={{ padding: "0 20px", background: "#3b82f6", color: "#fff", borderRadius: "8px", border: "none" }}>追加</button>
         </div>
-
-        <button onClick={handleGenerateSummary} style={{ width: "100%", padding: "16px", background: "#f472b6", color: "#fff", borderRadius: "12px", border: "none", fontWeight: "bold", fontSize: "16px" }}>
-          ✨ 今日のまとめ日記をAIで作成
-        </button>
+        <button onClick={handleGenerateSummary} style={{ width: "100%", padding: "16px", background: "#f472b6", color: "#fff", borderRadius: "12px", border: "none", fontWeight: "bold" }}>✨ AIで作成</button>
       </div>
 
-      {/* --- 録音中オーバーレイ --- */}
       {isListening && (
-        <div onClick={handleStartListening} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
-          <div style={{ fontSize: "100px", animation: "listeningPulse 1.2s infinite" }}>🎤</div>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 9999, pointerEvents: "none" }}>
+          <div style={{ fontSize: "100px" }}>🎤</div>
           <div style={{ color: "#fff", fontSize: "24px", fontWeight: "bold", marginTop: "20px" }}>ききとりちゅう...</div>
         </div>
       )}

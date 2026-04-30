@@ -201,10 +201,9 @@ export default function Page() {
       >
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "56px 1fr auto",
-            alignItems: "start",
-            gap: "8px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
             marginBottom: "16px",
             pointerEvents: "auto",
           }}
@@ -227,33 +226,36 @@ export default function Page() {
               touchAction: "manipulation",
               WebkitTapHighlightColor: "transparent",
               boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+              alignSelf: "flex-start",
             }}
           >
             {isListening ? "🔴" : "🎤"}
           </button>
-          <input
-            type="text"
-            value={inputText}
-            onChange={(event) => setInputText(event.target.value)}
-            placeholder="メモを手入力..."
-            style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "16px", minHeight: "44px" }}
-          />
-          <button
-            type="button"
-            onClick={handleAddTypedMemo}
-            style={{
-              padding: "10px 16px",
-              background: "#3b82f6",
-              color: "#fff",
-              borderRadius: "8px",
-              border: "none",
-              fontWeight: "bold",
-              touchAction: "manipulation",
-              cursor: "pointer",
-            }}
-          >
-            追加
-          </button>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <input
+              type="text"
+              value={inputText}
+              onChange={(event) => setInputText(event.target.value)}
+              placeholder="メモを手入力..."
+              style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "16px", minHeight: "44px" }}
+            />
+            <button
+              type="button"
+              onClick={handleAddTypedMemo}
+              style={{
+                padding: "10px 16px",
+                background: "#3b82f6",
+                color: "#fff",
+                borderRadius: "8px",
+                border: "none",
+                fontWeight: "bold",
+                touchAction: "manipulation",
+                cursor: "pointer",
+              }}
+            >
+              追加
+            </button>
+          </div>
         </div>
         <button
           type="button"

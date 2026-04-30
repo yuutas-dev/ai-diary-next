@@ -130,7 +130,7 @@ export default function Page() {
     };
 
     recognition.onerror = () => {
-      console.error("Speech recognition error", e);
+      console.error("Speech recognition error", );
       setIsListening(false);
     };
 

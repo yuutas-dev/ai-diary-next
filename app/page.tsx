@@ -34,6 +34,14 @@ export default function Page() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (recognitionRef.current) return;
+    const SpeechRecognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    recognitionRef.current = new SpeechRecognition();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     try {
       const stored = window.localStorage.getItem("fuzoku_daily_memos");
       if (!stored) {
@@ -76,9 +84,8 @@ export default function Page() {
 
   const handleToggleVoiceInput = useCallback(() => {
     if (typeof window === "undefined") return;
-
-    const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-    if (!Recognition) {
+    const recognition = recognitionRef.current;
+    if (!recognition) {
       alert("このブラウザでは音声入力を利用できません。");
       return;
     }
@@ -88,36 +95,30 @@ export default function Page() {
       return;
     }
 
-    let recognition = recognitionRef.current;
-    if (!recognition) {
-      recognition = new Recognition();
-      recognition.lang = "ja-JP";
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
+    recognition.lang = "ja-JP";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
 
-      recognition.onstart = () => {
-        setIsListening(true);
-      };
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
 
-      recognition.onresult = (event) => {
-        const transcript = event.results[0]?.[0]?.transcript ?? "";
-        const text = transcript.trim();
-        if (text) {
-          setDailyMemos((prev) => [...prev, text]);
-        }
-        setIsListening(false);
-      };
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript ?? "";
+      const text = transcript.trim();
+      if (text) {
+        setDailyMemos((prev) => [...prev, text]);
+      }
+      setIsListening(false);
+    };
 
-      recognition.onerror = () => {
-        setIsListening(false);
-      };
+    recognition.onerror = () => {
+      setIsListening(false);
+    };
 
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current = recognition;
-    }
+    recognition.onend = () => {
+      setIsListening(false);
+    };
 
     recognition.start();
   }, [handleCancelListening, isListening]);
@@ -199,32 +200,6 @@ export default function Page() {
         }}
       >
         <div style={{ display: "flex", gap: "8px", marginBottom: "16px", pointerEvents: "auto" }}>
-          <button
-            type="button"
-            onClick={handleToggleVoiceInput}
-            style={{
-              width: "48px",
-              height: "48px",
-              minWidth: "48px",
-              minHeight: "48px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 0,
-              background: isListening ? "#fee2e2" : "#f3f4f6",
-              borderRadius: "9999px",
-              border: "none",
-              fontSize: "22px",
-              touchAction: "manipulation",
-              cursor: "pointer",
-              position: "relative",
-              zIndex: 2001,
-              pointerEvents: "auto",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            {isListening ? "🔴" : "🎤"}
-          </button>
           <input
             type="text"
             value={inputText}
@@ -269,6 +244,44 @@ export default function Page() {
           ✨ 今日のまとめ日記をAIで作成
         </button>
       </div>
+      <div
+        style={{
+          position: "fixed",
+          right: "16px",
+          bottom: "88px",
+          zIndex: 999999,
+          pointerEvents: "auto",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            console.log("VOICE BUTTON CLICKED");
+            handleToggleVoiceInput();
+          }}
+          onPointerDown={() => console.log("pointer down")}
+          onTouchStart={() => console.log("touch start")}
+          style={{
+            width: "56px",
+            height: "56px",
+            minWidth: "56px",
+            minHeight: "56px",
+            borderRadius: "9999px",
+            border: "none",
+            background: isListening ? "#ef4444" : "#111827",
+            color: "#fff",
+            fontSize: "24px",
+            cursor: "pointer",
+            touchAction: "manipulation",
+            WebkitTapHighlightColor: "transparent",
+            pointerEvents: "auto",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+            position: "relative",
+          }}
+        >
+          {isListening ? "🔴" : "🎤"}
+        </button>
+      </div>
       {isListening ? (
         <div
           onClick={handleCancelListening}
@@ -281,6 +294,7 @@ export default function Page() {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1999,
+            pointerEvents: "none",
           }}
         >
           <div

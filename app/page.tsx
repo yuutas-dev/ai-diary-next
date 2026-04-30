@@ -47,6 +47,13 @@ export default function Page() {
     setInputText("");
   }, [addMemo, inputText]);
 
+  const handleCancelListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsListening(false);
+  }, []);
+
   const handleToggleVoiceInput = useCallback(() => {
     if (!canUseSpeechRecognition) {
       alert("このブラウザでは音声入力を利用できません。");
@@ -54,7 +61,7 @@ export default function Page() {
     }
 
     if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
+      handleCancelListening();
       return;
     }
 
@@ -72,7 +79,11 @@ export default function Page() {
 
     recognition.onresult = (event) => {
       const transcript = event.results[0]?.[0]?.transcript ?? "";
-      addMemo(transcript);
+      const text = transcript.trim();
+      if (text) {
+        setDailyMemos((prev) => [...prev, text]);
+      }
+      setIsListening(false);
     };
 
     recognition.onerror = () => {
@@ -86,7 +97,7 @@ export default function Page() {
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [addMemo, canUseSpeechRecognition, isListening]);
+  }, [canUseSpeechRecognition, handleCancelListening, isListening]);
 
   const handleGenerateSummary = useCallback(() => {
     alert(`【ダミー】AIでまとめ日記を作成します:\n\n${dailyMemos.join("\n")}`);
@@ -94,6 +105,13 @@ export default function Page() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", backgroundColor: "#f9fafb" }}>
+      <style>{`
+        @keyframes listeningPulse {
+          0% { transform: scale(1); opacity: 0.9; }
+          50% { transform: scale(1.1); opacity: 1; }
+          100% { transform: scale(1); opacity: 0.9; }
+        }
+      `}</style>
       <div style={{ flex: 1, overflowY: "auto", padding: "20px", paddingBottom: "150px" }}>
         <h2 style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "16px", color: "#333" }}>📝 今日のメモボード</h2>
         {dailyMemos.length === 0 ? (
@@ -184,6 +202,34 @@ export default function Page() {
           ✨ 今日のまとめ日記をAIで作成
         </button>
       </div>
+      {isListening ? (
+        <div
+          onClick={handleCancelListening}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(5px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 999,
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "14px",
+            }}
+          >
+            <div style={{ fontSize: "84px", animation: "listeningPulse 1.2s ease-in-out infinite" }}>🎤</div>
+            <div style={{ color: "#fff", fontSize: "20px", fontWeight: "bold" }}>ききとりちゅう...</div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

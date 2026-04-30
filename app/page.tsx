@@ -140,41 +140,6 @@ export default function Page() {
           100% { transform: scale(1); opacity: 0.9; }
         }
       `}</style>
-      <div
-        style={{
-          position: "fixed",
-          right: "16px",
-          bottom: "88px",
-          zIndex: 999999,
-          pointerEvents: "auto",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => {
-            handleToggleVoiceInput();
-          }}
-          style={{
-            width: "56px",
-            height: "56px",
-            minWidth: "56px",
-            minHeight: "56px",
-            borderRadius: "9999px",
-            border: "none",
-            background: isListening ? "#ef4444" : "#111827",
-            color: "#fff",
-            fontSize: "24px",
-            cursor: "pointer",
-            pointerEvents: "auto",
-            touchAction: "manipulation",
-            WebkitTapHighlightColor: "transparent",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-            position: "relative",
-          }}
-        >
-          {isListening ? "🔴" : "🎤"}
-        </button>
-      </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "20px", paddingBottom: "150px" }}>
         <h2 style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "16px", color: "#333" }}>📝 今日のメモボード</h2>
         {dailyMemos.length === 0 ? (
@@ -234,13 +199,44 @@ export default function Page() {
           pointerEvents: "auto",
         }}
       >
-        <div style={{ display: "flex", gap: "8px", marginBottom: "16px", pointerEvents: "auto" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "56px 1fr auto",
+            alignItems: "start",
+            gap: "8px",
+            marginBottom: "16px",
+            pointerEvents: "auto",
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleToggleVoiceInput}
+            style={{
+              width: "56px",
+              height: "56px",
+              minWidth: "56px",
+              minHeight: "56px",
+              borderRadius: "9999px",
+              border: "none",
+              background: isListening ? "#ef4444" : "#111827",
+              color: "#fff",
+              fontSize: "24px",
+              cursor: "pointer",
+              pointerEvents: "auto",
+              touchAction: "manipulation",
+              WebkitTapHighlightColor: "transparent",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+            }}
+          >
+            {isListening ? "🔴" : "🎤"}
+          </button>
           <input
             type="text"
             value={inputText}
             onChange={(event) => setInputText(event.target.value)}
             placeholder="メモを手入力..."
-            style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "16px" }}
+            style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #ddd", fontSize: "16px", minHeight: "44px" }}
           />
           <button
             type="button"
@@ -290,7 +286,7 @@ export default function Page() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 1999,
+            zIndex: 3000,
             pointerEvents: "auto",
           }}
         >

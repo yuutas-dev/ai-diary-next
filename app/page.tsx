@@ -192,6 +192,7 @@ export default function Page() {
           padding: "16px",
           paddingBottom: "max(16px, env(safe-area-inset-bottom))",
           pointerEvents: "auto",
+          zIndex: 2147483646,
         }}
       >
         <div
@@ -222,6 +223,8 @@ export default function Page() {
               WebkitTapHighlightColor: "transparent",
               boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
               alignSelf: "flex-start",
+              position: "relative",
+              zIndex: 2147483647,
             }}
           >
             {isListening ? "🔴" : "🎤"}
@@ -283,7 +286,7 @@ export default function Page() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 3000,
+            zIndex: 2147483647,
             pointerEvents: "auto",
           }}
         >

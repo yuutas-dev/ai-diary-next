@@ -64,12 +64,6 @@ export default function Page() {
     window.localStorage.setItem("fuzoku_daily_memos", JSON.stringify(dailyMemos));
   }, [dailyMemos, isHydrated]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const topEl = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
-    console.log("elementFromPoint center:", topEl);
-  }, []);
-
   const addMemo = useCallback((rawText: string) => {
     const text = rawText.trim();
     if (!text) return;
@@ -140,15 +134,6 @@ export default function Page() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", backgroundColor: "#f9fafb", position: "relative" }}>
       <style>{`
-        * {
-          pointer-events: auto !important;
-        }
-        .debug-voice-overlay {
-          pointer-events: none !important;
-        }
-        .debug-voice-overlay > button {
-          pointer-events: auto !important;
-        }
         @keyframes listeningPulse {
           0% { transform: scale(1); opacity: 0.9; }
           50% { transform: scale(1.1); opacity: 1; }
@@ -156,45 +141,38 @@ export default function Page() {
         }
       `}</style>
       <div
-        className="debug-voice-overlay"
         style={{
           position: "fixed",
-          inset: 0,
-          zIndex: 2147483647,
-          pointerEvents: "none",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          right: "16px",
+          bottom: "88px",
+          zIndex: 999999,
+          pointerEvents: "auto",
         }}
       >
         <button
           type="button"
           onClick={() => {
-            console.log("VOICE BUTTON CLICKED");
-            alert("VOICE BUTTON CLICKED");
             handleToggleVoiceInput();
           }}
-          onPointerDown={() => console.log("pointer down")}
-          onTouchStart={() => console.log("touch start")}
           style={{
-            width: "96px",
-            height: "96px",
+            width: "56px",
+            height: "56px",
+            minWidth: "56px",
+            minHeight: "56px",
             borderRadius: "9999px",
-            border: "4px solid white",
-            background: "red",
-            color: "white",
-            fontSize: "40px",
-            fontWeight: "bold",
+            border: "none",
+            background: isListening ? "#ef4444" : "#111827",
+            color: "#fff",
+            fontSize: "24px",
             cursor: "pointer",
             pointerEvents: "auto",
             touchAction: "manipulation",
             WebkitTapHighlightColor: "transparent",
-            boxShadow: "0 0 40px rgba(0,0,0,0.5)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
             position: "relative",
-            zIndex: 2147483647,
           }}
         >
-          🎤
+          {isListening ? "🔴" : "🎤"}
         </button>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "20px", paddingBottom: "150px" }}>
@@ -313,7 +291,7 @@ export default function Page() {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1999,
-            pointerEvents: "none",
+            pointerEvents: "auto",
           }}
         >
           <div

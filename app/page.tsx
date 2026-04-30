@@ -140,7 +140,18 @@ export default function Page() {
           100% { transform: scale(1); opacity: 0.9; }
         }
       `}</style>
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px", paddingBottom: "150px" }}>
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "20px",
+          paddingBottom: "150px",
+          position: "relative",
+          zIndex: 1,
+          WebkitOverflowScrolling: "touch",
+          overscrollBehavior: "contain",
+        }}
+      >
         <h2 style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "16px", color: "#333" }}>📝 今日のメモボード</h2>
         {dailyMemos.length === 0 ? (
           <p style={{ textAlign: "center", color: "#999", marginTop: "40px" }}>ここに今日の接客メモが溜まります</p>
@@ -192,7 +203,7 @@ export default function Page() {
           padding: "16px",
           paddingBottom: "max(16px, env(safe-area-inset-bottom))",
           pointerEvents: "auto",
-          zIndex: 2147483646,
+          zIndex: 10,
         }}
       >
         <div
@@ -204,31 +215,6 @@ export default function Page() {
             pointerEvents: "auto",
           }}
         >
-          <button
-            type="button"
-            onClick={handleToggleVoiceInput}
-            style={{
-              width: "56px",
-              height: "56px",
-              minWidth: "56px",
-              minHeight: "56px",
-              borderRadius: "9999px",
-              border: "none",
-              background: isListening ? "#ef4444" : "#111827",
-              color: "#fff",
-              fontSize: "24px",
-              cursor: "pointer",
-              pointerEvents: "auto",
-              touchAction: "manipulation",
-              WebkitTapHighlightColor: "transparent",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-              alignSelf: "flex-start",
-              position: "relative",
-              zIndex: 2147483647,
-            }}
-          >
-            {isListening ? "🔴" : "🎤"}
-          </button>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <input
               type="text"
@@ -273,6 +259,41 @@ export default function Page() {
           onClick={handleGenerateSummary}
         >
           ✨ 今日のまとめ日記をAIで作成
+        </button>
+      </div>
+      <div
+        style={{
+          position: "fixed",
+          right: "20px",
+          bottom: "110px",
+          zIndex: 999999,
+          pointerEvents: "none",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            console.log("VOICE BUTTON CLICKED");
+            handleToggleVoiceInput();
+          }}
+          onPointerDown={() => console.log("pointer down")}
+          onTouchStart={() => console.log("touch start")}
+          style={{
+            width: "56px",
+            height: "56px",
+            borderRadius: "9999px",
+            border: "none",
+            background: isListening ? "#ef4444" : "#111827",
+            color: "white",
+            fontSize: "24px",
+            cursor: "pointer",
+            pointerEvents: "auto",
+            touchAction: "manipulation",
+            WebkitTapHighlightColor: "transparent",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+          }}
+        >
+          {isListening ? "🔴" : "🎤"}
         </button>
       </div>
       {isListening ? (

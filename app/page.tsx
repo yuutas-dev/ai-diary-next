@@ -2,10 +2,24 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 
-type SpeechRecognitionConstructor = new () => SpeechRecognition;
+type SpeechRecognitionResultLike = { transcript?: string };
+type SpeechRecognitionEventLike = { results: ArrayLike<ArrayLike<SpeechRecognitionResultLike>> };
+type SpeechRecognitionInstance = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
 
 declare global {
   interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
     webkitSpeechRecognition?: SpeechRecognitionConstructor;
   }
 }
@@ -15,7 +29,7 @@ export default function Page() {
   const [inputText, setInputText] = useState("");
   const [isListening, setIsListening] = useState(false);
 
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   const canUseSpeechRecognition = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -56,7 +70,7 @@ export default function Page() {
       setIsListening(true);
     };
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event) => {
       const transcript = event.results[0]?.[0]?.transcript ?? "";
       addMemo(transcript);
     };

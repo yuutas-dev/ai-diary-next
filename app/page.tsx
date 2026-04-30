@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type SpeechRecognitionResultLike = { transcript?: string };
 type SpeechRecognitionEventLike = { results: ArrayLike<ArrayLike<SpeechRecognitionResultLike>> };
@@ -30,11 +30,31 @@ export default function Page() {
   const [isListening, setIsListening] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  const canUseSpeechRecognition = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return typeof window.SpeechRecognition !== "undefined" || typeof window.webkitSpeechRecognition !== "undefined";
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem("fuzoku_daily_memos");
+      if (!stored) {
+        setIsHydrated(true);
+        return;
+      }
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        setDailyMemos(parsed.filter((item): item is string => typeof item === "string"));
+      }
+    } catch {
+      // ignore broken localStorage payload and continue
+    } finally {
+      setIsHydrated(true);
+    }
   }, []);
+
+  useEffect(() => {
+    if (!isHydrated || typeof window === "undefined") return;
+    window.localStorage.setItem("fuzoku_daily_memos", JSON.stringify(dailyMemos));
+  }, [dailyMemos, isHydrated]);
 
   const addMemo = useCallback((rawText: string) => {
     const text = rawText.trim();
@@ -55,7 +75,10 @@ export default function Page() {
   }, []);
 
   const handleToggleVoiceInput = useCallback(() => {
-    if (!canUseSpeechRecognition) {
+    if (typeof window === "undefined") return;
+
+    const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!Recognition) {
       alert("このブラウザでは音声入力を利用できません。");
       return;
     }
@@ -64,9 +87,6 @@ export default function Page() {
       handleCancelListening();
       return;
     }
-
-    const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-    if (!Recognition) return;
 
     const recognition = new Recognition();
     recognition.lang = "ja-JP";
@@ -97,7 +117,11 @@ export default function Page() {
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [canUseSpeechRecognition, handleCancelListening, isListening]);
+  }, [handleCancelListening, isListening]);
+
+  const handleDeleteMemo = useCallback((index: number) => {
+    setDailyMemos((prev) => prev.filter((_, idx) => idx !== index));
+  }, []);
 
   const handleGenerateSummary = useCallback(() => {
     alert(`【ダミー】AIでまとめ日記を作成します:\n\n${dailyMemos.join("\n")}`);
@@ -122,6 +146,10 @@ export default function Page() {
               <div
                 key={idx}
                 style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: "10px",
                   background: "#fff",
                   padding: "12px",
                   borderRadius: "8px",
@@ -129,7 +157,24 @@ export default function Page() {
                   color: "#333",
                 }}
               >
-                {memo}
+                <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", flex: 1 }}>{memo}</span>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteMemo(idx)}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "#999",
+                    fontSize: "18px",
+                    lineHeight: 1,
+                    cursor: "pointer",
+                    padding: 0,
+                    marginTop: "-2px",
+                  }}
+                  aria-label="メモを削除"
+                >
+                  ×
+                </button>
               </div>
             ))}
           </div>

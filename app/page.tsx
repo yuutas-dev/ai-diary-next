@@ -30,7 +30,10 @@ interface MemoBlock {
   isDropdownOpen: boolean;
 }
 
+/** サンプル（マスタ）ダミーを一覧から隠す ID のみ LS。memo/名前の差分マージは行わず API の値を表示 */
 const HIDDEN_DUMMY_IDS_KEY = "hidden_dummy_customer_ids";
+
+/** 写メ日記のアップロード上限（バイト）。超える場合はアラートし読み込まない */
 const MAX_DIARY_PHOTO_FILE_BYTES = 5 * 1024 * 1024;
 
 interface CustomerEntry {
@@ -57,11 +60,15 @@ interface Customer {
   tags?: string;
   entries: CustomerEntry[];
   tagsArray: string[];
+  /** DB customers.business_type（未設定の旧データは undefined） */
   businessType?: BusinessType;
+  /** マスタ／タグ由来のダミー（リスト取得後に装飾） */
   isDummy?: boolean;
+  /** マスターダミー行のみ true */
   isMasterDummy?: boolean;
 }
 
+/** /api/entries/history の行 — 作った文章タブ用（業態フィルタと独立） */
 interface HistorySourceRow {
   id: string;
   customerId: string | null;
@@ -96,7 +103,7 @@ const INDUSTRY_FACT_CONFIGS: Record<BusinessType, string[]> = {
   cabaret: [
     "🍾 シャンパン", "🍷 ボトル", "🥂 ドリンク", "🎉 お祝い",
     "✨ 本指名", "🥂 同伴", "🍰 アフター", "⏳ 延長", "🏃‍♂️ 駆け込み",
-    "😂 爆笑", "🥺 相談", "💕 恋バナ", "🎤 カラীব", "🎮 飲みゲー",
+    "😂 爆笑", "🥺 相談", "💕 恋バナ", "🎤 カラオケ", "🎮 飲みゲー",
     "🎁 プレゼント", "📸 写真", "👗 ドレス", "🍽️ フード",
     "👔 お疲れ", "🥴 泥酔", "🙇‍♀️ 席外し", "💼 出張"
   ],
@@ -135,16 +142,13 @@ const MODE_LABELS: Record<BusinessType, { main: string; thanks: string }> = {
   garuba: { main: "ブログ・SNS", thanks: "お礼LINE" },
 };
 
-const STYLE_MODAL_TEXTS = {
-  cute: "🎀 可愛らしく、絵文字を多用した親しみやすい文体。",
-  neat: "💎 上品で丁寧な言葉遣い。落ち着いた大人っぽい文体。",
-  custom: "⚙️ AIへの細かいルール・NG設定　AIに守ってほしい口調のルールや、NGワードを自由に指定できます。",
-};
-
 const STYLE_PLACEHOLDERS: Record<BusinessType, string> = {
-  cabaret: "（例）・語尾は○○に固定して！\n　・絵文字は😸😹😻😼😺😽🙀😿😾だけ使って！\n　・誤字や間違った使い方を自然に入れて！",
-  fuzoku: "（例）・語尾は○○に固定して！\n　・絵文字は😸😹😻😼😺😽🙀😿😾だけ使って！\n　・誤字や間違った使い方を自然に入れて！",
-  garuba: "（例）・語尾は○○に固定して！\n　・絵文字は😸😹😻😼😺😽🙀😿😾だけ使って！\n　・誤字や間違った使い方を自然に入れて！",
+  cabaret:
+    "（例）・語尾は○○に固定して！\n　・絵文字は😸😹😻😼😺😽🙀😿😾だけ使って！\n　・誤字や間違った使い方を自然に入れて！",
+  fuzoku:
+    "（例）・語尾は○○に固定して！\n　・絵文字は😸😹😻😼😺😽🙀😿😾だけ使って！\n　・誤字や間違った使い方を自然に入れて！",
+  garuba:
+    "（例）・語尾は○○に固定して！\n　・絵文字は😸😹😻😼😺😽🙀😿😾だけ使って！\n　・誤字や間違った使い方を自然に入れて！",
 };
 
 const STYLE_DEFAULTS: Record<BusinessType, { tension: string; emoji: string }> = {
@@ -183,8 +187,8 @@ function parseMemoToJSON(memoStr?: string) {
 }
 
 function getCustomerStats(customer: Customer) {
-  const allMemos = Array.isArray(customer.entries) && customer.entries.length > 0 ? customer.entries : parseMemoToJSON(customer.memo);
-  const visitMemos = allMemos.filter((memo: any) => !memo.type || memo.type === "visit" || memo.status === "legacy");
+  const allMemos = parseMemoToJSON(customer.memo);
+  const visitMemos = allMemos.filter((memo) => !memo.type || memo.type === "visit" || memo.status === "legacy");
   const count = visitMemos.length === 0 ? 1 : visitMemos.length;
   const vipKeywords = ["太客", "エース", "一軍", "VIP", "金持ち", "良客", "常連", "一軍固定"];
   const isVip = customer.tagsArray.some((tag) => vipKeywords.includes(tag));
@@ -232,6 +236,7 @@ function getTargetDummyTag(businessType: BusinessType) {
   return "キャバ客";
 }
 
+/** 画面上の業態選択と顧客の business_type が一致するときのみ一覧に出す（未設定や不正値は除外） */
 function passesBusinessTypeSelection(c: Customer, selected: BusinessType): boolean {
   const bt = parseCustomerBusinessType(c.businessType);
   if (bt === undefined) return false;
@@ -240,6 +245,10 @@ function passesBusinessTypeSelection(c: Customer, selected: BusinessType): boole
 
 type CustomerSource = { masters: Customer[]; users: Customer[] };
 
+/**
+ * 取得→業態フィルター→ダミー間引き→マージ（一方通行）
+ * （customerSource が users / masters 分離済み・masters にはマスタのみ）
+ */
 function mergeCustomerDisplayPipeline(
   source: CustomerSource,
   businessType: BusinessType,
@@ -267,9 +276,9 @@ function mergeCustomerDisplayPipeline(
   return [...mastersPassed, ...usersPassed];
 }
 
-function getDaysSinceLastVisit(customer: Customer) {
-  const allMemos = Array.isArray(customer.entries) && customer.entries.length > 0 ? customer.entries : parseMemoToJSON(customer.memo);
-  const visitMemos = allMemos.filter((memo: any) => !memo.type || memo.type === "visit" || memo.status === "legacy");
+function getDaysSinceLastVisit(memoStr?: string) {
+  const allMemos = parseMemoToJSON(memoStr);
+  const visitMemos = allMemos.filter((memo) => !memo.type || memo.type === "visit" || memo.status === "legacy");
   if (visitMemos.length === 0) return null;
   const lastMemo = visitMemos[visitMemos.length - 1];
   if (!lastMemo?.date) return null;
@@ -284,7 +293,7 @@ function getDaysSinceLastVisit(customer: Customer) {
 
 function isAlertCustomer(customer: Customer) {
   const stats = getCustomerStats(customer);
-  const days = getDaysSinceLastVisit(customer);
+  const days = getDaysSinceLastVisit(customer.memo);
   if (days === null) return false;
   if (stats.isVip) return days >= 14;
   if (stats.count <= 2) return days >= 7;
@@ -360,16 +369,14 @@ function normalizeCustomer(customer: {
 }): Customer {
   const businessTypeParsed = parseCustomerBusinessType(customer.business_type ?? customer.businessType);
   const memoStr = memoFieldAsStringFromApi(customer.memo);
-  
-  const resolvedEntries = Array.isArray(customer.entries) ? customer.entries : parseMemoToJSON(memoStr);
-
+  /** 一覧・編集共通: エピソードは customers.memo を parse した結果のみ（API の entries 列依存を排除） */
   const normalized: Record<string, unknown> = {
     ...customer,
     id: customer.id || null,
     name: customer.name || "",
     memo: memoStr,
     tags: customer.tags || "",
-    entries: resolvedEntries,
+    entries: parseMemoToJSON(memoStr),
     tagsArray: customer.tags ? customer.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : [],
     isMasterDummy: customer.is_master_dummy === true,
   };
@@ -409,15 +416,7 @@ export default function Page() {
   const [nameInputValue, setNameInputValue] = useState("");
   const [isCreateDetailsOpen, setIsCreateDetailsOpen] = useState(false);
   const [isTagAccordionOpen, setIsTagAccordionOpen] = useState(false);
-  const [activeModal, setActiveModal] = useState<null | "style" | "help" | "hidden" | "photo" | "edit" | "delete">(null);
-  
-  // Onboarding States
-  const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
-  const [isOnboardingStyleModalOpen, setIsOnboardingStyleModalOpen] = useState(false);
-  const [hasCustomPrompt, setHasCustomPrompt] = useState(false);
-  const [onboardingLineText, setOnboardingLineText] = useState("");
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-
+  const [activeModal, setActiveModal] = useState<null | "help" | "hidden" | "photo" | "edit" | "delete">(null);
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState("");
   const [selectedBusinessType, setSelectedBusinessType] = useState<BusinessType>("cabaret");
   const [iconTheme, setIconTheme] = useState<IconTheme>("glass");
@@ -431,6 +430,8 @@ export default function Page() {
   const [styleTension, setStyleTension] = useState("3");
   const [styleEmoji, setStyleEmoji] = useState("4");
   const [customStyleText, setCustomStyleText] = useState("");
+  const [isOnboardingStyleModalOpen, setIsOnboardingStyleModalOpen] = useState(false);
+  const [isAdvancedStyleOpen, setIsAdvancedStyleOpen] = useState(false);
   const [editAttributeTags, setEditAttributeTags] = useState<string[]>([]);
   const [customAttrInput, setCustomAttrInput] = useState("");
   const [memoBlocks, setMemoBlocks] = useState<MemoBlock[]>([]);
@@ -441,8 +442,10 @@ export default function Page() {
   const [currentEntryId, setCurrentEntryId] = useState("");
   const [isInlineResultVisible, setIsInlineResultVisible] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  /** OSから選んだ元ファイル（プレビューは URL.createObjectURL 側と同期） */
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [photoPreviewObjectUrl, setPhotoPreviewObjectUrl] = useState<string | null>(null);
+  /** API 送信用（canvas リサイズ後の JPEG data URL） */
   const [photoJpegDataUrl, setPhotoJpegDataUrl] = useState<string | null>(null);
   const photoUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [actionToastText, setActionToastText] = useState("完了しました");
@@ -476,6 +479,7 @@ export default function Page() {
     regular: null,
   });
 
+  /** お客様ノート：下スクロールで検索バーを隠す / 上で再表示（state は方向転換時のみ） */
   const [isCustomerSearchBarVisible, setIsCustomerSearchBarVisible] = useState(true);
   const mainScrollAreaRef = useRef<HTMLElement | null>(null);
   const lastScrollTopRef = useRef(0);
@@ -489,13 +493,6 @@ export default function Page() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const isSetupDone = localStorage.getItem("isSetupDone");
-      const hasPrompt = localStorage.getItem("hasCustomPrompt") === "true";
-      if (!isSetupDone) {
-        setIsSetupModalOpen(true);
-      }
-      setHasCustomPrompt(hasPrompt);
-
       const params = new URLSearchParams(window.location.search);
       const pageParam = params.get("page");
       const modeParam = params.get("mode");
@@ -513,6 +510,7 @@ export default function Page() {
     customerSearchBarVisibleRef.current = isCustomerSearchBarVisible;
   }, [isCustomerSearchBarVisible]);
 
+  /** imageFile からプレビュー用 blob URL（解放漏れ防止） */
   useEffect(() => {
     if (!imageFile) {
       setPhotoPreviewObjectUrl(null);
@@ -560,6 +558,7 @@ export default function Page() {
       const clientH = root.clientHeight;
       const scrollH = root.scrollHeight;
 
+      // 上端 or 上ラバーバンド（scrollTop ≦ 0）: 検索バーは常に表示し、以降の方向判定をしない
       if (st <= 0) {
         if (!customerSearchBarVisibleRef.current) {
           customerSearchBarVisibleRef.current = true;
@@ -569,6 +568,7 @@ export default function Page() {
         return;
       }
 
+      // 下端 or 下ラバーバンド: 可視性の setState だけ飛ばす（揺れによるジッターを防ぐ）
       if (st + clientH >= scrollH) {
         lastScrollTopRef.current = st;
         return;
@@ -615,6 +615,7 @@ export default function Page() {
 
   const flushLoadingOnAuthError = useCallback(() => setIsCustomersLoading(false), []);
 
+  /** /api/entries/history — 一覧は業態フィルタに依存しないユーザーの全文履歴（作った文章タブ） */
   const fetchHistoryEntries = useCallback(async (targetUserId: string) => {
     try {
       const res = await fetch("/api/entries/history", {
@@ -713,12 +714,14 @@ export default function Page() {
 
   const { userId, liffAuthStatus, sessionReady, authErrorDetail } = useLiffAuth(fetchCustomers, flushLoadingOnAuthError);
 
+  /** 認証未完了または顧客データ取得中 — コンテンツ領域のみスケルトン（レイアウトシェルは常時表示） */
   const showCustomersDataSkeleton = !sessionReady || isCustomersLoading;
 
   const persistHiddenDummyIds = useCallback((next: Set<string>) => {
     try {
       localStorage.setItem(HIDDEN_DUMMY_IDS_KEY, JSON.stringify([...next]));
     } catch {
+      /* noop */
     }
     setHiddenDummyIds(new Set(next));
   }, []);
@@ -760,7 +763,6 @@ export default function Page() {
     setCustomStyleText(localStorage.getItem("customStyleText") || "");
     setIsCompactMode(localStorage.getItem("isCompactMode") === "true");
   }, []);
-
   useEffect(() => {
     document.body.dataset.appTheme = appTheme;
     document.body.dataset.appFont = appFont;
@@ -801,9 +803,9 @@ export default function Page() {
     .filter((customer) => {
       const normalizedSearchText = customerSearchText.trim().toLowerCase();
       if (normalizedSearchText) {
-        const memos = (Array.isArray(customer.entries) && customer.entries.length > 0 ? customer.entries : parseMemoToJSON(customer.memo)).filter((memo: any) => memo.type !== "sales");
+        const memos = parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
         const matchName = customer.name.toLowerCase().includes(normalizedSearchText);
-        const matchMemo = memos.some((memo: any) => String(memo.text || "").toLowerCase().includes(normalizedSearchText) || (memo.tags || []).some((tag: string) => tag.toLowerCase().includes(normalizedSearchText)));
+        const matchMemo = memos.some((memo) => String(memo.text || "").toLowerCase().includes(normalizedSearchText) || (memo.tags || []).some((tag: string) => tag.toLowerCase().includes(normalizedSearchText)));
         const matchTags = customer.tagsArray.some((tag) => tag.toLowerCase().includes(normalizedSearchText));
         return matchName || matchMemo || matchTags;
       }
@@ -822,13 +824,12 @@ export default function Page() {
       if (currentListFilter === "alert") {
         if (statsA.isVip && !statsB.isVip) return -1;
         if (!statsA.isVip && statsB.isVip) return 1;
-        return (getDaysSinceLastVisit(b) || 0) - (getDaysSinceLastVisit(a) || 0);
+        return (getDaysSinceLastVisit(b.memo) || 0) - (getDaysSinceLastVisit(a.memo) || 0);
       }
       if (statsA.isVip && !statsB.isVip) return -1;
       if (!statsA.isVip && statsB.isVip) return 1;
       return statsB.count - statsA.count;
     });
-  
   const alertCount = customerData.filter(isAlertCustomer).length;
   const hiddenCustomers = customerData.filter((customer) => customer.tagsArray.includes("非表示"));
   const selectedCustomer = selectedCustomerId
@@ -840,6 +841,13 @@ export default function Page() {
   const messageMode = createMode === "photo" ? "diary" : "line";
   const modeLabels = MODE_LABELS[selectedBusinessType] || MODE_LABELS.cabaret;
   const stylePlaceholder = STYLE_PLACEHOLDERS[selectedBusinessType] || STYLE_PLACEHOLDERS.cabaret;
+  const hasCustomPrompt = customStyleText.trim().length > 0;
+  const customStylePreview = customStyleText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" / ");
   const moodTags = INDUSTRY_MOOD_CONFIGS[selectedBusinessType] || INDUSTRY_MOOD_CONFIGS.cabaret;
   const lineFactTags = INDUSTRY_FACT_CONFIGS[selectedBusinessType] || INDUSTRY_FACT_CONFIGS.cabaret;
   const diaryFactTags = DIARY_FACT_CONFIGS[selectedBusinessType] || DIARY_FACT_CONFIGS.cabaret;
@@ -882,6 +890,7 @@ export default function Page() {
     window.alert(message);
   }
 
+  /** 写メ日記: ファイル取得 → imageFile + 即時プレビュー、並行で canvas JPEG を API 用にセット */
   function handlePhotoFileChange(event: ChangeEvent<HTMLInputElement>) {
     const inputEl = event.currentTarget;
     const resetInput = () => {
@@ -1190,7 +1199,7 @@ export default function Page() {
 
   function getPastMemos(customer: Customer | null) {
     if (!customer) return [];
-    return (Array.isArray(customer.entries) && customer.entries.length > 0 ? customer.entries : parseMemoToJSON(customer.memo)).filter((memo: any) => memo.type !== "sales");
+    return parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
   }
 
   function toggleStringValue(value: string, setter: Dispatch<SetStateAction<string[]>>) {
@@ -1210,7 +1219,7 @@ export default function Page() {
     setNameInputValue(customer.name);
     setEditCustomerName(customer.name);
     setEditAttributeTags(customer.tagsArray.filter((tag) => tag !== "非表示" && tag !== "一軍固定" && tag !== "ダミー"));
-    setMemoBlocks(memos.length > 0 ? memos.map((memo: any) => createMemoBlock(memo, false)) : [createMemoBlock({}, true)]);
+    setMemoBlocks(memos.length > 0 ? memos.map((memo) => createMemoBlock(memo, false)) : [createMemoBlock({}, true)]);
     setIsTagAccordionOpen(false);
     setActiveModal("edit");
   }
@@ -1324,7 +1333,7 @@ export default function Page() {
       showActionToast("保存されたプリセットがありません");
       return;
     }
-    setSelectedMoodTags(saved.map((tag: unknown) => String(tag)).filter(Boolean));
+    setSelectedMoodTags(saved.map((tag) => String(tag)).filter(Boolean));
     showActionToast("プリセットを読み込みました");
   }
 
@@ -1489,58 +1498,6 @@ export default function Page() {
     cancelEditHistory(targetId);
   }
 
-  async function executeStyleAnalysis(text: string, isFromOnboarding: boolean) {
-    if (!text.trim()) {
-      showNotice("LINEの文章を貼り付けてね🥺");
-      return;
-    }
-    setIsAnalyzing(true);
-    showCuteToast(false);
-    
-    try {
-      const res = await fetch("/api/users/analyze-style", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, pastLineText: text }),
-      });
-      const data = await res.json();
-      
-      if (!data.success) throw new Error(data.error || "分析に失敗しちゃった💦");
-      
-      localStorage.setItem("hasCustomPrompt", "true");
-      setHasCustomPrompt(true);
-      
-      setCustomStyleText(data.customPrompt);
-      localStorage.setItem("customStyleText", data.customPrompt);
-
-      showCuteToast(true);
-      showActionToast("✨ あなたの言葉のクセを学習したよ！");
-      
-      if (isFromOnboarding) {
-        setIsOnboardingStyleModalOpen(false);
-      } else {
-        setActiveModal(null);
-      }
-    } catch (error) {
-      console.error(error);
-      showCuteErrorToast();
-      showNotice("エラーが発生しました💦 もう一度試してね");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }
-
-  function finishSetup() {
-    localStorage.setItem("isSetupDone", "true");
-    setIsSetupModalOpen(false);
-    setIsOnboardingStyleModalOpen(true);
-  }
-
-  function skipOnboardingStyle() {
-    setIsOnboardingStyleModalOpen(false);
-    showActionToast("マイページからいつでも設定できるよ😉");
-  }
-
   async function generateDiary() {
     if (isCreateDetailsOpen) setIsCreateDetailsOpen(false);
 
@@ -1586,8 +1543,8 @@ export default function Page() {
 
       const forbiddenTags = ["新規", "初回", "初回来店", "初めて", "一見", "常連", "リピーター", "2回目", "二回目", "3回目", "三回目", "1回目", "一回目"];
       const cleanedCustomerTags = (targetCustomer?.tagsArray || []).filter((tag) => !forbiddenTags.some((forbidden) => tag.includes(forbidden)));
-      const memos = (Array.isArray(targetCustomer?.entries) && targetCustomer.entries.length > 0 ? targetCustomer.entries : parseMemoToJSON(targetCustomer?.memo)).filter((memo: any) => memo.type !== "sales");
-      const filteredMemosStr = memos.map((memo: any) => {
+      const memos = parseMemoToJSON(targetCustomer ? targetCustomer.memo : "").filter((memo) => memo.type !== "sales");
+      const filteredMemosStr = memos.map((memo) => {
         const filteredTags = (memo.tags || []).filter((tag: string) => !isEmotionTag(tag));
         const tagsStr = filteredTags.length > 0 ? `(タグ: ${filteredTags.join(", ")})` : "";
         return `${memo.date}: ${memo.text} ${tagsStr}`.trim();
@@ -1622,7 +1579,7 @@ export default function Page() {
         imageFile: isPhoto ? photoJpegDataUrl : null,
       };
 
-      const res = await fetch("/api/entries/generate", {
+      const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1645,15 +1602,17 @@ export default function Page() {
       setSelectedFactTags([]);
       setCurrentEntryId(data.entry_id || "");
 
+      // スクロール処理をより安全な形（Reactのレンダリング完了後を確約する形）に変更
       window.setTimeout(() => {
         if (inlineResultRef.current) {
-           try {
-              inlineResultRef.current.scrollIntoView({ behavior: "auto", block: "center" });
-           } catch (e) {
-              console.warn("Scroll failed", e);
-           }
+          try {
+            // Safari/iOSのsmoothスクロールバグを回避するため、即時スクロールを使用
+            inlineResultRef.current.scrollIntoView({ behavior: "auto", block: "center" });
+          } catch (e) {
+            console.warn("Scroll failed", e);
+          }
         }
-      }, 300);
+      }, 300); // 待機時間も少し短くして体感速度を向上
     } catch (error) {
       console.error("generateDiary Error:", error);
       showCuteErrorToast();
@@ -1778,10 +1737,6 @@ export default function Page() {
       <input type="radio" name="visit" id="visit-yes" className="ui-state" checked={visitStatus === "yes"} onChange={() => setVisitStatus("yes")} />
       <input type="radio" name="visit" id="visit-no" className="ui-state" checked={visitStatus === "no"} onChange={() => setVisitStatus("no")} />
   
-      <input type="radio" name="style" id="style-cute" className="ui-state" checked={styleTab === "cute"} onChange={() => setSelectedStyle("cute")} />
-      <input type="radio" name="style" id="style-custom" className="ui-state" checked={styleTab === "custom"} onChange={() => setSelectedStyle("custom")} />
-      <input type="radio" name="style" id="style-neat" className="ui-state" checked={styleTab === "neat"} onChange={() => setSelectedStyle("neat")} />
-
   <div id="photoModal" className="modal-overlay" style={{zIndex: "10008", display: activeModal === "photo" ? "flex" : "none"}} data-original-click={"closePhotoModal(event)"} onClick={closeModal}>
     <div style={{position: "relative", maxWidth: "90%", maxHeight: "90%", margin: "auto", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center"}} data-original-click={"event.stopPropagation()"} onClick={(event) => event.stopPropagation()}>
       <img id="expandedPhoto" src={expandedPhotoUrl} style={{width: "100%", height: "auto", maxHeight: "80vh", objectFit: "contain", borderRadius: "16px", boxShadow: "0 10px 40px rgba(0,0,0,0.3)"}} />
@@ -1797,6 +1752,7 @@ export default function Page() {
       <button type="button" className="create-details-modal-close" data-original-click={"closeCreateDetailsModal()"} onClick={() => setIsCreateDetailsOpen(false)} aria-label="閉じる">×</button>
     </div>
     <div id="createDetailsContent" className="create-details-modal-scroll">
+      {/* 感情タグ */}
       <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px"}}>
         <span className="label" style={{margin: "0"}}>🎭 感情・ムード</span>
         <div style={{display: "flex", gap: "6px"}}>
@@ -1817,6 +1773,7 @@ export default function Page() {
         </div>
       </div>
 
+      {/* 事実タグ */}
       <span className="label">📝 今日の出来事（トピック）</span>
       <div className="tags-scroll-container create-details-tags-grid overflow-x-auto no-scrollbar" id="factTagsArea">
         <div className="tag-row">
@@ -1831,6 +1788,7 @@ export default function Page() {
         </div>
       </div>
 
+      {/* 本文 */}
       <span className="label">📝 今日の出来事・接客メモ</span>
       <div className="textarea-wrapper">
         <textarea id="todayEpisodeInput" className="input-field" rows={4} placeholder="（例）こけてみんなで爆笑した！ウザ絡みされたけどシャンパン入れてくれた笑&#10;※AIが空気を読んで綺麗なメッセージにします✨" data-original-input={"autoScrollTextarea()"} value={todayEpisodeText} onChange={(event) => setTodayEpisodeText(event.target.value)} style={{background: "var(--input-bg)", border: "1px solid transparent", minHeight: "100px"}}></textarea>
@@ -1847,7 +1805,7 @@ export default function Page() {
         {hiddenCustomers.length === 0 ? (
           <p style={{textAlign: "center", color: "var(--text-sub)", marginTop: "40px", fontWeight: "700"}}>非表示の顧客はいません</p>
         ) : hiddenCustomers.map((customer) => {
-          const memos = (Array.isArray(customer.entries) && customer.entries.length > 0 ? customer.entries : parseMemoToJSON(customer.memo)).filter((memo: any) => memo.type !== "sales");
+          const memos = parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
           const lastMemo = memos[memos.length - 1];
           const previewMemo = lastMemo?.text ? `${String(lastMemo.text).substring(0, 30)}...` : "メモなし";
           const visibleTags = customer.tagsArray.filter((tag) => tag !== "ダミー" && tag !== "非表示" && tag !== "一軍固定");
@@ -1877,76 +1835,27 @@ export default function Page() {
     </div>
   </div>
 
-  <div id="setupModal" className="modal-overlay" style={{display: isSetupModalOpen ? "flex" : "none"}}>
+  <div id="setupModal" className="modal-overlay">
     <div className="modal-content" style={{textAlign: "center"}}>
-      <h2 style={{margin: "0 0 10px", fontWeight: "900", fontSize: "20px"}}>おしごとの種類をえらんでね🎀</h2>
-      <p style={{color: "var(--text-sub)", fontSize: "13px", fontWeight: "700", marginBottom: "24px"}}>あとからマイページでも変えられます</p>
-      <select className="input-field" value={selectedBusinessType} onChange={(event) => setBusinessType(event.target.value as BusinessType)} style={{marginBottom: "24px", fontWeight: "700", textAlign: "center", background: "#FFF", border: "1px solid var(--border-color)"}}>
+      <h2 id="setup-title" style={{margin: "0 0 10px", fontWeight: "900", fontSize: "20px"}}>おしごとの種類をえらんでね🎀</h2>
+      <p id="setup-desc" style={{color: "var(--text-sub)", fontSize: "13px", fontWeight: "700", marginBottom: "24px"}}>あとからマイページでも変えられます</p>
+      <select id="initialBusinessType" className="input-field" style={{marginBottom: "24px", fontWeight: "700", textAlign: "center", background: "#FFF", border: "1px solid var(--border-color)"}}>
         <option value="cabaret">キャバクラ・ラウンジ</option>
         <option value="fuzoku">風俗・メンエス</option>
         <option value="garuba">ガルバ</option>
       </select>
-      <button onClick={finishSetup} style={{width: "100%", background: "var(--primary)", color: "#FFF", border: "none", padding: "16px", borderRadius: "24px", fontWeight: "700", fontSize: "14px", boxShadow: "var(--shadow-float)"}}>次へすすむ ✨</button>
+      <button data-original-click={"saveInitialSetup()"} style={{width: "100%", background: "var(--primary)", color: "#FFF", border: "none", padding: "16px", borderRadius: "24px", fontWeight: "700", fontSize: "14px", boxShadow: "var(--shadow-float)"}}>はじめる ✨</button>
     </div>
   </div>
 
-  <div id="onboardingStyleModal" className="modal-overlay" style={{display: isOnboardingStyleModalOpen ? "flex" : "none"}}>
-    <div className="modal-content" style={{textAlign: "center"}}>
-      <h2 style={{margin: "0 0 10px", fontWeight: "900", fontSize: "20px"}}>✨ AIに言葉を教えよう🎀</h2>
-      
-      <div style={{fontSize: "12px", color: "var(--text-main)", fontWeight: "700", lineHeight: 1.6, background: "var(--input-bg)", padding: "12px", borderRadius: "16px", marginBottom: "16px", textAlign: "left"}}>
-        <p style={{margin: "0 0 8px"}}>普段お客様に送っているLINEを１つコピペしてみて！</p>
-        <p style={{margin: "0", color: "var(--primary)"}}>AIがそれを読んで、<b>あなたそっくりの文章</b>を作れるようになるよ🪄</p>
-      </div>
-
-      <textarea 
-        className="input-field" 
-        rows={5}
-        placeholder="（例）今日はいっぱい飲んでくれてありがとー！😹🥂 めっちゃ楽しかったよ！また来週も待ってるね🎀" 
-        value={onboardingLineText} 
-        onChange={(e) => setOnboardingLineText(e.target.value)}
-        style={{background: "#FFF", border: "1px solid var(--border-color)", fontSize: "13px", marginBottom: "16px"}}
-      ></textarea>
-
-      <button 
-        onClick={() => executeStyleAnalysis(onboardingLineText, true)} 
-        disabled={isAnalyzing}
-        style={{width: "100%", background: "var(--primary-gradient)", color: "#FFF", border: "none", padding: "16px", borderRadius: "24px", fontWeight: "700", fontSize: "14px", boxShadow: "var(--shadow-float)", marginBottom: "12px", opacity: isAnalyzing ? 0.7 : 1}}
-      >
-        {isAnalyzing ? "AIが読み取り中..." : "AIに覚えさせる 🧠✨"}
-      </button>
-
-      <button onClick={skipOnboardingStyle} style={{background: "transparent", color: "var(--text-sub)", border: "none", fontSize: "12px", fontWeight: "700", textDecoration: "underline", cursor: "pointer"}}>
-        いまはスキップ（あとで設定する）
-      </button>
-    </div>
-  </div>
-
-  <div id="styleModal" className="modal-overlay" style={{display: activeModal === "style" ? "flex" : "none"}} onClick={closeModal}>
+  <div id="onboardingStyleModal" className="modal-overlay" style={{display: isOnboardingStyleModalOpen ? "flex" : "none"}} onClick={() => setIsOnboardingStyleModalOpen(false)}>
     <div className="modal-content style-modal-content" onClick={(event) => event.stopPropagation()}>
-      <h2 style={{margin: "0 0 20px", fontWeight: "700", textAlign: "center"}}>🎨 AI口調・スタイル設定</h2>
-      <div className="style-selector">
-        <label htmlFor="style-cute" className="style-btn btn-cute">かわいい</label>
-        <label htmlFor="style-custom" className="style-btn btn-custom">⚙️ AIへの細かいルール・NG設定</label>
-        <label htmlFor="style-neat" className="style-btn btn-neat">清楚</label>
-      </div>
-      <div className="style-content-wrapper">
-        <div className="style-desc-cute">
-          <div id="text-style-cute" className="style-desc-box">{STYLE_MODAL_TEXTS.cute}</div>
-        </div>
-        <div className="style-desc-custom">
-          <div id="text-style-custom" className="style-desc-box">{STYLE_MODAL_TEXTS.custom}</div>
-          <textarea id="customStyleText" className="input-field" placeholder={stylePlaceholder} value={customStyleText} onChange={(event) => { setCustomStyleText(event.target.value); localStorage.setItem("customStyleText", event.target.value); }} style={{height: "100px", marginBottom: "16px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}} data-original-change={"saveStyleSettings()"}></textarea>
-          <div style={{display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}><span>テンション（低）</span><span>（高）</span></div>
-          <input type="range" id="tensionSlider" min="1" max="5" value={styleTension} onChange={(event) => { setStyleTension(event.target.value); localStorage.setItem("tensionSlider", event.target.value); }} style={{width: "100%", marginBottom: "16px"}} data-original-change={"saveStyleSettings()"} />
-          <div style={{display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}><span>絵文字の量（少）</span><span>（多）</span></div>
-          <input type="range" id="emojiSlider" min="1" max="5" value={styleEmoji} onChange={(event) => { setStyleEmoji(event.target.value); localStorage.setItem("emojiSlider", event.target.value); }} style={{width: "100%", marginBottom: "10px"}} data-original-change={"saveStyleSettings()"} />
-        </div>
-        <div className="style-desc-neat">
-          <div id="text-style-neat" className="style-desc-box">{STYLE_MODAL_TEXTS.neat}</div>
-        </div>
-      </div>
-      <button data-original-click={"closeStyleModal()"} onClick={closeModal} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", marginTop: "8px"}}>設定を保存して閉じる</button>
+      <h2 style={{margin: "0 0 10px", fontWeight: "700", textAlign: "center"}}>💬 いつものLINEを貼り付けて教える</h2>
+      <p style={{margin: "0 0 14px", fontSize: "12px", color: "var(--text-sub)", fontWeight: "600", lineHeight: 1.6}}>
+        いつもの言い回し・絵文字・NGワードを書いておくと、分身AIがあなたの口調を学習します。
+      </p>
+      <textarea id="onboardingStyleText" className="input-field" placeholder={stylePlaceholder} value={customStyleText} onChange={(event) => { setCustomStyleText(event.target.value); localStorage.setItem("customStyleText", event.target.value); }} style={{height: "130px", marginBottom: "14px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}}></textarea>
+      <button type="button" onClick={() => setIsOnboardingStyleModalOpen(false)} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700"}}>保存して閉じる</button>
     </div>
   </div>
 
@@ -2221,32 +2130,7 @@ export default function Page() {
         </div>
       ) : null}
       <div className="page page-create">
-        {!hasCustomPrompt ? (
-          <div style={{
-            background: "var(--primary-light)", 
-            border: "1px dashed var(--primary)", 
-            borderRadius: "16px", 
-            padding: "12px 14px", 
-            marginBottom: "16px", 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "space-between",
-            boxShadow: "var(--shadow-sm)"
-          }}>
-            <div style={{fontSize: "12px", color: "var(--text-main)", fontWeight: "700", lineHeight: 1.5}}>
-              <span style={{color: "var(--primary)"}}>⚠️ AIがまだあなたの言葉を知らないよ！</span><br/>
-              設定からいつものLINEを教えよう🎀
-            </div>
-            <button 
-              type="button" 
-              onClick={() => setActiveTab("settings")} 
-              style={{background: "var(--primary)", color: "#FFF", border: "none", padding: "8px 12px", borderRadius: "12px", fontWeight: "700", fontSize: "11px", flexShrink: 0}}
-            >
-              設定する
-            </button>
-          </div>
-        ) : null}
-        
+        {/* 👤 誰に送る？ */}
         <div className="card card-customer-select">
           <span className="label">👤 誰に送る？ <span style={{fontSize: "11px", fontWeight: "normal", color: "var(--text-muted)"}}>(任意)</span></span>
           <div className="fade-scroll-wrapper">
@@ -2296,7 +2180,7 @@ export default function Page() {
               getPastMemos(selectedCustomer).length === 0 ? (
                 <div style={{color: "var(--text-muted)", textAlign: "center", padding: "10px 0", fontSize: "12px"}}>(過去の記録はありません)</div>
               ) : (
-                getPastMemos(selectedCustomer).map((memo: any, index) => (
+                getPastMemos(selectedCustomer).map((memo, index) => (
                   <div key={`${memo.date || "memo"}-${index}`} style={{marginBottom: "12px", paddingBottom: "10px", borderBottom: "1px dashed var(--border-color)", display: "flex", gap: "10px", alignItems: "flex-start"}}>
                     <div style={{flex: "1"}}>
                       <div style={{fontSize: "11px", color: "var(--text-sub)", fontWeight: "700", marginBottom: "4px"}}>{memo.date}</div>
@@ -2327,6 +2211,7 @@ export default function Page() {
           </label>
         </div>
 
+        {/* 🚶‍♀️ 来店あり/なし トグル */}
         <div className="mode-text-only" style={{marginBottom: "16px", display: "flex", justifyContent: "center"}}>
           <div style={{width: "100%", maxWidth: "240px"}}>
             <div className="visit-toggle-hint">
@@ -2340,6 +2225,7 @@ export default function Page() {
           </div>
         </div>
 
+        {/* 📝 今日のメモを追加 */}
         <div style={{textAlign: "center", margin: "12px 0"}}>
           <div className="accordion-header" data-original-click={"toggleCreateDetails()"} id="createDetailsHeader" onClick={() => setIsCreateDetailsOpen((isOpen) => !isOpen)} style={{display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "8px 24px", background: "#FFF", border: "1px solid var(--border-color)", borderRadius: "24px", fontSize: "12px", fontWeight: "700", color: "var(--text-main)", boxShadow: "var(--shadow-sm)", cursor: "pointer", transform: "translateY(-20px)"}}>
             📝 今日のメモを追加 <span style={{color: "var(--text-sub)", fontSize: "11px", fontWeight: "normal"}}>(任意)</span> <span id="createDetailsIcon">{isCreateDetailsOpen ? "▲" : "▼"}</span>
@@ -2363,6 +2249,7 @@ export default function Page() {
           </div>
         </div>
 
+        {/* 💎 CTA 下部固定浮遊 */}
         <div className="sticky-submit" style={{pointerEvents: "auto"}}>
           <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"} onClick={generateDiary} disabled={isGenerating || !sessionReady} style={{pointerEvents: "auto"}}>{isGenerating ? "考え中..." : "✨ AIで作成する"}</button>
         </div>
@@ -2476,7 +2363,7 @@ export default function Page() {
               if (customer.tagsArray.includes("一軍固定")) sysBadge = "💎 固定一軍";
 
               const visibleTags = customer.tagsArray.filter((tag) => tag !== "ダミー" && tag !== "非表示" && tag !== "一軍固定");
-              const memos = (Array.isArray(customer.entries) && customer.entries.length > 0 ? customer.entries : parseMemoToJSON(customer.memo)).filter((memo: any) => memo.type !== "sales");
+              const memos = parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
               const lastMemo = memos[memos.length - 1];
               const previewMemo = lastMemo
                 ? lastMemo.text
@@ -2594,10 +2481,35 @@ export default function Page() {
         <h2 style={{margin: "0 0 14px", fontWeight: "700", fontSize: "18px"}}>マイページ・設定</h2>
 
         <div className="settings-stack">
-          <div className="card settings-card settings-card-main" data-original-click={"openStyleModal()"} onClick={() => setActiveModal("style")}>
-            <div className="setting-card-title">🎨 AIスタイル・口調設定</div>
-            <div className="setting-card-desc">文章の雰囲気を、あなたらしく整えます</div>
-            <span className="settings-val" id="styleOverviewText">かわいい・カスタム・清楚</span>
+          <div className="card settings-card settings-card-main">
+            {hasCustomPrompt ? (
+              <>
+                <div className="setting-card-title">✨ あなたの分身AI（学習済み）</div>
+                <div className="setting-card-desc" style={{marginBottom: "10px"}}>現在のルール：{customStylePreview || "（学習データを表示できません）"}</div>
+                <button type="button" className="input-field" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", border: "none", background: "var(--primary)", color: "#FFF", fontWeight: "700", cursor: "pointer", marginBottom: "10px"}}>🔄 新しいLINEで覚え直させる</button>
+                <div style={{fontSize: "12px", color: "var(--text-sub)", fontWeight: "700", marginBottom: "8px"}}>📈 AIの成長度（お気に入り学習）</div>
+                <div style={{fontSize: "13px", fontWeight: "800", color: "var(--text-main)", marginBottom: "10px"}}>（{Math.min(currentFavoriteIds.length, 5)}/5件）</div>
+              </>
+            ) : (
+              <>
+                <div className="setting-card-title">👯‍♀️ あなたの分身AI（未学習）</div>
+                <div style={{background: "#fff6df", border: "1px solid #ffd89a", borderRadius: "12px", padding: "10px", fontSize: "12px", fontWeight: "700", color: "#8a5a00", marginBottom: "10px"}}>⚠️ まだあなたの言葉のクセを学習していません</div>
+                <button type="button" className="input-field" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", border: "none", background: "var(--primary)", color: "#FFF", fontWeight: "700", cursor: "pointer", marginBottom: "10px"}}>💬 いつものLINEを貼り付けて教える</button>
+              </>
+            )}
+
+            <button type="button" onClick={() => setIsAdvancedStyleOpen((current) => !current)} style={{width: "100%", border: "1px dashed var(--border-color)", background: "var(--input-bg)", color: "var(--text-main)", borderRadius: "14px", padding: "10px 12px", fontSize: "12px", fontWeight: "700", cursor: "pointer", marginBottom: isAdvancedStyleOpen ? "10px" : "0"}}>
+              ⚙️ さらに細かく調整・NGワードを指定する（上級者向け）
+            </button>
+            {isAdvancedStyleOpen ? (
+              <div style={{marginTop: "10px"}}>
+                <div style={{display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}><span>テンション（低）</span><span>（高）</span></div>
+                <input type="range" id="tensionSlider" min="1" max="5" value={styleTension} onChange={(event) => { setStyleTension(event.target.value); localStorage.setItem("tensionSlider", event.target.value); }} style={{width: "100%", marginBottom: "16px"}} data-original-change={"saveStyleSettings()"} />
+                <div style={{display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}><span>絵文字の量（少）</span><span>（多）</span></div>
+                <input type="range" id="emojiSlider" min="1" max="5" value={styleEmoji} onChange={(event) => { setStyleEmoji(event.target.value); localStorage.setItem("emojiSlider", event.target.value); }} style={{width: "100%", marginBottom: "10px"}} data-original-change={"saveStyleSettings()"} />
+                <textarea id="customStyleText" className="input-field" placeholder={stylePlaceholder} value={customStyleText} onChange={(event) => { setCustomStyleText(event.target.value); localStorage.setItem("customStyleText", event.target.value); }} style={{height: "100px", marginBottom: "0px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}} data-original-change={"saveStyleSettings()"}></textarea>
+              </div>
+            ) : null}
           </div>
 
           <div className="card settings-card" style={{ marginTop: "6px" }}>

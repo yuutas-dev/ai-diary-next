@@ -1,4 +1,4 @@
-﻿import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { requireResolvedUserId } from '../../lib/validateUserId.js';
 
 function sendJson(res, status, payload) {
@@ -28,17 +28,12 @@ function getTodayFormatted() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
-/** Dify に送る imageFile ペイロードが空とみなす（null / undefined / 空文字） */
 function isEmptyImagePayload(value) {
   if (value == null) return true;
   if (typeof value !== 'string') return true;
   return value.trim() === '';
 }
 
-/**
- * クライアントからの JPEG data URL または base64 を Buffer + MIME に分解
- * @returns {{ buffer: Buffer, mimeType: string, filename: string } | null}
- */
 function parseClientImagePayload(raw) {
   if (isEmptyImagePayload(raw)) return null;
   const s = String(raw).trim();
@@ -65,9 +60,6 @@ function getDifyApiBase() {
   return 'https://api.dify.ai/v1';
 }
 
-/**
- * POST /files/upload → upload_file_id
- */
 async function uploadImageToDify({ apiKey, userId, buffer, filename, mimeType }) {
   const base = getDifyApiBase();
   const form = new FormData();
@@ -128,16 +120,26 @@ async function findCustomerIdByName({ supabase, userId, customerId, name }) {
 }
 
 async function createDraftEntry({ supabase, userId, customerId, visitStatus, episodeText, factTags, moodTags, aiText, mode }) {
+  // modeがdiary等の場合はスキップ。また顧客IDがない場合もスキップ。
   if (mode === 'diary' || mode === 'photo' || !customerId) return null;
+
+  // エピソード（事実）があるかどうかの判定
+  const hasEpisodeContent = (episodeText && episodeText.length > 0) || (factTags && factTags.length > 0);
+  
+  // typeを決定。エピソードがない場合は生成履歴専用として 'generation_log' (または既存の 'sales'等に逃すか)
+  // ここでは生成履歴として一律に扱うが、エピソードがない場合 input_memo 等は空にする。
+  // ※ 'visit'はカルテに残るもの、'generation_only' は次回コンテキストに含めないフラグとして扱う
+  const entryType = hasEpisodeContent ? (visitStatus === 'visit' ? 'visit' : 'sales') : 'generation_only';
+
   const { data, error } = await supabase
     .from('customer_entries')
     .insert({
       user_id: userId,
       customer_id: customerId,
-      entry_type: visitStatus === 'visit' ? 'visit' : 'sales',
+      entry_type: entryType,
       entry_date: getTodayFormatted(),
-      input_memo: episodeText,
-      input_tags: [...factTags, ...moodTags],
+      input_memo: hasEpisodeContent ? episodeText : '',
+      input_tags: hasEpisodeContent ? [...factTags, ...moodTags] : [],
       photo_url: null,
       ai_generated_text: aiText,
       final_sent_text: null,

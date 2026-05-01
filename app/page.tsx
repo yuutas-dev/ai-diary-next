@@ -451,7 +451,9 @@ export default function Page() {
   const [styleTension, setStyleTension] = useState("3");
   const [styleEmoji, setStyleEmoji] = useState("4");
   const [customStyleText, setCustomStyleText] = useState("");
+  const [hasCustomPrompt, setHasCustomPrompt] = useState(false);
   const [onboardingLineText, setOnboardingLineText] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isOnboardingStyleModalOpen, setIsOnboardingStyleModalOpen] = useState(false);
   const [isAdvancedStyleOpen, setIsAdvancedStyleOpen] = useState(false);
   const [editAttributeTags, setEditAttributeTags] = useState<string[]>([]);
@@ -783,13 +785,40 @@ export default function Page() {
     if (savedStyle && ["cute", "custom", "neat"].includes(savedStyle)) {
       setStyleTab(savedStyle);
     }
-    setCustomStyleText(localStorage.getItem("customStyleText") || "");
+    const savedCustomStyle = localStorage.getItem("customStyleText") || "";
+    setCustomStyleText(savedCustomStyle);
+    setHasCustomPrompt(savedCustomStyle.trim().length > 0);
     setIsCompactMode(localStorage.getItem("isCompactMode") === "true");
   }, []);
+  useEffect(() => {
+    if (!sessionReady || userId === null) return;
+    let isMounted = true;
+    void (async () => {
+      try {
+        const query = new URLSearchParams({ userId }).toString();
+        const res = await fetch(`/api/users/profile?${query}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) return;
+        const prompt = typeof data.profile?.ai_custom_prompt === "string" ? data.profile.ai_custom_prompt : "";
+        if (!isMounted || !prompt.trim()) return;
+        setCustomStyleText(prompt);
+        setHasCustomPrompt(true);
+        localStorage.setItem("customStyleText", prompt);
+      } catch (error) {
+        console.error("fetchUserProfile Error:", error);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [sessionReady, userId]);
   useEffect(() => {
     document.body.dataset.appTheme = appTheme;
     document.body.dataset.appFont = appFont;
   }, [appTheme, appFont]);
+  useEffect(() => {
+    setHasCustomPrompt(customStyleText.trim().length > 0);
+  }, [customStyleText]);
 
   useEffect(() => {
     const defaults = STYLE_DEFAULTS[selectedBusinessType] || STYLE_DEFAULTS.cabaret;
@@ -864,7 +893,6 @@ export default function Page() {
   const messageMode = createMode === "photo" ? "diary" : "line";
   const modeLabels = MODE_LABELS[selectedBusinessType] || MODE_LABELS.cabaret;
   const stylePlaceholder = STYLE_PLACEHOLDERS[selectedBusinessType] || STYLE_PLACEHOLDERS.cabaret;
-  const hasCustomPrompt = customStyleText.trim().length > 0;
   const customStylePreview = customStyleText
     .split("\n")
     .map((line) => line.trim())
@@ -1370,6 +1398,45 @@ export default function Page() {
     }
     setSelectedMoodTags(saved.map((tag) => String(tag)).filter(Boolean));
     showActionToast("プリセットを読み込みました");
+  }
+
+  async function executeStyleAnalysis(lineText: string) {
+    const trimmed = lineText.trim();
+    if (!trimmed) {
+      showNotice("LINEの文章を入力してください");
+      return;
+    }
+    if (!sessionReady || userId === null) {
+      showNotice("ユーザー認証が終わるまで少し待ってね⏳");
+      return;
+    }
+    setIsAnalyzing(true);
+    try {
+      const res = await fetch("/api/users/analyze-style", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, pastLineText: trimmed }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "分析に失敗しました");
+      }
+      const customPrompt = typeof data.customPrompt === "string" ? data.customPrompt : "";
+      if (!customPrompt.trim()) {
+        throw new Error("分析結果が空です");
+      }
+      setCustomStyleText(customPrompt);
+      setHasCustomPrompt(true);
+      localStorage.setItem("customStyleText", customPrompt);
+      setOnboardingLineText("");
+      setIsOnboardingStyleModalOpen(false);
+      showActionToast("✨ 言葉のクセを学習しました");
+    } catch (error) {
+      console.error("executeStyleAnalysis Error:", error);
+      showNotice(`分析に失敗しました: ${error instanceof Error ? error.message : "不明なエラー"}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
   }
 
   function sendCompletionStatus(status: string) {
@@ -1886,7 +1953,7 @@ export default function Page() {
         いつもの言い回し・絵文字・NGワードを書いておくと、分身AIがあなたの口調を学習します。
       </p>
       <textarea id="onboardingStyleText" className="input-field" placeholder={stylePlaceholder} value={onboardingLineText} onChange={(event) => setOnboardingLineText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{minHeight: "220px", marginBottom: "14px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}}></textarea>
-      <button type="button" onClick={() => setIsOnboardingStyleModalOpen(false)} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700"}}>保存して閉じる</button>
+      <button type="button" onClick={() => executeStyleAnalysis(onboardingLineText)} disabled={isAnalyzing} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", opacity: isAnalyzing ? 0.7 : 1, cursor: isAnalyzing ? "not-allowed" : "pointer"}}>{isAnalyzing ? "AIが分析中..." : "保存して閉じる"}</button>
     </div>
   </div>
 

@@ -32,27 +32,56 @@ export default async function handler(req, res) {
     const difyBase = (process.env.DIFY_API_URL || process.env.DIFY_BASE_URL || 'https://api.dify.ai/v1').replace(/\/$/, '');
 
     // 1. Difyに分析をリクエスト
-    // ※もしDify側で「ワークフロー」ではなく「テキストジェネレーター」で作った場合は、
-    // ここを `${difyBase}/completion-messages` に変更し、body内の response_mode を除外する必要があります。
-    const difyRes = await fetch(`${difyBase}/workflows/run`, {
+    // まずワークフローを試し、404/405などの失敗時はテキストジェネレーターAPIへフォールバックする。
+    const authHeaders = {
+      'Authorization': `Bearer ${difyAnalyzeKey}`,
+      'Content-Type': 'application/json',
+    };
+    const workflowBody = {
+      inputs: { past_line_text: pastLineText },
+      response_mode: 'blocking',
+      user: userId,
+    };
+    const completionBody = {
+      inputs: { past_line_text: pastLineText },
+      query: pastLineText,
+      response_mode: 'blocking',
+      user: userId,
+    };
+
+    let difyRes = await fetch(`${difyBase}/workflows/run`, {
       method: 'POST',
-      headers: { 
-        'Authorization': `Bearer ${difyAnalyzeKey}`,
-        'Content-Type': 'application/json' 
-      },
-      body: JSON.stringify({ 
-        inputs: { past_line_text: pastLineText }, 
-        response_mode: 'blocking', 
-        user: userId 
-      }),
+      headers: authHeaders,
+      body: JSON.stringify(workflowBody),
     });
+    let difyData = null;
 
-    if (!difyRes.ok) {
-      const errText = await difyRes.text().catch(() => '');
-      throw new Error(`Dify分析エラー: ${difyRes.status} ${errText}`);
+    if (difyRes.ok) {
+      difyData = await difyRes.json();
+    } else {
+      const workflowStatus = difyRes.status;
+      const workflowErrText = await difyRes.text().catch(() => '');
+      console.error('Dify workflow API failed, fallback to completion-messages', {
+        status: workflowStatus,
+        statusText: difyRes.statusText,
+        body: workflowErrText,
+      });
+
+      difyRes = await fetch(`${difyBase}/completion-messages`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify(completionBody),
+      });
+
+      if (!difyRes.ok) {
+        const completionErrText = await difyRes.text().catch(() => '');
+        throw new Error(
+          `Dify分析エラー: workflow=${workflowStatus} ${workflowErrText} ` +
+          `completion=${difyRes.status} ${completionErrText || workflowErrText}`,
+        );
+      }
+      difyData = await difyRes.json();
     }
-
-    const difyData = await difyRes.json();
     
     // Difyの出力から生成されたプロンプトを抽出
     const analyzedPrompt = 
@@ -79,7 +108,22 @@ export default async function handler(req, res) {
       }, { onConflict: 'user_id' });
 
     if (dbError) {
-      throw new Error(`DB保存エラー: ${dbError.message}`);
+      console.error('Supabase upsert error on user_profiles', {
+        code: dbError.code || null,
+        message: dbError.message || '',
+        details: dbError.details || null,
+        hint: dbError.hint || null,
+      });
+      return sendJson(res, 500, {
+        success: false,
+        error: 'DB保存エラー',
+        dbError: {
+          code: dbError.code || null,
+          message: dbError.message || 'unknown db error',
+          details: dbError.details || null,
+          hint: dbError.hint || null,
+        },
+      });
     }
 
     return sendJson(res, 200, { success: true, customPrompt: analyzedPrompt.trim() });

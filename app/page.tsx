@@ -847,7 +847,9 @@ export default function Page() {
     .map((line) => line.trim())
     .filter(Boolean)
     .slice(0, 3)
-    .join(" / ");
+    .join(" ");
+  const favoriteProgress = Math.min(currentFavoriteIds.length, 5);
+  const favoriteProgressRatio = favoriteProgress / 5;
   const moodTags = INDUSTRY_MOOD_CONFIGS[selectedBusinessType] || INDUSTRY_MOOD_CONFIGS.cabaret;
   const lineFactTags = INDUSTRY_FACT_CONFIGS[selectedBusinessType] || INDUSTRY_FACT_CONFIGS.cabaret;
   const diaryFactTags = DIARY_FACT_CONFIGS[selectedBusinessType] || DIARY_FACT_CONFIGS.cabaret;
@@ -2486,24 +2488,35 @@ export default function Page() {
         <h2 style={{margin: "0 0 14px", fontWeight: "700", fontSize: "18px"}}>マイページ・設定</h2>
 
         <div className="settings-stack">
-          <div className="card settings-card settings-card-main">
+          <div className="card settings-card settings-card-main" style={{background: "#FFF", border: "1px solid var(--border-color)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)"}}>
             {hasCustomPrompt ? (
               <>
                 <div className="setting-card-title">✨ あなたの分身AI（学習済み）</div>
-                <div className="setting-card-desc" style={{marginBottom: "10px"}}>現在のルール：{customStylePreview || "（学習データを表示できません）"}</div>
-                <button type="button" className="input-field" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", border: "none", background: "var(--primary)", color: "#FFF", fontWeight: "700", cursor: "pointer", marginBottom: "10px"}}>🔄 新しいLINEで覚え直させる</button>
-                <div style={{fontSize: "12px", color: "var(--text-sub)", fontWeight: "700", marginBottom: "8px"}}>📈 AIの成長度（お気に入り学習）</div>
-                <div style={{fontSize: "13px", fontWeight: "800", color: "var(--text-main)", marginBottom: "10px"}}>（{Math.min(currentFavoriteIds.length, 5)}/5件）</div>
+                <div style={{background: "#f5f6f8", border: "1px solid #e6e8ee", borderRadius: "12px", padding: "10px 12px", marginBottom: "10px"}}>
+                  <div style={{fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "4px"}}>現在のルール</div>
+                  <p style={{margin: 0, color: "var(--text-main)", fontSize: "12px", lineHeight: 1.6, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical"}}>
+                    {customStylePreview || "（学習データを表示できません）"}
+                  </p>
+                </div>
+                <button type="button" className="input-field" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", border: "1px solid var(--border-color)", background: "var(--input-bg)", color: "var(--text-main)", fontWeight: "700", cursor: "pointer", marginBottom: "10px"}}>🔄 新しいLINEで覚え直させる</button>
+                <div style={{fontSize: "12px", color: "var(--text-sub)", fontWeight: "700", marginBottom: "6px"}}>📈 AIの成長度（お気に入り学習）</div>
+                <div style={{display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px"}}>
+                  <span style={{fontSize: "12px"}}>💗</span>
+                  <div style={{flex: 1, height: "8px", borderRadius: "999px", background: "#eef1f6", overflow: "hidden"}}>
+                    <div style={{width: `${favoriteProgressRatio * 100}%`, height: "100%", background: "linear-gradient(90deg, #ff8eb7, #ff6fa8)", borderRadius: "999px"}}></div>
+                  </div>
+                  <span style={{fontSize: "12px", fontWeight: "700", color: "var(--text-sub)"}}>{favoriteProgress}/5件</span>
+                </div>
               </>
             ) : (
               <>
                 <div className="setting-card-title">👯‍♀️ あなたの分身AI（未学習）</div>
                 <div style={{background: "#fff6df", border: "1px solid #ffd89a", borderRadius: "12px", padding: "10px", fontSize: "12px", fontWeight: "700", color: "#8a5a00", marginBottom: "10px"}}>⚠️ まだあなたの言葉のクセを学習していません</div>
-                <button type="button" className="input-field" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", border: "none", background: "var(--primary)", color: "#FFF", fontWeight: "700", cursor: "pointer", marginBottom: "10px"}}>💬 いつものLINEを貼り付けて教える</button>
+                <button type="button" className="input-field" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", border: "1px solid var(--border-color)", background: "var(--input-bg)", color: "var(--text-main)", fontWeight: "700", cursor: "pointer", marginBottom: "10px"}}>💬 いつものLINEを貼り付けて教える</button>
               </>
             )}
 
-            <button type="button" onClick={() => setIsAdvancedStyleOpen((current) => !current)} style={{width: "100%", border: "1px dashed var(--border-color)", background: "var(--input-bg)", color: "var(--text-main)", borderRadius: "14px", padding: "10px 12px", fontSize: "12px", fontWeight: "700", cursor: "pointer", marginBottom: isAdvancedStyleOpen ? "10px" : "0"}}>
+            <button type="button" onClick={() => setIsAdvancedStyleOpen((current) => !current)} style={{width: "100%", border: "1px solid #e4e6eb", background: "#f8f9fb", color: "#7c828f", borderRadius: "12px", padding: "8px 10px", fontSize: "11px", fontWeight: "600", cursor: "pointer", marginBottom: isAdvancedStyleOpen ? "10px" : "0"}}>
               ⚙️ さらに細かく調整・NGワードを指定する（上級者向け）
             </button>
             {isAdvancedStyleOpen ? (

@@ -1554,6 +1554,11 @@ export default function Page() {
       const dayOfWeek = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"][now.getDay()];
       const currentMonth = `${now.getMonth() + 1}月`;
 
+      const safeStyle: StyleTab = ["cute", "custom", "neat"].includes(styleTab) ? styleTab : "cute";
+      const safeTension = ["1", "2", "3", "4", "5"].includes(styleTension) ? styleTension : "3";
+      const safeEmoji = ["1", "2", "3", "4", "5"].includes(styleEmoji) ? styleEmoji : "4";
+      const safeCustomStyleText = typeof customStyleText === "string" ? customStyleText : "";
+
       const payload = {
         userId,
         customerId: targetCustomer?.id || selectedCustomerId,
@@ -1570,16 +1575,16 @@ export default function Page() {
         customerTags: cleanedCustomerTags.join(","),
         factTags: selectedFactTags.filter((tag) => factTags.includes(tag)).join(","),
         moodTags: selectedMoodTags.join(","),
-        style: styleTab,
-        tension: styleTension,
-        emoji: styleEmoji,
-        customText: customStyleText,
+        style: safeStyle,
+        tension: safeTension,
+        emoji: safeEmoji,
+        customText: safeCustomStyleText,
         favoriteTexts: currentFavoriteTexts.slice(0, 5).join("\n"),
         messageMode,
         imageFile: isPhoto ? photoJpegDataUrl : null,
       };
 
-      const res = await fetch("/api/generate", {
+      const res = await fetch("/api/entries/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

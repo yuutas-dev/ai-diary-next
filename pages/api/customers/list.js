@@ -1,7 +1,6 @@
-﻿import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { requireResolvedUserId } from '../../../lib/validateUserId.js';
 
-/** Data route: always run on request; avoid stale caches for Supabase-backed list payloads. */
 export const dynamic = 'force-dynamic';
 
 function sendJson(res, status, payload) {
@@ -29,55 +28,42 @@ function getSupabase() {
   return createClient(supabaseUrl, supabaseKey);
 }
 
-/** HTTP 載せ用メモ JSON 文字列（customers.memo をそのまま扱う。空は []） */
-function memoStringForPayload(memo) {
-  if (memo == null || memo === '') return '[]';
-  if (typeof memo === 'string') return memo.trim() === '' ? '[]' : memo;
-  return JSON.stringify(memo);
-}
-
-/** エピソード一覧は customers.memo のみから組み立てる（customer_entries は参照しない） */
-function entriesFromCustomersMemoOnly(memo) {
-  if (memo == null) return [];
-  let arr;
-  if (Array.isArray(memo)) {
-    arr = memo;
-  } else if (typeof memo === 'string' && memo.trim()) {
-    try {
-      const parsed = JSON.parse(memo);
-      arr = Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  } else {
-    return [];
-  }
-  return arr.map((m) => ({
-    id: m.id,
-    date: m.date ?? m.entry_date ?? '',
-    text: m.text ?? m.input_memo ?? m.inputMemo ?? '',
-    aiGeneratedText: m.ai_generated_text ?? m.aiGeneratedText ?? '',
-    finalSentText: m.final_sent_text ?? m.finalSentText ?? '',
-    tags: Array.isArray(m.tags) ? m.tags : (m.input_tags ?? []),
-    photoUrl: m.photo_url ?? m.photoUrl ?? undefined,
-    type: m.type ?? m.entry_type ?? 'visit',
-    status: m.status ?? m.delivery_status ?? ''
-  }));
-}
-
-/** rows: Supabase customers 行のみ。memo / entries は customers.memo が唯一のソース */
-function customerRowToListPayload(customer, masterIdsSet) {
-  const memoStr = memoStringForPayload(customer.memo);
-  const canonicalEntries = entriesFromCustomersMemoOnly(customer.memo);
+/** rows: フォーマット処理（entriesはDBから引数として受け取る） */
+function customerRowToListPayload(customer, masterIdsSet, customerEntriesMap) {
   const tagsJoin = normalizeTags(customer.tags).join(', ');
   const isMasterDummy =
     masterIdsSet.has(String(customer.id)) ||
     customer.is_master_dummy === true ||
     customer.is_master_dummy === 'true';
+
+  // マップからこの顧客の履歴（customer_entries）を取得
+  const rawEntries = customerEntriesMap.get(customer.id) || [];
+  const canonicalEntries = rawEntries.map((m) => ({
+    id: m.id,
+    date: m.entry_date || '',
+    text: m.input_memo || '',
+    aiGeneratedText: m.ai_generated_text || '',
+    finalSentText: m.final_sent_text || '',
+    tags: normalizeTags(m.input_tags),
+    photoUrl: m.photo_url || undefined,
+    type: m.entry_type || 'visit',
+    status: m.delivery_status || ''
+  }));
+
+  // memoは純粋な静的文字列（全体メモ）として扱う。
+  // ※レガシーデータで配列のJSON文字列 `[{"id"...}]` が残っていた場合は弾く
+  let staticMemo = '';
+  if (typeof customer.memo === 'string') {
+     const trimmed = customer.memo.trim();
+     if (!trimmed.startsWith('[')) {
+         staticMemo = trimmed;
+     }
+  }
+
   const out = {
     id: customer.id,
     name: customer.name,
-    memo: memoStr,
+    memo: staticMemo,
     tags: tagsJoin,
     entries: canonicalEntries,
     is_master_dummy: isMasterDummy
@@ -97,8 +83,8 @@ export default async function handler(req, res) {
     if (!userId) return;
     const supabase = getSupabase();
 
+    // 1. ダミー顧客の取得
     const masterResult = await supabase.from('customers').select('*').eq('is_master_dummy', true);
-
     let masterRows = [];
     if (masterResult.error) {
       console.warn('[customers/list] is_master_dummy 取得フォールバック:', masterResult.error.message);
@@ -108,12 +94,33 @@ export default async function handler(req, res) {
       masterRows = masterResult.data || [];
     }
 
+    // 2. ユーザー顧客の取得
     const userRowsResult = await supabase.from('customers').select('*').eq('user_id', userId);
     if (userRowsResult.error) throw new Error('Supabaseユーザーデータ取得エラー: ' + userRowsResult.error.message);
-
     const userRows = userRowsResult.data || [];
+
+    // 3. 【NEW】customer_entries（イベントログ）の一括取得
+    const entriesResult = await supabase
+      .from('customer_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .order('entry_date', { ascending: false })
+      .order('created_at', { ascending: false });
+    
+    if (entriesResult.error) throw new Error('履歴データ取得エラー: ' + entriesResult.error.message);
+
+    // 取得した履歴を customer_id ごとにグループ化する
+    const customerEntriesMap = new Map();
+    for (const entry of (entriesResult.data || [])) {
+      if (!customerEntriesMap.has(entry.customer_id)) {
+        customerEntriesMap.set(entry.customer_id, []);
+      }
+      customerEntriesMap.get(entry.customer_id).push(entry);
+    }
+
     const masterIdsSet = new Set((masterRows || []).map(c => String(c.id)));
 
+    // 4. お気に入りの取得
     const { data: favorites, error: favError } = await supabase
       .from('favorite_writing_samples')
       .select('source_entry_id, sample_text')
@@ -123,14 +130,13 @@ export default async function handler(req, res) {
     const favoriteIds = favorites ? favorites.map(f => f.source_entry_id) : [];
     const favoriteTexts = favorites ? favorites.map(f => f.sample_text) : [];
 
-    /** 一覧は user が優先（レガシー取得でユーザー行が masters に混入してもユーザー側だけ残す） */
     const userIdSetForDedupe = new Set((userRows || []).map(u => String(u.id)));
     const masterCustomers = (masterRows || [])
       .filter(m => !userIdSetForDedupe.has(String(m.id)))
-      .map(customer => customerRowToListPayload(customer, masterIdsSet));
+      .map(customer => customerRowToListPayload(customer, masterIdsSet, customerEntriesMap));
 
     const userCustomers = userRows.map(customer =>
-      customerRowToListPayload(customer, masterIdsSet)
+      customerRowToListPayload(customer, masterIdsSet, customerEntriesMap)
     );
 
     return sendJson(res, 200, {

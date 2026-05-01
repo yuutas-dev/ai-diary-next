@@ -451,6 +451,7 @@ export default function Page() {
   const [styleTension, setStyleTension] = useState("3");
   const [styleEmoji, setStyleEmoji] = useState("4");
   const [customStyleText, setCustomStyleText] = useState("");
+  const [onboardingLineText, setOnboardingLineText] = useState("");
   const [isOnboardingStyleModalOpen, setIsOnboardingStyleModalOpen] = useState(false);
   const [isAdvancedStyleOpen, setIsAdvancedStyleOpen] = useState(false);
   const [editAttributeTags, setEditAttributeTags] = useState<string[]>([]);
@@ -1641,19 +1642,7 @@ export default function Page() {
       setSelectedFactTags([]);
       setCurrentEntryId(data.entry_id || "");
 
-      // スクロール処理をより安全な形（Reactのレンダリング完了後を確約する形）に変更
-      window.setTimeout(() => {
-        if (inlineResultRef.current && mainScrollAreaRef.current) {
-          try {
-            mainScrollAreaRef.current.scrollTo({
-              top: inlineResultRef.current.offsetTop - 20,
-              behavior: "smooth",
-            });
-          } catch (e) {
-            console.warn("Scroll failed", e);
-          }
-        }
-      }, 300); // 待機時間も少し短くして体感速度を向上
+      // iOS/Safari の viewport ずれ対策のため、自動スクロールは無効化
     } catch (error) {
       console.error("generateDiary Error:", error);
       showCuteErrorToast();
@@ -1833,7 +1822,7 @@ export default function Page() {
       {/* 本文 */}
       <span className="label">📝 今日の出来事・接客メモ</span>
       <div className="textarea-wrapper">
-        <textarea id="todayEpisodeInput" className="input-field" rows={4} placeholder="（例）こけてみんなで爆笑した！ウザ絡みされたけどシャンパン入れてくれた笑&#10;※AIが空気を読んで綺麗なメッセージにします✨" data-original-input={"autoScrollTextarea()"} value={todayEpisodeText} onChange={(event) => setTodayEpisodeText(event.target.value)} style={{background: "var(--input-bg)", border: "1px solid transparent", minHeight: "100px"}}></textarea>
+        <textarea id="todayEpisodeInput" className="input-field" rows={4} placeholder="（例）こけてみんなで爆笑した！ウザ絡みされたけどシャンパン入れてくれた笑&#10;※AIが空気を読んで綺麗なメッセージにします✨" data-original-input={"autoScrollTextarea()"} value={todayEpisodeText} onChange={(event) => setTodayEpisodeText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{background: "var(--input-bg)", border: "1px solid transparent", minHeight: "100px"}}></textarea>
         <div className="clear-btn" data-original-click={"clearEpisodeInput()"} onClick={() => { if (!todayEpisodeText && selectedFactTags.length === 0 && selectedMoodTags.length === 0) return; if (window.confirm("入力をクリアしますか？")) { setTodayEpisodeText(""); setSelectedFactTags([]); setSelectedMoodTags([]); } }}>🧹 クリア</div>
       </div>
     </div>
@@ -1896,7 +1885,7 @@ export default function Page() {
       <p style={{margin: "0 0 14px", fontSize: "12px", color: "var(--text-sub)", fontWeight: "600", lineHeight: 1.6}}>
         いつもの言い回し・絵文字・NGワードを書いておくと、分身AIがあなたの口調を学習します。
       </p>
-      <textarea id="onboardingStyleText" className="input-field" placeholder={stylePlaceholder} value={customStyleText} onChange={(event) => { setCustomStyleText(event.target.value); localStorage.setItem("customStyleText", event.target.value); }} style={{minHeight: "220px", marginBottom: "14px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}}></textarea>
+      <textarea id="onboardingStyleText" className="input-field" placeholder={stylePlaceholder} value={onboardingLineText} onChange={(event) => setOnboardingLineText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{minHeight: "220px", marginBottom: "14px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}}></textarea>
       <button type="button" onClick={() => setIsOnboardingStyleModalOpen(false)} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700"}}>保存して閉じる</button>
     </div>
   </div>
@@ -2019,7 +2008,7 @@ export default function Page() {
                 {block.isReadOnly || memoReadOnly ? (
                   <div style={{fontSize: "14px", color: "var(--text-main)", lineHeight: 1.6, marginTop: "4px", padding: "12px", background: "var(--input-bg)", borderRadius: "12px"}}>{block.text || "（本文なし）"}</div>
                 ) : (
-                  <textarea className="memo-text" rows={2} placeholder="エピソードを入力..." value={block.text} onChange={(event) => updateMemoBlock(block.id, { text: event.target.value })}></textarea>
+                  <textarea className="memo-text" rows={2} placeholder="エピソードを入力..." value={block.text} onChange={(event) => updateMemoBlock(block.id, { text: event.target.value })} onBlur={() => window.scrollTo(0, 0)}></textarea>
                 )}
                 <div className="memo-tags-area" style={{marginTop: "8px", position: "relative"}}>
                   <div className="memo-selected-tags" style={{display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "6px"}}>
@@ -2275,7 +2264,7 @@ export default function Page() {
         </div>
 
         <div id="inlineResultArea" ref={inlineResultRef} className="card" style={{display: isInlineResultVisible ? "block" : "none", border: "1px solid var(--primary-light)", background: "#FFF", marginTop: "24px", position: "relative"}}>
-          <textarea id="inlineResultText" className="input-field" value={inlineResultText} onChange={(event) => setInlineResultText(event.target.value)} style={{height: "200px", lineHeight: "1.6", fontSize: "14px", marginBottom: "12px", resize: "vertical"}} placeholder="ここに生成された文章が表示されます。自由に修正できます。"></textarea>
+          <textarea id="inlineResultText" className="input-field" value={inlineResultText} onChange={(event) => setInlineResultText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{height: "200px", lineHeight: "1.6", fontSize: "14px", marginBottom: "12px", resize: "vertical"}} placeholder="ここに生成された文章が表示されます。自由に修正できます。"></textarea>
           <input type="hidden" id="currentEntryId" value={currentEntryId} />
           <h3 style={{textAlign: "center", marginBottom: "6px", color: "var(--primary)", fontSize: "16px"}}>✨ 文章ができたよ！</h3>
           <div style={{textAlign: "center", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "16px"}}>
@@ -2505,7 +2494,7 @@ export default function Page() {
                     <div className={`favorite-btn ${isFavorite ? "active" : ""}`} onClick={() => toggleFavoriteHistory(item)}>{isFavorite ? "♥" : "☆"}</div>
                   </div>
                   <div id={`history-view-${viewId}`} className={`history-text ${isExpanded ? "" : "collapsed"}`} onClick={() => toggleHistoryText(viewId)} style={{display: isEditing ? "none" : undefined}}>{item.displayText}</div>
-                  <textarea id={`history-edit-${itemId}`} className="input-field" value={editText} onChange={(event) => setHistoryEditTexts((current) => ({ ...current, [itemId]: event.target.value }))} style={{display: isEditing ? "block" : "none", height: `${editHeight}px`, minHeight: `${editHeight}px`, boxSizing: "border-box", overflowY: "hidden", marginTop: "8px", fontSize: "13px", lineHeight: "1.6", background: "#FFF", border: "1px solid var(--primary)", padding: "12px"}} />
+                  <textarea id={`history-edit-${itemId}`} className="input-field" value={editText} onChange={(event) => setHistoryEditTexts((current) => ({ ...current, [itemId]: event.target.value }))} onBlur={() => window.scrollTo(0, 0)} style={{display: isEditing ? "block" : "none", height: `${editHeight}px`, minHeight: `${editHeight}px`, boxSizing: "border-box", overflowY: "hidden", marginTop: "8px", fontSize: "13px", lineHeight: "1.6", background: "#FFF", border: "1px solid var(--primary)", padding: "12px"}} />
                   <div style={{display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "12px", borderTop: "1px dashed var(--border-color)", paddingTop: "8px"}}>
                     <button type="button" id={`history-save-btn-${itemId}`} onClick={() => saveAndCopyHistory(item)} style={{display: isEditing ? "block" : "none", background: "var(--primary)", color: "#FFF", border: "none", padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "0.2s"}}>📋 コピーして保存</button>
                     <button type="button" id={`history-edit-btn-${itemId}`} onClick={() => isEditing ? cancelEditHistory(itemId) : enableEditHistory(item)} style={{background: "var(--input-bg)", color: "var(--text-main)", border: "none", padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "0.2s"}}>{isEditing ? "✖ キャンセル" : "✏️ 編集"}</button>
@@ -2560,7 +2549,7 @@ export default function Page() {
                 <input type="range" id="tensionSlider" min="1" max="5" value={styleTension} onChange={(event) => { setStyleTension(event.target.value); localStorage.setItem("tensionSlider", event.target.value); }} style={{width: "100%", marginBottom: "16px"}} data-original-change={"saveStyleSettings()"} />
                 <div style={{display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}><span>絵文字の量（少）</span><span>（多）</span></div>
                 <input type="range" id="emojiSlider" min="1" max="5" value={styleEmoji} onChange={(event) => { setStyleEmoji(event.target.value); localStorage.setItem("emojiSlider", event.target.value); }} style={{width: "100%", marginBottom: "10px"}} data-original-change={"saveStyleSettings()"} />
-                <textarea id="customStyleText" className="input-field" placeholder={stylePlaceholder} value={customStyleText} onChange={(event) => { setCustomStyleText(event.target.value); localStorage.setItem("customStyleText", event.target.value); }} style={{height: "100px", marginBottom: "0px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}} data-original-change={"saveStyleSettings()"}></textarea>
+                <textarea id="customStyleText" className="input-field" placeholder={stylePlaceholder} value={customStyleText} onChange={(event) => { setCustomStyleText(event.target.value); localStorage.setItem("customStyleText", event.target.value); }} onBlur={() => window.scrollTo(0, 0)} style={{height: "100px", marginBottom: "0px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}} data-original-change={"saveStyleSettings()"}></textarea>
               </div>
             ) : null}
           </div>

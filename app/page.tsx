@@ -1599,13 +1599,17 @@ export default function Page() {
       setSelectedFactTags([]);
       setCurrentEntryId(data.entry_id || "");
 
+      // スクロール処理をより安全な形（Reactのレンダリング完了後を確約する形）に変更
       window.setTimeout(() => {
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => {
-            inlineResultRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-          });
-        });
-      }, 650);
+        if (inlineResultRef.current) {
+          try {
+            // Safari/iOSのsmoothスクロールバグを回避するため、即時スクロールを使用
+            inlineResultRef.current.scrollIntoView({ behavior: "auto", block: "center" });
+          } catch (e) {
+            console.warn("Scroll failed", e);
+          }
+        }
+      }, 300); // 待機時間も少し短くして体感速度を向上
     } catch (error) {
       console.error("generateDiary Error:", error);
       showCuteErrorToast();

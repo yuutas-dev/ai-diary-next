@@ -187,7 +187,7 @@ function parseMemoToJSON(memoStr?: string) {
 }
 
 function getCustomerStats(customer: Customer) {
-  const allMemos = parseMemoToJSON(customer.memo);
+  const allMemos = customer.entries;
   const visitMemos = allMemos.filter((memo) => !memo.type || memo.type === "visit" || memo.status === "legacy");
   const count = visitMemos.length === 0 ? 1 : visitMemos.length;
   const vipKeywords = ["太客", "エース", "一軍", "VIP", "金持ち", "良客", "常連", "一軍固定"];
@@ -276,8 +276,8 @@ function mergeCustomerDisplayPipeline(
   return [...mastersPassed, ...usersPassed];
 }
 
-function getDaysSinceLastVisit(memoStr?: string) {
-  const allMemos = parseMemoToJSON(memoStr);
+function getDaysSinceLastVisit(customer: Customer) {
+  const allMemos = customer.entries;
   const visitMemos = allMemos.filter((memo) => !memo.type || memo.type === "visit" || memo.status === "legacy");
   if (visitMemos.length === 0) return null;
   const lastMemo = visitMemos[visitMemos.length - 1];
@@ -293,7 +293,7 @@ function getDaysSinceLastVisit(memoStr?: string) {
 
 function isAlertCustomer(customer: Customer) {
   const stats = getCustomerStats(customer);
-  const days = getDaysSinceLastVisit(customer.memo);
+  const days = getDaysSinceLastVisit(customer);
   if (days === null) return false;
   if (stats.isVip) return days >= 14;
   if (stats.count <= 2) return days >= 7;
@@ -369,8 +369,20 @@ function normalizeCustomer(customer: {
 }): Customer {
   const businessTypeParsed = parseCustomerBusinessType(customer.business_type ?? customer.businessType);
   const memoStr = memoFieldAsStringFromApi(customer.memo);
-  const resolvedEntries = (Array.isArray(customer.entries) && customer.entries.length > 0)
-    ? customer.entries
+  const validEntries = Array.isArray(customer.entries) ? customer.entries.filter((e: any) => e && e.id) : [];
+  const mappedEntries = validEntries.map((e: any) => ({
+    id: e.id,
+    date: e.entry_date || e.date || "",
+    text: e.input_memo || e.text || "",
+    tags: e.input_tags || e.tags || [],
+    type: e.entry_type || e.type || "visit",
+    photoUrl: e.photo_url || e.photoUrl || "",
+    status: e.delivery_status || e.status || "legacy",
+    aiGeneratedText: e.ai_generated_text || e.aiGeneratedText || "",
+    finalSentText: e.final_sent_text || e.finalSentText || "",
+  }));
+  const resolvedEntries = mappedEntries.length > 0
+    ? mappedEntries
     : parseMemoToJSON(memoStr);
   const normalized: Record<string, unknown> = {
     ...customer,
@@ -805,7 +817,7 @@ export default function Page() {
     .filter((customer) => {
       const normalizedSearchText = customerSearchText.trim().toLowerCase();
       if (normalizedSearchText) {
-        const memos = parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
+        const memos = customer.entries.filter((memo) => memo.type !== "sales");
         const matchName = customer.name.toLowerCase().includes(normalizedSearchText);
         const matchMemo = memos.some((memo) => String(memo.text || "").toLowerCase().includes(normalizedSearchText) || (memo.tags || []).some((tag: string) => tag.toLowerCase().includes(normalizedSearchText)));
         const matchTags = customer.tagsArray.some((tag) => tag.toLowerCase().includes(normalizedSearchText));
@@ -826,7 +838,7 @@ export default function Page() {
       if (currentListFilter === "alert") {
         if (statsA.isVip && !statsB.isVip) return -1;
         if (!statsA.isVip && statsB.isVip) return 1;
-        return (getDaysSinceLastVisit(b.memo) || 0) - (getDaysSinceLastVisit(a.memo) || 0);
+        return (getDaysSinceLastVisit(b) || 0) - (getDaysSinceLastVisit(a) || 0);
       }
       if (statsA.isVip && !statsB.isVip) return -1;
       if (!statsA.isVip && statsB.isVip) return 1;
@@ -1203,7 +1215,7 @@ export default function Page() {
 
   function getPastMemos(customer: Customer | null) {
     if (!customer) return [];
-    return parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
+    return customer.entries.filter((memo) => memo.type !== "sales");
   }
 
   function toggleStringValue(value: string, setter: Dispatch<SetStateAction<string[]>>) {
@@ -1613,10 +1625,12 @@ export default function Page() {
 
       // スクロール処理をより安全な形（Reactのレンダリング完了後を確約する形）に変更
       window.setTimeout(() => {
-        if (inlineResultRef.current) {
+        if (inlineResultRef.current && mainScrollAreaRef.current) {
           try {
-            // Safari/iOSのsmoothスクロールバグを回避するため、即時スクロールを使用
-            inlineResultRef.current.scrollIntoView({ behavior: "auto", block: "nearest" });
+            mainScrollAreaRef.current.scrollTo({
+              top: inlineResultRef.current.offsetTop - 20,
+              behavior: "smooth",
+            });
           } catch (e) {
             console.warn("Scroll failed", e);
           }
@@ -1814,7 +1828,7 @@ export default function Page() {
         {hiddenCustomers.length === 0 ? (
           <p style={{textAlign: "center", color: "var(--text-sub)", marginTop: "40px", fontWeight: "700"}}>非表示の顧客はいません</p>
         ) : hiddenCustomers.map((customer) => {
-          const memos = parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
+          const memos = customer.entries.filter((memo) => memo.type !== "sales");
           const lastMemo = memos[memos.length - 1];
           const previewMemo = lastMemo?.text ? `${String(lastMemo.text).substring(0, 30)}...` : "メモなし";
           const visibleTags = customer.tagsArray.filter((tag) => tag !== "ダミー" && tag !== "非表示" && tag !== "一軍固定");
@@ -2372,7 +2386,7 @@ export default function Page() {
               if (customer.tagsArray.includes("一軍固定")) sysBadge = "💎 固定一軍";
 
               const visibleTags = customer.tagsArray.filter((tag) => tag !== "ダミー" && tag !== "非表示" && tag !== "一軍固定");
-              const memos = parseMemoToJSON(customer.memo).filter((memo) => memo.type !== "sales");
+              const memos = customer.entries.filter((memo) => memo.type !== "sales");
               const lastMemo = memos[memos.length - 1];
               const previewMemo = lastMemo
                 ? lastMemo.text

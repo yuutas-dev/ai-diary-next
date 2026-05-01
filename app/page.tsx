@@ -369,14 +369,16 @@ function normalizeCustomer(customer: {
 }): Customer {
   const businessTypeParsed = parseCustomerBusinessType(customer.business_type ?? customer.businessType);
   const memoStr = memoFieldAsStringFromApi(customer.memo);
-  /** 一覧・編集共通: エピソードは customers.memo を parse した結果のみ（API の entries 列依存を排除） */
+  const resolvedEntries = (Array.isArray(customer.entries) && customer.entries.length > 0)
+    ? customer.entries
+    : parseMemoToJSON(memoStr);
   const normalized: Record<string, unknown> = {
     ...customer,
     id: customer.id || null,
     name: customer.name || "",
     memo: memoStr,
     tags: customer.tags || "",
-    entries: parseMemoToJSON(memoStr),
+    entries: resolvedEntries,
     tagsArray: customer.tags ? customer.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : [],
     isMasterDummy: customer.is_master_dummy === true,
   };
@@ -1614,7 +1616,7 @@ export default function Page() {
         if (inlineResultRef.current) {
           try {
             // Safari/iOSのsmoothスクロールバグを回避するため、即時スクロールを使用
-            inlineResultRef.current.scrollIntoView({ behavior: "auto", block: "center" });
+            inlineResultRef.current.scrollIntoView({ behavior: "auto", block: "nearest" });
           } catch (e) {
             console.warn("Scroll failed", e);
           }

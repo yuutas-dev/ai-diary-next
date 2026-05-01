@@ -1054,12 +1054,12 @@ export default function Page() {
     }, 2500);
   }
 
-  function showCuteToast(isComplete: boolean) {
+  function showCuteToast(isComplete: boolean, customText?: string) {
     if (cuteToastTimerRef.current) window.clearTimeout(cuteToastTimerRef.current);
 
     if (!isComplete) {
       setCuteToastIcon("🐰");
-      setCuteToastText("考え中だよ...");
+      setCuteToastText(customText || "考え中だよ...");
       setIsCuteToastIconAnimating(true);
       setIsCuteToastVisible(true);
       return;
@@ -1403,14 +1403,16 @@ export default function Page() {
   async function executeStyleAnalysis(lineText: string) {
     const trimmed = lineText.trim();
     if (!trimmed) {
-      showNotice("LINEの文章を入力してください");
+      setIsOnboardingStyleModalOpen(false);
       return;
     }
     if (!sessionReady || userId === null) {
       showNotice("ユーザー認証が終わるまで少し待ってね⏳");
       return;
     }
+    setIsOnboardingStyleModalOpen(false);
     setIsAnalyzing(true);
+    showCuteToast(false, "がくしゅうちゅう...");
     try {
       const res = await fetch("/api/users/analyze-style", {
         method: "POST",
@@ -1429,7 +1431,7 @@ export default function Page() {
       setHasCustomPrompt(true);
       localStorage.setItem("customStyleText", customPrompt);
       setOnboardingLineText("");
-      setIsOnboardingStyleModalOpen(false);
+      showCuteToast(true);
       showActionToast("✨ 言葉のクセを学習しました");
     } catch (error) {
       console.error("executeStyleAnalysis Error:", error);
@@ -2580,16 +2582,16 @@ export default function Page() {
 
         <div className="settings-stack">
           <div className="card settings-card settings-card-main" style={{background: "#FFF", border: "1px solid var(--border-color)", boxShadow: "0 2px 8px rgba(0,0,0,0.04)"}}>
-            {hasCustomPrompt ? (
+            {hasCustomPrompt || isAnalyzing ? (
               <>
-                <div className="setting-card-title">✨ あなたの分身AI（学習済み）</div>
+                <div className="setting-card-title">{isAnalyzing ? "✨ あなたの分身AI（学習中）" : "✨ あなたの分身AI（学習済み）"}</div>
                 <div style={{background: "#f5f6f8", border: "1px solid #e6e8ee", borderRadius: "12px", padding: "10px 12px", marginBottom: "10px"}}>
                   <div style={{fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "4px"}}>分析された言葉のクセ</div>
-                  <p style={{margin: 0, color: "var(--text-main)", fontSize: "12px", lineHeight: 1.6, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical"}}>
-                    {customStylePreview || "（まだ言葉のクセが登録されていません）"}
+                  <p style={{margin: 0, color: "var(--text-main)", fontSize: "12px", lineHeight: 1.6, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", opacity: isAnalyzing ? 0.8 : 1}}>
+                    {isAnalyzing ? "🐰 あなたの言葉のクセを一生懸命学習しています..." : (customStylePreview || "（まだ言葉のクセが登録されていません）")}
                   </p>
                 </div>
-                <button type="button" className="input-field" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", border: "1px solid var(--border-color)", background: "var(--input-bg)", color: "var(--text-main)", fontWeight: "700", cursor: "pointer", marginBottom: "10px"}}>🔄 新しいLINEで覚え直させる</button>
+                <button type="button" className="input-field" onClick={() => setIsOnboardingStyleModalOpen(true)} disabled={isAnalyzing} style={{width: "100%", border: "1px solid var(--border-color)", background: "var(--input-bg)", color: "var(--text-main)", fontWeight: "700", cursor: isAnalyzing ? "not-allowed" : "pointer", marginBottom: "10px", opacity: isAnalyzing ? 0.7 : 1}}>{isAnalyzing ? "学習中..." : "🔄 新しいLINEで覚え直させる"}</button>
                 <div style={{fontSize: "12px", color: "var(--text-sub)", fontWeight: "700", marginBottom: "6px"}}>📈 AIの成長度（お気に入り学習）</div>
                 <div style={{display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px"}}>
                   <span style={{fontSize: "12px"}}>💗</span>

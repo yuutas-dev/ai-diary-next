@@ -1579,7 +1579,7 @@ export default function Page() {
         imageFile: isPhoto ? photoJpegDataUrl : null,
       };
 
-      const res = await fetch("/api/generate", {
+      const res = await fetch("/api/entries/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

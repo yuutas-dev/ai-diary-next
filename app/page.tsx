@@ -376,13 +376,16 @@ function normalizeCustomer(customer: {
   const businessTypeParsed = parseCustomerBusinessType(customer.business_type ?? customer.businessType);
   const memoStr = memoFieldAsStringFromApi(customer.memo);
   /** 一覧・編集共通: エピソードは customers.memo を parse した結果のみ（API の entries 列依存を排除） */
+// 💡 APIから来た本物のentries配列があればそれを優先する
+  const resolvedEntries = Array.isArray(customer.entries) ? customer.entries : parseMemoToJSON(memoStr);
+
   const normalized: Record<string, unknown> = {
     ...customer,
     id: customer.id || null,
     name: customer.name || "",
     memo: memoStr,
     tags: customer.tags || "",
-    entries: parseMemoToJSON(memoStr),
+    entries: resolvedEntries, // ✅ 正しい履歴をセット！
     tagsArray: customer.tags ? customer.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : [],
     isMasterDummy: customer.is_master_dummy === true,
   };

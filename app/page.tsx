@@ -1952,7 +1952,7 @@ export default function Page() {
       <p style={{margin: "0 0 14px", fontSize: "12px", color: "var(--text-sub)", fontWeight: "600", lineHeight: 1.6}}>
         いつもの言い回し・絵文字・NGワードを書いておくと、分身AIがあなたの口調を学習します。
       </p>
-      <textarea id="onboardingStyleText" className="input-field" placeholder={stylePlaceholder} value={onboardingLineText} onChange={(event) => setOnboardingLineText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{minHeight: "220px", marginBottom: "14px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}}></textarea>
+      <textarea id="onboardingStyleText" className="input-field" placeholder="（例）今日はいっぱい飲んでくれてありがとー！😹🥂 めっちゃ楽しかったよ！また来週も待ってるね🎀" value={onboardingLineText} onChange={(event) => setOnboardingLineText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{minHeight: "220px", marginBottom: "14px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}}></textarea>
       <button type="button" onClick={() => executeStyleAnalysis(onboardingLineText)} disabled={isAnalyzing} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", opacity: isAnalyzing ? 0.7 : 1, cursor: isAnalyzing ? "not-allowed" : "pointer"}}>{isAnalyzing ? "AIが分析中..." : "保存して閉じる"}</button>
     </div>
   </div>

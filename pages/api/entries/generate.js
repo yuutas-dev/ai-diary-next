@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { requireResolvedUserId } from '../../lib/validateUserId.js';
+import { requireResolvedUserId } from '../../../lib/validateUserId.js';
 
 function sendJson(res, status, payload) {
   return res.status(status).json(payload);

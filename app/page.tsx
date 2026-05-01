@@ -384,13 +384,20 @@ function normalizeCustomer(customer: {
   const resolvedEntries = mappedEntries.length > 0
     ? mappedEntries
     : parseMemoToJSON(memoStr);
+  const sortedEntries = [...resolvedEntries].sort((a, b) => {
+    const aDate = String((a as any).date || (a as any).entry_date || "").replace(/\//g, "-");
+    const bDate = String((b as any).date || (b as any).entry_date || "").replace(/\//g, "-");
+    const aTime = aDate ? new Date(`${aDate}T00:00:00`).getTime() : 0;
+    const bTime = bDate ? new Date(`${bDate}T00:00:00`).getTime() : 0;
+    return aTime - bTime;
+  });
   const normalized: Record<string, unknown> = {
     ...customer,
     id: customer.id || null,
     name: customer.name || "",
     memo: memoStr,
     tags: customer.tags || "",
-    entries: resolvedEntries,
+    entries: sortedEntries,
     tagsArray: customer.tags ? customer.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : [],
     isMasterDummy: customer.is_master_dummy === true,
   };
@@ -449,6 +456,7 @@ export default function Page() {
   const [editAttributeTags, setEditAttributeTags] = useState<string[]>([]);
   const [customAttrInput, setCustomAttrInput] = useState("");
   const [memoBlocks, setMemoBlocks] = useState<MemoBlock[]>([]);
+  const [deletedEntryIds, setDeletedEntryIds] = useState<string[]>([]);
   const [isCreateCustomerMode, setIsCreateCustomerMode] = useState(false);
   const [editCustomerName, setEditCustomerName] = useState("");
   const [todayEpisodeText, setTodayEpisodeText] = useState("");
@@ -1228,6 +1236,7 @@ export default function Page() {
 
   function openEditCustomer(customer: Customer, fromHiddenList = false) {
     const memos = getPastMemos(customer);
+    setDeletedEntryIds([]);
     setIsCreateCustomerMode(false);
     setIsEditingHiddenCustomer(fromHiddenList);
     setDeleteTargetCustomer(null);
@@ -1241,6 +1250,7 @@ export default function Page() {
   }
 
   function openCreateCustomerModal() {
+    setDeletedEntryIds([]);
     setIsCreateCustomerMode(true);
     setIsEditingHiddenCustomer(false);
     setDeleteTargetCustomer(null);
@@ -1317,6 +1327,14 @@ export default function Page() {
   }
 
   function deleteMemoBlock(id: string) {
+    const targetBlock = memoBlocks.find((block) => block.id === id);
+    if (targetBlock?.entryId) {
+      setDeletedEntryIds((current) => (
+        current.includes(String(targetBlock.entryId))
+          ? current
+          : [...current, String(targetBlock.entryId)]
+      ));
+    }
     setMemoBlocks((current) => current.filter((block) => block.id !== id));
   }
 
@@ -1723,7 +1741,7 @@ export default function Page() {
               userId,
               customerId,
               entries: entriesPayload,
-              deletedEntryIds: [],
+              deletedEntryIds,
             }),
           });
           const upsertData = (await upsertRes.json().catch(() => ({}))) as { success?: boolean; error?: string };
@@ -1733,6 +1751,7 @@ export default function Page() {
         }
 
         await fetchCustomers(userId);
+        setDeletedEntryIds([]);
       } catch (error) {
         console.error("saveCustomerEdit Error:", error);
         showActionToast("通信エラーがおきたので元に戻したよ🥺");
@@ -1877,7 +1896,7 @@ export default function Page() {
       <p style={{margin: "0 0 14px", fontSize: "12px", color: "var(--text-sub)", fontWeight: "600", lineHeight: 1.6}}>
         いつもの言い回し・絵文字・NGワードを書いておくと、分身AIがあなたの口調を学習します。
       </p>
-      <textarea id="onboardingStyleText" className="input-field" placeholder={stylePlaceholder} value={customStyleText} onChange={(event) => { setCustomStyleText(event.target.value); localStorage.setItem("customStyleText", event.target.value); }} style={{height: "130px", marginBottom: "14px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}}></textarea>
+      <textarea id="onboardingStyleText" className="input-field" placeholder={stylePlaceholder} value={customStyleText} onChange={(event) => { setCustomStyleText(event.target.value); localStorage.setItem("customStyleText", event.target.value); }} style={{minHeight: "220px", marginBottom: "14px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}}></textarea>
       <button type="button" onClick={() => setIsOnboardingStyleModalOpen(false)} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700"}}>保存して閉じる</button>
     </div>
   </div>
@@ -2509,9 +2528,9 @@ export default function Page() {
               <>
                 <div className="setting-card-title">✨ あなたの分身AI（学習済み）</div>
                 <div style={{background: "#f5f6f8", border: "1px solid #e6e8ee", borderRadius: "12px", padding: "10px 12px", marginBottom: "10px"}}>
-                  <div style={{fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "4px"}}>現在のルール</div>
+                  <div style={{fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "4px"}}>分析された言葉のクセ</div>
                   <p style={{margin: 0, color: "var(--text-main)", fontSize: "12px", lineHeight: 1.6, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical"}}>
-                    {customStylePreview || "（学習データを表示できません）"}
+                    {customStylePreview || "（まだ言葉のクセが登録されていません）"}
                   </p>
                 </div>
                 <button type="button" className="input-field" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", border: "1px solid var(--border-color)", background: "var(--input-bg)", color: "var(--text-main)", fontWeight: "700", cursor: "pointer", marginBottom: "10px"}}>🔄 新しいLINEで覚え直させる</button>

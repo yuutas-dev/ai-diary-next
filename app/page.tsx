@@ -358,6 +358,8 @@ export default function Page() {
   const [selectedMoodTags, setSelectedMoodTags] = useState<string[]>([]);
   const [selectedFactTags, setSelectedFactTags] = useState<string[]>([]);
   const [customStyleText, setCustomStyleText] = useState("");
+  /** オンボーディングで貼った「いつものLINE」生テキスト（お気に入り5件とは別の基盤お手本） */
+  const [baseStyleText, setBaseStyleText] = useState("");
   /** プロフィールの ai_custom_prompt を一度でも取得判断できたら true（未取得の間は文体バナーを出さない） */
   const [isProfileStyleLoaded, setIsProfileStyleLoaded] = useState(false);
   const [hasCustomPrompt, setHasCustomPrompt] = useState(false);
@@ -668,6 +670,7 @@ export default function Page() {
     const savedCustomStyle = localStorage.getItem("customStyleText") || "";
     setCustomStyleText(savedCustomStyle);
     setHasCustomPrompt(savedCustomStyle.trim().length > 0);
+    setBaseStyleText(localStorage.getItem("baseStyleText") || "");
     setIsCompactMode(localStorage.getItem("isCompactMode") === "true");
   }, []);
   useEffect(() => {
@@ -687,11 +690,18 @@ export default function Page() {
         const res = await fetch(`/api/users/profile?${query}`);
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) return;
-        const prompt = typeof data.profile?.ai_custom_prompt === "string" ? data.profile.ai_custom_prompt : "";
-        if (!isMounted || !prompt.trim()) return;
-        setCustomStyleText(prompt);
-        setHasCustomPrompt(true);
-        localStorage.setItem("customStyleText", prompt);
+        if (!isMounted) return;
+        const profile = data.profile || {};
+        const prompt = typeof profile.ai_custom_prompt === "string" ? profile.ai_custom_prompt : "";
+        const baseRaw = typeof profile.base_style_text === "string" ? profile.base_style_text : "";
+        if (prompt.trim()) {
+          setCustomStyleText(prompt);
+          setHasCustomPrompt(true);
+          localStorage.setItem("customStyleText", prompt);
+        }
+        setBaseStyleText(baseRaw);
+        if (baseRaw) localStorage.setItem("baseStyleText", baseRaw);
+        else localStorage.removeItem("baseStyleText");
       } catch (error) {
         console.error("fetchUserProfile Error:", error);
       } finally {
@@ -1308,6 +1318,8 @@ export default function Page() {
       setCustomStyleText(customPrompt);
       setHasCustomPrompt(true);
       localStorage.setItem("customStyleText", customPrompt);
+      setBaseStyleText(trimmed);
+      localStorage.setItem("baseStyleText", trimmed);
       setOnboardingLineText("");
       showCuteToast(true);
       showActionToast("✨ 言葉のクセを学習しました");
@@ -1542,6 +1554,7 @@ export default function Page() {
       const safeTension = defaults.tension;
       const safeEmoji = defaults.emoji;
       const safeCustomStyleText = typeof customStyleText === "string" ? customStyleText : "";
+      const safeBaseStyleText = typeof baseStyleText === "string" ? baseStyleText : "";
 
       const payload = {
         userId,
@@ -1563,6 +1576,7 @@ export default function Page() {
         tension: safeTension,
         emoji: safeEmoji,
         customText: safeCustomStyleText,
+        baseStyleText: safeBaseStyleText,
         favoriteTexts: currentFavoriteTexts.slice(0, 5).join("\n"),
         messageMode,
         imageFile: isPhoto ? photoJpegDataUrl : null,

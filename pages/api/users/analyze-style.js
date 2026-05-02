@@ -104,7 +104,8 @@ export default async function handler(req, res) {
       .upsert({
         user_id: userId,
         ai_custom_prompt: analyzedPrompt.trim(),
-        updated_at: new Date().toISOString()
+        base_style_text: pastLineText,
+        updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' });
 
     if (dbError) {
@@ -122,42 +123,6 @@ export default async function handler(req, res) {
           message: dbError.message || 'unknown db error',
           details: dbError.details || null,
           hint: dbError.hint || null,
-        },
-      });
-    }
-
-    /** customer_entries に無い「貼り付け本文」をお気に入り実データとして保持するための固定キー（ユーザー単位で一意） */
-    const onboardingFavoriteSourceEntryId = '00000000-0000-4000-b001-000000000001';
-
-    const { error: favError } = await supabase
-      .from('favorite_writing_samples')
-      .upsert(
-        {
-          user_id: userId,
-          source_entry_id: onboardingFavoriteSourceEntryId,
-          source_customer_id: null,
-          source_customer_name: '文体オンボーディング',
-          sample_text: pastLineText,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,source_entry_id' },
-      );
-
-    if (favError) {
-      console.error('Supabase upsert error on favorite_writing_samples (onboarding seed)', {
-        code: favError.code || null,
-        message: favError.message || '',
-        details: favError.details || null,
-        hint: favError.hint || null,
-      });
-      return sendJson(res, 500, {
-        success: false,
-        error: 'お気に入り（お手本）の保存に失敗しました',
-        dbError: {
-          code: favError.code || null,
-          message: favError.message || 'unknown db error',
-          details: favError.details || null,
-          hint: favError.hint || null,
         },
       });
     }

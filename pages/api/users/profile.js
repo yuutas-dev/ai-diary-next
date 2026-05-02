@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabase
       .from('user_profiles')
-      .select('ai_custom_prompt')
+      .select('ai_custom_prompt, base_style_text')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -33,6 +33,7 @@ export default async function handler(req, res) {
       success: true,
       profile: {
         ai_custom_prompt: data?.ai_custom_prompt || '',
+        base_style_text: data?.base_style_text || '',
       },
     });
   } catch (err) {

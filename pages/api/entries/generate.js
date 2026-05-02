@@ -215,6 +215,7 @@ export default async function handler(req, res) {
           .join('\n')
       : (typeof data?.favoriteTexts === 'string' ? data.favoriteTexts : '');
     const favoriteTextCount = favoriteTexts ? favoriteTexts.split('\n').filter(Boolean).length : 0;
+    const baseStyleText = trimText(data?.baseStyleText);
     const customerName = trimText(data?.customerName);
     const customerId = await findCustomerIdByName({ supabase, userId, customerId: data?.customerId, name: customerName });
 
@@ -239,6 +240,7 @@ export default async function handler(req, res) {
       tension: data?.tension || '3',
       emoji: data?.emoji || '4',
       customText: data?.customText || '',
+      baseStyleText,
       favoriteTexts,
       messageMode: mode,
     };

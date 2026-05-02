@@ -1286,6 +1286,7 @@ export default function Page() {
       setOnboardingLineText("");
       showCuteToast(true);
       showActionToast("✨ 言葉のクセを学習しました");
+      await fetchCustomers(userId, { showLoading: false });
     } catch (error) {
       console.error("executeStyleAnalysis Error:", error);
       showNotice(`分析に失敗しました: ${error instanceof Error ? error.message : "不明なエラー"}`);

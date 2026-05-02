@@ -119,25 +119,36 @@ async function findCustomerIdByName({ supabase, userId, customerId, name }) {
   return data?.[0]?.id || null;
 }
 
+/** 営業・生成のみログなどを除外し、実来店相当のエントリのみ pastMemo 文脈に使う */
+function isVisitLikeEntryForPastMemo(entry) {
+  const raw = entry?.entry_type;
+  if (raw == null || String(raw).trim() === '') return true;
+  const t = String(raw).trim().toLowerCase();
+  return t === 'visit' || t === 'legacy';
+}
+
 // 【NEW】「直近の有効な来店カルテ（エピソードあり）」だけをDifyの文脈用に自動抽出する
 async function fetchValidPastContext({ supabase, userId, customerId }) {
   if (!customerId) return '';
-  
+
   const { data, error } = await supabase
     .from('customer_entries')
-    .select('entry_date, input_memo, input_tags')
+    .select('entry_date, input_memo, input_tags, entry_type')
     .eq('user_id', userId)
     .eq('customer_id', customerId)
-    .neq('entry_type', 'generation_only') // 生成だけのログは無視
     .order('entry_date', { ascending: false })
     .order('created_at', { ascending: false });
 
   if (error || !data || data.length === 0) return '';
 
-  // メモかタグのどちらかが入力されている最新の「意味のある」レコードを探す
-  const validEntry = data.find(entry => 
-    (entry.input_memo && entry.input_memo.trim() !== '') || 
-    (Array.isArray(entry.input_tags) && entry.input_tags.length > 0)
+  const visitLikeRows = data.filter(isVisitLikeEntryForPastMemo);
+  if (visitLikeRows.length === 0) return '';
+
+  // メモかタグのどちらかが入力されている最新の「意味のある」レコードを探す（sales は上で除外済み）
+  const validEntry = visitLikeRows.find(
+    (entry) =>
+      (entry.input_memo && entry.input_memo.trim() !== '') ||
+      (Array.isArray(entry.input_tags) && entry.input_tags.length > 0),
   );
 
   if (!validEntry) return '';

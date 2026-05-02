@@ -1954,6 +1954,46 @@ export default function Page() {
         </div>
       ) : null}
       <div className="page page-create">
+        {currentFavoriteTexts.length === 0 ? (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setIsOnboardingStyleModalOpen(true)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setIsOnboardingStyleModalOpen(true);
+              }
+            }}
+            style={{
+              marginBottom: "20px",
+              padding: "12px 16px",
+              backgroundColor: "#fff0f5",
+              border: "1px solid #f1dce7",
+              borderRadius: "12px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ fontSize: "13px", fontWeight: "bold", color: "#d81b60" }}>
+              ⚠️ まだあなたの文章が登録されてないよ！
+            </div>
+            <div style={{
+              backgroundColor: "#d81b60",
+              color: "#fff",
+              fontSize: "11px",
+              fontWeight: "bold",
+              padding: "6px 12px",
+              borderRadius: "16px",
+              whiteSpace: "nowrap",
+            }}
+            >
+              登録する
+            </div>
+          </div>
+        ) : null}
         {/* 👤 誰に送る？ */}
         <div className="card card-customer-select">
           <span className="label">👤 誰に送る？ <span style={{fontSize: "11px", fontWeight: "normal", color: "var(--text-muted)"}}>(任意)</span></span>

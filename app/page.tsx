@@ -279,6 +279,7 @@ function normalizeCustomer(customer: {
     tags: customer.tags || "",
     entries: sortedEntries,
     tagsArray: customer.tags ? customer.tags.split(",").map((tag) => tag.trim()).filter(Boolean) : [],
+    isDummy: customer.is_master_dummy === true,
     isMasterDummy: customer.is_master_dummy === true,
   };
   Reflect.deleteProperty(normalized, "business_type");
@@ -582,20 +583,8 @@ export default function Page() {
           Boolean(!(c && typeof c === "object" && Boolean((c as { is_master_dummy?: boolean }).is_master_dummy))));
       }
 
-      const masters: Customer[] = mastersRaw.map((raw) => ({
-        ...normalizeCustomer(raw),
-        isDummy: true,
-        isMasterDummy: true,
-      }));
-
-      const users: Customer[] = usersRaw.map((raw) => {
-        const normalized = normalizeCustomer(raw);
-        return {
-          ...normalized,
-          isDummy: normalized.tagsArray.includes("ダミー"),
-          isMasterDummy: false,
-        };
-      });
+      const masters: Customer[] = mastersRaw.map((raw) => normalizeCustomer(raw));
+      const users: Customer[] = usersRaw.map((raw) => normalizeCustomer(raw));
 
       setCustomerSource({ masters, users });
       setCurrentFavoriteIds(Array.isArray(data.favoriteIds) ? data.favoriteIds.map((id: unknown) => String(id)).filter(Boolean) : []);

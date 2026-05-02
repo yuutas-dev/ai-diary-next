@@ -330,33 +330,36 @@ input[type="radio"].ui-state { display: none; }
 .create-addon-actions {
   display: flex;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 12px;
   min-height: 44px;
   align-items: center;
 }
 
 .create-addon-actions button {
-  min-width: 72px;
+  flex: 1;
+  max-width: 168px;
   padding: 10px 14px;
-  border-radius: 14px;
-  border: none;
-  font-weight: 800;
-  font-size: 15px;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  background: var(--text-main);
-  color: #FFF;
-  box-shadow: var(--shadow-sm);
-  transition: opacity 0.18s ease, transform 0.12s ease;
+  background: var(--input-bg, #f3f4f6);
+  color: #4b5563;
+  box-shadow: none;
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
 }
 
 .create-addon-actions button[aria-expanded="true"] {
-  opacity: 0.92;
-  box-shadow: var(--shadow-float);
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: rgba(0, 0, 0, 0.04);
 }
 
 .create-addon-actions button:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 .create-accordion-panel {

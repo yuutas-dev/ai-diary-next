@@ -439,6 +439,11 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    if (selectedCustomerId !== RECIPIENT_EVERYONE_ID) return;
+    setNameInputValue("");
+  }, [selectedCustomerId]);
+
+  useEffect(() => {
     customerSearchBarVisibleRef.current = isCustomerSearchBarVisible;
   }, [isCustomerSearchBarVisible]);
 
@@ -1491,7 +1496,7 @@ export default function Page() {
       return;
     }
 
-    const name = nameInputValue.trim();
+    const name = isEveryoneRecipient ? "" : nameInputValue.trim();
     const hasPhotoPayload = Boolean(photoJpegDataUrl);
     const targetCustomer =
       selectedCustomer || (!isEveryoneRecipient ? customerData.find((customer) => customer.name === name) || null : null);
@@ -1547,7 +1552,7 @@ export default function Page() {
         userId,
         customerId:
           isEveryoneRecipient ? null : (targetCustomer?.id ?? (selectedCustomerId !== RECIPIENT_EVERYONE_ID ? selectedCustomerId : null)),
-        customerName: targetCustomer ? targetCustomer.name : name,
+        customerName: isEveryoneRecipient ? "" : (targetCustomer ? targetCustomer.name : name),
         businessType: selectedBusinessType,
         customerRank,
         visitCount: String(visitCount),
@@ -2021,7 +2026,26 @@ export default function Page() {
             </div>
           </div>
           <div style={{position: "relative", flexShrink: "0"}}>
-            <input type="text" id="nameInput" className="input-field" placeholder="名前を入力..." data-original-input={"suggestCustomer()"} value={nameInputValue} onChange={(event) => { setNameInputValue(event.target.value); if (selectedCustomer && event.target.value !== selectedCustomer.name) setSelectedCustomerId(RECIPIENT_EVERYONE_ID); }} />
+            <input
+              type="text"
+              id="nameInput"
+              className="input-field"
+              placeholder={isEveryoneRecipient ? "全体への発信（SNS・ブログ等）" : "名前を入力..."}
+              data-original-input={"suggestCustomer()"}
+              value={isEveryoneRecipient ? "" : nameInputValue}
+              readOnly={isEveryoneRecipient}
+              aria-readOnly={isEveryoneRecipient}
+              onChange={(event) => {
+                if (isEveryoneRecipient) return;
+                setNameInputValue(event.target.value);
+                if (selectedCustomer && event.target.value !== selectedCustomer.name) setSelectedCustomerId(RECIPIENT_EVERYONE_ID);
+              }}
+              style={
+                isEveryoneRecipient
+                  ? { background: "var(--input-bg)", color: "var(--text-sub)", cursor: "not-allowed" }
+                  : undefined
+              }
+            />
             <div id="resultArea" className="result-box"></div>
           </div>
           <div className="past-memo-box" style={{marginTop: "12px", marginBottom: "0"}}>
@@ -2073,7 +2097,7 @@ export default function Page() {
             aria-controls="createPhotoAccordion"
             onClick={() => setIsPhotoAccordionOpen((v) => !v)}
           >
-            [ 📷 ＋ ]
+            📷 写真
           </button>
           <button
             type="button"
@@ -2082,7 +2106,7 @@ export default function Page() {
             aria-controls="createMemoAccordion"
             onClick={() => setIsMemoAccordionOpen((v) => !v)}
           >
-            [ 📝 ＋ ]
+            📝 メモ
           </button>
         </div>
 

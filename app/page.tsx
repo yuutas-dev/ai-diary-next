@@ -765,6 +765,12 @@ export default function Page() {
   const modeLabels = MODE_LABELS[selectedBusinessType] || MODE_LABELS.cabaret;
   const favoriteProgress = Math.min(currentFavoriteIds.length, 5);
   const favoriteProgressRatio = favoriteProgress / 5;
+  const customStylePreview = customStyleText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" ");
   const moodTags = INDUSTRY_MOOD_CONFIGS[selectedBusinessType] || INDUSTRY_MOOD_CONFIGS.cabaret;
   const lineFactTags = INDUSTRY_FACT_CONFIGS[selectedBusinessType] || INDUSTRY_FACT_CONFIGS.cabaret;
   const diaryFactTags = DIARY_FACT_CONFIGS[selectedBusinessType] || DIARY_FACT_CONFIGS.cabaret;
@@ -2330,6 +2336,9 @@ export default function Page() {
                   <p style={{margin: 0, color: "#8a6a78", lineHeight: 1.6, fontSize: "13px"}}>
                     🐰 AIがあなたの話し方の雰囲気をインプットしました！日々のLINE作成や『お気に入り(☆)』の登録で、さらにあなたらしく賢く育ちます。
                   </p>
+                  <div style={{ marginTop: "12px", padding: "10px 12px", background: "rgba(255,255,255,0.6)", borderRadius: "12px", fontSize: "11px", color: "#a88e9a", border: "1px dashed #f1dce7", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    {customStylePreview || customStyleText}
+                  </div>
                 </div>
                 <button type="button" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", background: "#FFF", border: "1px solid #fae6f0", color: "#b47b93", borderRadius: "18px", padding: "13px 14px", fontWeight: "700", cursor: "pointer"}}>
                   ➕ さらにLINEを読み込ませて賢くする

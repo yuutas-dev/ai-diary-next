@@ -446,8 +446,6 @@ export default function Page() {
   const [customerSearchText, setCustomerSearchText] = useState("");
   const [selectedMoodTags, setSelectedMoodTags] = useState<string[]>([]);
   const [selectedFactTags, setSelectedFactTags] = useState<string[]>([]);
-  const [styleTension, setStyleTension] = useState("3");
-  const [styleEmoji, setStyleEmoji] = useState("4");
   const [customStyleText, setCustomStyleText] = useState("");
   const [hasCustomPrompt, setHasCustomPrompt] = useState(false);
   const [onboardingLineText, setOnboardingLineText] = useState("");
@@ -816,12 +814,6 @@ export default function Page() {
   useEffect(() => {
     setHasCustomPrompt(customStyleText.trim().length > 0);
   }, [customStyleText]);
-
-  useEffect(() => {
-    const defaults = STYLE_DEFAULTS[selectedBusinessType] || STYLE_DEFAULTS.cabaret;
-    setStyleTension(localStorage.getItem("tensionSlider") || defaults.tension);
-    setStyleEmoji(localStorage.getItem("emojiSlider") || defaults.emoji);
-  }, [selectedBusinessType]);
 
   useEffect(() => {
     return () => {
@@ -1643,8 +1635,9 @@ export default function Page() {
       const currentMonth = `${now.getMonth() + 1}月`;
 
       const safeStyle: StyleTab = ["cute", "custom", "neat"].includes(styleTab) ? styleTab : "cute";
-      const safeTension = ["1", "2", "3", "4", "5"].includes(styleTension) ? styleTension : "3";
-      const safeEmoji = ["1", "2", "3", "4", "5"].includes(styleEmoji) ? styleEmoji : "4";
+      const defaults = STYLE_DEFAULTS[selectedBusinessType] || STYLE_DEFAULTS.cabaret;
+      const safeTension = defaults.tension;
+      const safeEmoji = defaults.emoji;
       const safeCustomStyleText = typeof customStyleText === "string" ? customStyleText : "";
 
       const payload = {

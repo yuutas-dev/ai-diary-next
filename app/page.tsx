@@ -4,80 +4,36 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLiffAuth } from "../hooks/useLiffAuth";
 import { buildCustomersCreatePayload, buildCustomersUpdatePayload } from "../lib/buildCustomerApiPayload.js";
 import type { ChangeEvent, Dispatch, PointerEvent, SetStateAction } from "react";
-
-type ActiveTab = "create" | "data" | "settings";
-type CreateMode = "text" | "photo";
-type VisitStatus = "yes" | "no";
-type StyleTab = "cute" | "custom" | "neat";
-type DataView = "customer" | "history";
-type BusinessType = "cabaret" | "fuzoku" | "garuba";
-type ListFilter = "alert" | "all" | "vip" | "new" | "second" | "regular";
-type IconTheme = "glass" | "jewel" | "perfume" | "moon_star" | "flower" | "teacup" | "symbol";
-type AppTheme = "pink" | "blue";
-type AppFont = "standard" | "maru" | "mincho"; 
-
-interface MemoBlock {
-  id: string;
-  entryId?: string | null;
-  date: string;
-  text: string;
-  tags: string[];
-  photoUrl?: string;
-  type: string;
-  status: string;
-  isExpanded: boolean;
-  isReadOnly: boolean;
-  isDropdownOpen: boolean;
-}
-
-/** サンプル（マスタ）ダミーを一覧から隠す ID のみ LS。memo/名前の差分マージは行わず API の値を表示 */
-const HIDDEN_DUMMY_IDS_KEY = "hidden_dummy_customer_ids";
-
-/** 写メ日記のアップロード上限（バイト）。超える場合はアラートし読み込まない */
-const MAX_DIARY_PHOTO_FILE_BYTES = 5 * 1024 * 1024;
-
-interface CustomerEntry {
-  id?: string | null;
-  date?: string;
-  text?: string;
-  tags?: string[];
-  photoUrl?: string;
-  type?: string;
-  status?: string;
-  aiGeneratedText?: string;
-  ai_generated_text?: string;
-  finalSentText?: string;
-  final_sent_text?: string;
-  inputMemo?: string;
-  input_memo?: string;
-  entry_date?: string;
-}
-
-interface Customer {
-  id: string | null;
-  name: string;
-  memo?: string;
-  tags?: string;
-  entries: CustomerEntry[];
-  tagsArray: string[];
-  /** DB customers.business_type（未設定の旧データは undefined） */
-  businessType?: BusinessType;
-  /** マスタ／タグ由来のダミー（リスト取得後に装飾） */
-  isDummy?: boolean;
-  /** マスターダミー行のみ true */
-  isMasterDummy?: boolean;
-}
-
-/** /api/entries/history の行 — 作った文章タブ用（業態フィルタと独立） */
-interface HistorySourceRow {
-  id: string;
-  customerId: string | null;
-  customerName: string;
-  customerTags: string[];
-  displayText: string;
-  displayDate: string;
-  inputText: string;
-}
+import type {
+  ActiveTab,
+  AppFont,
+  AppTheme,
+  BusinessType,
+  CreateMode,
+  Customer,
+  CustomerEntry,
+  CustomerSource,
+  DataView,
+  HistorySourceRow,
+  IconTheme,
+  ListFilter,
+  MemoBlock,
+  StyleTab,
+  VisitStatus,
+} from "@/types";
+import {
+  APP_FONT_OPTIONS,
+  APP_THEME_OPTIONS,
+  DIARY_FACT_CONFIGS,
+  EMOTION_TAG_KEYWORDS,
+  HIDDEN_DUMMY_IDS_KEY,
+  INDUSTRY_ATTRIBUTE_TAGS,
+  INDUSTRY_FACT_CONFIGS,
+  INDUSTRY_MOOD_CONFIGS,
+  MAX_DIARY_PHOTO_FILE_BYTES,
+  MODE_LABELS,
+  STYLE_DEFAULTS,
+} from "@/constants";
 
 function parseCustomerBusinessType(value: unknown): BusinessType | undefined {
   if (value === undefined || value === null) return undefined;
@@ -86,78 +42,6 @@ function parseCustomerBusinessType(value: unknown): BusinessType | undefined {
   if (v === "cabaret" || v === "fuzoku" || v === "garuba") return v;
   return undefined;
 }
-
-const INDUSTRY_MOOD_CONFIGS: Record<BusinessType, string[]> = {
-  cabaret: ["💖 大好き", "✨ 特別な存在", "🥂 一緒に飲みたい", "🥺 早く会いたい", "🤫 ナイショの話", "💕 ずっと一緒にいたい", "🧸 癒やされる", "🍼 頼りにしてる", "💋 ドキドキ", "👗 可愛くなりたい", "🥺 寂しいな", "📱 連絡きて嬉しい", "🖤 独占してほしい", "🎉 楽しすぎた！", "💖 いつもありがとう"],
-  fuzoku: ["💖 あなたが特別", "🧸 癒やされた", "🤤 余韻", "💕 相性良すぎ", "🥺 一緒にいたかった", "🤫 2人の秘密", "💋 ドキドキした", "🍼 甘えちゃった", "🖤 独占したい", "🥺 早く会いたい", "✨ 楽しかった", "📱 連絡待ってる", "🥺 依存しちゃいそう", "💖 感謝", "💤 夢で会いたい"],
-  garuba: ["🍻 乾杯したい", "✨ 楽しかった", "🥺 また話そ", "🎤 一緒に歌いたい", "💕 気になる", "🤫 2人だけの話", "📱 連絡待ってる", "🧸 癒やされた", "🎉 最高だった", "💖 いつもありがとう", "🥂 また飲もうね", "😂 笑いすぎた", "🥺 会いたい", "🌙 夜更かししたい", "💤 夢で会いたい"],
-};
-
-const INDUSTRY_ATTRIBUTE_TAGS: Record<BusinessType, string[]> = {
-  cabaret: ["太客", "細客", "常連", "新規", "痛客", "お酒好き", "下戸", "金持ち", "ケチ", "既婚", "独身", "おじさん", "若者", "イケメン", "優しい"],
-  fuzoku: ["M気質", "S気質", "常連", "新規", "キモい", "優しい", "痛客", "匂いキツめ", "マナー良", "本番要求", "おじさん", "若者", "イケメン", "デブ", "ハゲ"],
-  garuba: ["太客", "細客", "常連", "新規", "痛客", "お酒好き", "下戸", "金持ち", "ケチ", "既婚", "独身", "おじさん", "若者", "イケメン", "優しい"],
-};
-
-const INDUSTRY_FACT_CONFIGS: Record<BusinessType, string[]> = {
-  cabaret: [
-    "🍾 シャンパン", "🍷 ボトル", "🥂 ドリンク", "🎉 お祝い",
-    "✨ 本指名", "🥂 同伴", "🍰 アフター", "⏳ 延長", "🏃‍♂️ 駆け込み",
-    "😂 爆笑", "🥺 相談", "💕 恋バナ", "🎤 カラオケ", "🎮 飲みゲー",
-    "🎁 プレゼント", "📸 写真", "👗 ドレス", "🍽️ フード",
-    "👔 お疲れ", "🥴 泥酔", "🙇‍♀️ 席外し", "💼 出張"
-  ],
-  fuzoku: [
-    "✨ 本指名", "🏩 ロング", "🔞 濃厚", "🧴 メンエス", "💋 キス",
-    "🛁 お風呂", "🧼 泡", "💆‍♂️ 癒やし", "🛌 延長", "🏃‍♂️ スキマ",
-    "👗 コスプレ", "🤐 秘密", "🥺 甘え", "🍼 イチャ",
-    "👔 仕事帰り", "🥴 快感", "🤫 絶頂", "🛌 爆睡"
-  ],
-  garuba: [
-    "🍻 乾杯", "🍹 オリカク", "🥃 テキーラ", "🍾 シャンパン",
-    "🎤 カラオケ", "🎯 ダーツ", "🍜 締め", "🏃‍♂️ 終電",
-    "😂 爆笑", "🥴 泥酔", "📸 チェキ", "🍽️ 差し入れ",
-    "⏳ 朝まで", "🥺 ガチ恋", "👕 私服", "🙇‍♀️ バタバタ"
-  ]
-};
-
-const DIARY_FACT_CONFIGS: Record<BusinessType, string[]> = {
-  cabaret: [
-    "👗 新ドレス", "🍾 お祝い感謝", "🎉 満員御礼", "🥺 暇アピ", "📸 盛れた",
-    "🍰 差し入れ感謝", "💇‍♀️ ヘアメ完了", "💤 営業後・余韻"
-  ],
-  fuzoku: [
-    "✨ 枠空き", "🏩 ロング歓迎", "🏃‍♂️ 突撃歓迎", "👗 新衣装・コス", "🛁 癒やし",
-    "🤫 秘密の共有", "💄 準備完了", "💤 退勤・感謝"
-  ],
-  garuba: [
-    "🍻 乾杯しよ", "🥃 テキーラ", "🎮 フルメン", "🍜 締めラー", "🥺 暇アピ",
-    "📸 チェキ感謝", "👕 私服デー", "💤 朝まで・始発"
-  ],
-};
-
-const MODE_LABELS: Record<BusinessType, { main: string; thanks: string }> = {
-  fuzoku: { main: "写メ日記", thanks: "お礼日記" },
-  cabaret: { main: "ブログ・SNS", thanks: "お礼LINE" },
-  garuba: { main: "ブログ・SNS", thanks: "お礼LINE" },
-};
-
-const STYLE_DEFAULTS: Record<BusinessType, { tension: string; emoji: string }> = {
-  cabaret: { tension: "4", emoji: "5" },
-  fuzoku: { tension: "3", emoji: "4" },
-  garuba: { tension: "3", emoji: "2" },
-};
-
-const APP_THEME_OPTIONS: { value: AppTheme; label: string; description: string }[] = [
-  { value: "pink", label: "Pink", description: "やさしいピンク" },
-  { value: "blue", label: "Blue", description: "淡くてかわいい青" },
-];
-
-const APP_FONT_OPTIONS: { value: AppFont; label: string; description: string }[] = [
-  { value: "maru", label: "丸ゴシック", description: "やわらかい標準フォント" },
-  { value: "standard", label: "標準ゴシック", description: "すっきり読みやすい" },
-  { value: "mincho", label: "明朝体", description: "大人っぽくエモい" },
-];
 
 function parseMemoToJSON(memoStr?: string) {
   if (!memoStr) return [];
@@ -233,8 +117,6 @@ function passesBusinessTypeSelection(c: Customer, selected: BusinessType): boole
   return bt === selected;
 }
 
-type CustomerSource = { masters: Customer[]; users: Customer[] };
-
 /**
  * 取得→業態フィルター→ダミー間引き→マージ（一方通行）
  * （customerSource が users / masters 分離済み・masters にはマスタのみ）
@@ -297,8 +179,6 @@ function isAlertCustomer(customer: Customer) {
   if (stats.count <= 2) return days >= 7;
   return days >= 30;
 }
-
-const EMOTION_TAG_KEYWORDS = ["会いたい", "逢いたい", "逢い", "寂しい", "さみしい", "さびしい", "愛して", "好き", "秘密", "内緒", "おやすみ", "嬉しい", "うれしい", "夢心地", "待ってる", "独占", "枕", "病み", "メンヘラ"];
 
 function isEmotionTag(tag: string) {
   return EMOTION_TAG_KEYWORDS.some((keyword) => tag.includes(keyword));

@@ -142,15 +142,6 @@ const MODE_LABELS: Record<BusinessType, { main: string; thanks: string }> = {
   garuba: { main: "ブログ・SNS", thanks: "お礼LINE" },
 };
 
-const STYLE_PLACEHOLDERS: Record<BusinessType, string> = {
-  cabaret:
-    "（例）・語尾は○○に固定して！\n　・絵文字は😸😹😻😼😺😽🙀😿😾だけ使って！\n　・誤字や間違った使い方を自然に入れて！",
-  fuzoku:
-    "（例）・語尾は○○に固定して！\n　・絵文字は😸😹😻😼😺😽🙀😿😾だけ使って！\n　・誤字や間違った使い方を自然に入れて！",
-  garuba:
-    "（例）・語尾は○○に固定して！\n　・絵文字は😸😹😻😼😺😽🙀😿😾だけ使って！\n　・誤字や間違った使い方を自然に入れて！",
-};
-
 const STYLE_DEFAULTS: Record<BusinessType, { tension: string; emoji: string }> = {
   cabaret: { tension: "4", emoji: "5" },
   fuzoku: { tension: "3", emoji: "4" },
@@ -444,7 +435,7 @@ export default function Page() {
   const [nameInputValue, setNameInputValue] = useState("");
   const [isCreateDetailsOpen, setIsCreateDetailsOpen] = useState(false);
   const [isTagAccordionOpen, setIsTagAccordionOpen] = useState(false);
-  const [activeModal, setActiveModal] = useState<null | "help" | "hidden" | "photo" | "edit" | "delete" | "styleDetail">(null);
+  const [activeModal, setActiveModal] = useState<null | "help" | "hidden" | "photo" | "edit" | "delete">(null);
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState("");
   const [selectedBusinessType, setSelectedBusinessType] = useState<BusinessType>("cabaret");
   const [iconTheme, setIconTheme] = useState<IconTheme>("glass");
@@ -898,13 +889,6 @@ export default function Page() {
     selectedCustomer?.isDummy === true;
   const messageMode = createMode === "photo" ? "diary" : "line";
   const modeLabels = MODE_LABELS[selectedBusinessType] || MODE_LABELS.cabaret;
-  const stylePlaceholder = STYLE_PLACEHOLDERS[selectedBusinessType] || STYLE_PLACEHOLDERS.cabaret;
-  const customStylePreview = customStyleText
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(" ");
   const favoriteProgress = Math.min(currentFavoriteIds.length, 5);
   const favoriteProgressRatio = favoriteProgress / 5;
   const moodTags = INDUSTRY_MOOD_CONFIGS[selectedBusinessType] || INDUSTRY_MOOD_CONFIGS.cabaret;
@@ -1402,16 +1386,15 @@ export default function Page() {
   }
 
   async function executeStyleAnalysis(lineText: string) {
+    setIsOnboardingStyleModalOpen(false);
     const trimmed = lineText.trim();
     if (!trimmed) {
-      setIsOnboardingStyleModalOpen(false);
       return;
     }
     if (!sessionReady || userId === null) {
       showNotice("ユーザー認証が終わるまで少し待ってね⏳");
       return;
     }
-    setIsOnboardingStyleModalOpen(false);
     setIsAnalyzing(true);
     showCuteToast(false, "がくしゅうちゅう...");
     try {
@@ -1955,21 +1938,8 @@ export default function Page() {
       <p style={{margin: "0 0 14px", fontSize: "12px", color: "var(--text-sub)", fontWeight: "600", lineHeight: 1.6}}>
         いつもの言い回し・絵文字・NGワードを書いておくと、分身AIがあなたの口調を学習します。
       </p>
-      <textarea id="onboardingStyleText" className="input-field" placeholder="（例）今日はいっぱい飲んでくれてありがとー！😹🥂 めっちゃ楽しかったよ！また来週も待ってるね🎀" value={onboardingLineText} onChange={(event) => setOnboardingLineText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{minHeight: "220px", marginBottom: "14px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}}></textarea>
-      <button type="button" onClick={() => executeStyleAnalysis(onboardingLineText)} disabled={isAnalyzing} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", opacity: isAnalyzing ? 0.7 : 1, cursor: isAnalyzing ? "not-allowed" : "pointer"}}>{isAnalyzing ? "AIが分析中..." : "保存して閉じる"}</button>
-    </div>
-  </div>
-
-  <div id="styleDetailModal" className="modal-overlay" style={{display: activeModal === "styleDetail" ? "flex" : "none"}} onClick={closeModal}>
-    <div className="modal-content style-modal-content" onClick={(event) => event.stopPropagation()}>
-      <h2 style={{margin: "0 0 12px", fontWeight: "700", textAlign: "center"}}>📝 分身AIの話し方設定</h2>
-      <textarea id="customStyleText" className="input-field" placeholder={stylePlaceholder} value={customStyleText} onChange={(event) => { setCustomStyleText(event.target.value); localStorage.setItem("customStyleText", event.target.value); }} onBlur={() => window.scrollTo(0, 0)} style={{minHeight: "200px", marginBottom: "14px", fontSize: "13px", lineHeight: 1.7, background: "#FFF", border: "1px solid #f1dce7", borderRadius: "16px"}} data-original-change={"saveStyleSettings()"}></textarea>
-      <div style={{display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}><span>テンション（低）</span><span>（高）</span></div>
-      <input type="range" id="tensionSlider" min="1" max="5" value={styleTension} onChange={(event) => { setStyleTension(event.target.value); localStorage.setItem("tensionSlider", event.target.value); }} style={{width: "100%", marginBottom: "16px"}} data-original-change={"saveStyleSettings()"} />
-      <div style={{display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "6px"}}><span>絵文字の量（少）</span><span>（多）</span></div>
-      <input type="range" id="emojiSlider" min="1" max="5" value={styleEmoji} onChange={(event) => { setStyleEmoji(event.target.value); localStorage.setItem("emojiSlider", event.target.value); }} style={{width: "100%", marginBottom: "14px"}} data-original-change={"saveStyleSettings()"} />
-      <button type="button" onClick={() => { setActiveModal(null); setIsOnboardingStyleModalOpen(true); }} style={{width: "100%", background: "linear-gradient(135deg, #f8dce9, #f4c9dc)", color: "#6f4958", border: "none", padding: "12px", borderRadius: "16px", fontWeight: "700", marginBottom: "10px"}}>🔄 別のLINEを読み込ませて一から覚え直す</button>
-      <button type="button" onClick={() => setActiveModal(null)} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "18px", fontWeight: "700"}}>保存して閉じる</button>
+      <textarea id="onboardingStyleText" className="input-field" placeholder={"（例）今日はいっぱい飲んでくれてありがとー！😹🥂 めっちゃ楽しかったよ！また来週も待ってるね🎀"} value={onboardingLineText} onChange={(event) => setOnboardingLineText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{minHeight: "220px", marginBottom: "14px", fontSize: "13px", background: "#FFF", border: "1px solid var(--border-color)"}}></textarea>
+      <button type="button" onClick={() => executeStyleAnalysis(onboardingLineText)} style={{width: "100%", background: "var(--text-main)", color: "#FFF", border: "none", padding: "14px", borderRadius: "20px", fontWeight: "700", cursor: "pointer"}}>保存して閉じる</button>
     </div>
   </div>
 
@@ -2595,31 +2565,41 @@ export default function Page() {
         <h2 style={{margin: "0 0 14px", fontWeight: "700", fontSize: "18px"}}>マイページ・設定</h2>
 
         <div className="settings-stack">
-          <div className="card settings-card settings-card-main" style={{background: "#FFF", border: "1px solid #f1dce7", borderRadius: "22px", padding: "20px 18px", boxShadow: "0 8px 24px rgba(230, 190, 205, 0.2)"}}>
-            <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px"}}>
-              <div className="setting-card-title" style={{margin: 0}}>✨ わたしの分身AI</div>
-              <span style={{fontSize: "12px", color: "#8a6a78", fontWeight: "700"}}>AIの成長度 {favoriteProgress}/5件</span>
-            </div>
-            <div style={{height: "9px", borderRadius: "999px", background: "#f7edf2", overflow: "hidden", marginBottom: "14px"}}>
-              <div style={{width: `${favoriteProgressRatio * 100}%`, height: "100%", borderRadius: "999px", background: "linear-gradient(90deg, #f7b8d1, #ea8fb8)"}}></div>
-            </div>
-
+          <div className="card settings-card settings-card-main" style={{background: "#FFF", border: "1px solid #fae6f0", borderRadius: "24px", padding: "24px 20px", boxShadow: "0 8px 24px rgba(230, 190, 205, 0.22)"}}>
             {isAnalyzing ? (
-              <div style={{background: "#fff", border: "1px solid #fae6f0", borderRadius: "20px", padding: "16px", fontSize: "13px", color: "#7f5b6b", lineHeight: 1.7, animation: "styleAnalyzingPulse 1.8s ease-in-out infinite"}}>
-                ✨ あなたの話し方を分析しています...
+              <div style={{textAlign: "center", padding: "18px 8px"}}>
+                <div style={{fontSize: "14px", fontWeight: "700", color: "#b47b93", lineHeight: 1.7, animation: "styleAnalyzingPulse 1.8s ease-in-out infinite"}}>
+                  ✨ あなたの話し方を分析しています...
+                </div>
               </div>
             ) : hasCustomPrompt ? (
-              <button type="button" onClick={() => setActiveModal("styleDetail")} style={{width: "100%", textAlign: "left", background: "#FFF", border: "1px solid #fae6f0", borderRadius: "20px", padding: "16px", boxShadow: "0 6px 18px rgba(230, 190, 205, 0.16)", cursor: "pointer"}}>
-                <div style={{fontSize: "12px", fontWeight: "700", color: "#8a6a78", marginBottom: "8px"}}>📝 AIが学習した話し方の特徴</div>
-                <p style={{margin: 0, color: "var(--text-main)", fontSize: "13px", lineHeight: 1.7, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical"}}>
-                  {customStylePreview || "（まだ言葉のクセが登録されていません）"}
-                </p>
-                <div style={{marginTop: "10px", textAlign: "right", fontSize: "12px", fontWeight: "700", color: "#b47b93"}}>🔍 全文を読む・調整する ▶</div>
-              </button>
+              <>
+                <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", gap: "12px"}}>
+                  <div className="setting-card-title" style={{margin: 0}}>✨ わたしの分身AI</div>
+                  <span style={{fontSize: "12px", color: "#8a6a78", fontWeight: "700", whiteSpace: "nowrap"}}>成長度 {favoriteProgress}/5件</span>
+                </div>
+                <div style={{height: "8px", borderRadius: "999px", background: "#fdf1f6", overflow: "hidden", marginBottom: "16px"}}>
+                  <div style={{width: `${favoriteProgressRatio * 100}%`, height: "100%", borderRadius: "999px", background: "linear-gradient(90deg, #f7b8d1, #ea8fb8)"}}></div>
+                </div>
+                <div style={{background: "#fffafc", borderRadius: "16px", padding: "16px", marginBottom: "16px"}}>
+                  <p style={{margin: 0, color: "#8a6a78", lineHeight: 1.6, fontSize: "13px"}}>
+                    🐰 AIがあなたの話し方の雰囲気をインプットしました！日々のLINE作成や『お気に入り(☆)』の登録で、さらにあなたらしく賢く育ちます。
+                  </p>
+                </div>
+                <button type="button" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", background: "#FFF", border: "1px solid #fae6f0", color: "#b47b93", borderRadius: "18px", padding: "13px 14px", fontWeight: "700", cursor: "pointer"}}>
+                  ➕ さらにLINEを読み込ませて賢くする
+                </button>
+              </>
             ) : (
-              <button type="button" className="input-field" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", border: "none", background: "linear-gradient(135deg, #f6d7e5, #edb9d1)", color: "#6f4958", fontWeight: "700", borderRadius: "18px", padding: "13px 14px", cursor: "pointer", boxShadow: "0 8px 20px rgba(230, 190, 205, 0.25)"}}>
-                💬 いつものLINEを貼り付けて教える
-              </button>
+              <>
+                <div className="setting-card-title" style={{margin: "0 0 14px"}}>👯‍♀️ わたしの分身AI（未学習）</div>
+                <div style={{background: "#fff8f0", color: "#a67c00", fontSize: "13px", fontWeight: "600", lineHeight: 1.65, padding: "14px 16px", borderRadius: "16px", marginBottom: "16px"}}>
+                  ⚠️ まだあなたの言葉のクセを学習していません
+                </div>
+                <button type="button" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", border: "none", background: "linear-gradient(135deg, #f6d7e5, #edb9d1)", color: "#6f4958", fontWeight: "700", borderRadius: "20px", padding: "14px 16px", cursor: "pointer", boxShadow: "0 4px 12px rgba(230, 190, 205, 0.3)"}}>
+                  💬 いつものLINEを貼り付けて教える
+                </button>
+              </>
             )}
           </div>
 
@@ -2730,7 +2710,7 @@ export default function Page() {
     </footer>
     <style jsx global>{`
       @keyframes styleAnalyzingPulse {
-        0%, 100% { opacity: 0.45; }
+        0%, 100% { opacity: 0.5; }
         50% { opacity: 1; }
       }
     `}</style>

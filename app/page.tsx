@@ -9,7 +9,6 @@ import type {
   AppFont,
   AppTheme,
   BusinessType,
-  CreateMode,
   Customer,
   CustomerEntry,
   CustomerSource,
@@ -31,11 +30,13 @@ import {
   INDUSTRY_FACT_CONFIGS,
   INDUSTRY_MOOD_CONFIGS,
   MAX_DIARY_PHOTO_FILE_BYTES,
-  MODE_LABELS,
   STYLE_DEFAULTS,
 } from "@/constants";
 import { CustomerEditModal } from "@/components/CustomerEditModal";
 import { StyleOnboardingModal } from "@/components/StyleOnboardingModal";
+
+/** クリエイト画面・宛先「全体向け（写メ / ファン向け）」 */
+const RECIPIENT_EVERYONE_ID = "everyone";
 
 function parseCustomerBusinessType(value: unknown): BusinessType | undefined {
   if (value === undefined || value === null) return undefined;
@@ -333,7 +334,6 @@ function readHiddenDummyIdsFromStorage(): Set<string> {
 
 export default function Page() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("create");
-  const [createMode, setCreateMode] = useState<CreateMode>("text");
   const [visitStatus, setVisitStatus] = useState<VisitStatus>("yes");
   const [styleTab, setStyleTab] = useState<StyleTab>("cute");
   const [dataView, setDataView] = useState<DataView>("customer");
@@ -342,9 +342,10 @@ export default function Page() {
     typeof window !== "undefined" ? readHiddenDummyIdsFromStorage() : new Set(),
   );
   const [isCustomersLoading, setIsCustomersLoading] = useState(true);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(RECIPIENT_EVERYONE_ID);
   const [nameInputValue, setNameInputValue] = useState("");
-  const [isCreateDetailsOpen, setIsCreateDetailsOpen] = useState(false);
+  const [isPhotoAccordionOpen, setIsPhotoAccordionOpen] = useState(false);
+  const [isMemoAccordionOpen, setIsMemoAccordionOpen] = useState(false);
   const [isTagAccordionOpen, setIsTagAccordionOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<null | "help" | "hidden" | "photo" | "edit" | "delete">(null);
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState("");
@@ -430,13 +431,9 @@ export default function Page() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const pageParam = params.get("page");
-      const modeParam = params.get("mode");
 
       if (pageParam === "create" || pageParam === "data" || pageParam === "settings") {
         setActiveTab(pageParam as ActiveTab);
-      }
-      if (modeParam === "text" || modeParam === "photo") {
-        setCreateMode(modeParam as CreateMode);
       }
     }
   }, []);
@@ -779,14 +776,15 @@ export default function Page() {
     });
   const alertCount = customerData.filter(isAlertCustomer).length;
   const hiddenCustomers = customerData.filter((customer) => customer.tagsArray.includes("非表示"));
-  const selectedCustomer = selectedCustomerId
-    ? customerData.find((customer) => customer.id === selectedCustomerId) || null
-    : null;
+  const isEveryoneRecipient = selectedCustomerId === RECIPIENT_EVERYONE_ID;
+  const selectedCustomer =
+    selectedCustomerId && !isEveryoneRecipient
+      ? customerData.find((customer) => customer.id === selectedCustomerId) || null
+      : null;
   const isEditingDummyCustomer =
     !isCreateCustomerMode &&
     selectedCustomer?.isDummy === true;
-  const messageMode = createMode === "photo" ? "diary" : "line";
-  const modeLabels = MODE_LABELS[selectedBusinessType] || MODE_LABELS.cabaret;
+  const messageMode = isEveryoneRecipient ? "diary" : "line";
   const favoriteProgress = Math.min(currentFavoriteIds.length, 5);
   const favoriteProgressRatio = favoriteProgress / 5;
   const customStylePreview = customStyleText
@@ -931,14 +929,6 @@ export default function Page() {
     resetInput();
   }
 
-  useEffect(() => {
-    if (createMode !== "photo") {
-      setImageFile(null);
-      setPhotoJpegDataUrl(null);
-      if (photoUploadInputRef.current) photoUploadInputRef.current.value = "";
-    }
-  }, [createMode]);
-
   function showActionToast(message: string) {
     if (actionToastTimerRef.current) window.clearTimeout(actionToastTimerRef.current);
     setActionToastText(message);
@@ -983,14 +973,13 @@ export default function Page() {
     const isSameCustomer = selectedCustomerId === customer.id && nameInputValue === customer.name;
 
     if (isSameCustomer) {
-      setSelectedCustomerId(null);
+      setSelectedCustomerId(RECIPIENT_EVERYONE_ID);
       setNameInputValue("");
       return;
     }
 
     setSelectedCustomerId(customer.id);
     setNameInputValue(customer.name);
-    setCreateMode("text");
     setActiveTab("create");
   }
 
@@ -1494,7 +1483,8 @@ export default function Page() {
   }
 
   async function generateDiary() {
-    if (isCreateDetailsOpen) setIsCreateDetailsOpen(false);
+    setIsMemoAccordionOpen(false);
+    setIsPhotoAccordionOpen(false);
 
     if (!sessionReady || userId === null) {
       showNotice("ユーザー認証が終わるまで少し待ってね⏳");
@@ -1502,19 +1492,16 @@ export default function Page() {
     }
 
     const name = nameInputValue.trim();
-    const isPhoto = createMode === "photo";
-    const targetCustomer = selectedCustomer || customerData.find((customer) => customer.name === name) || null;
+    const hasPhotoPayload = Boolean(photoJpegDataUrl);
+    const targetCustomer =
+      selectedCustomer || (!isEveryoneRecipient ? customerData.find((customer) => customer.name === name) || null : null);
 
-    if (!isPhoto && !name && !window.confirm("名前が入力されていませんが、そのまま作成しますか？")) {
+    if (!isEveryoneRecipient && !targetCustomer && !name && !window.confirm("名前が入力されていませんが、そのまま作成しますか？")) {
       return;
     }
 
-    if (isPhoto && (!imageFile || !photoJpegDataUrl)) {
-      if (imageFile && !photoJpegDataUrl) {
-        showNotice("画像の処理が完了するまでお待ちください。");
-      } else {
-        showNotice("写真を選択してください。");
-      }
+    if (imageFile && !photoJpegDataUrl) {
+      showNotice("画像の処理が完了するまでお待ちください。");
       return;
     }
 
@@ -1558,7 +1545,8 @@ export default function Page() {
 
       const payload = {
         userId,
-        customerId: targetCustomer?.id || selectedCustomerId,
+        customerId:
+          isEveryoneRecipient ? null : (targetCustomer?.id ?? (selectedCustomerId !== RECIPIENT_EVERYONE_ID ? selectedCustomerId : null)),
         customerName: targetCustomer ? targetCustomer.name : name,
         businessType: selectedBusinessType,
         customerRank,
@@ -1579,7 +1567,7 @@ export default function Page() {
         baseStyleText: safeBaseStyleText,
         favoriteTexts: currentFavoriteTexts.slice(0, 5).join("\n"),
         messageMode,
-        imageFile: isPhoto ? photoJpegDataUrl : null,
+        imageFile: hasPhotoPayload ? photoJpegDataUrl : null,
       };
 
       const res = await fetch("/api/entries/generate", {
@@ -1594,7 +1582,7 @@ export default function Page() {
       }
 
       showCuteToast(true);
-      if (!isPhoto && name) {
+      if (messageMode === "line" && (targetCustomer || name.trim())) {
         await fetchCustomers(userId, { showLoading: false });
       } else {
         await fetchHistoryEntries(userId);
@@ -1628,7 +1616,7 @@ export default function Page() {
     }
 
     const customerBeingEdited =
-      !isCreateCustomerMode && selectedCustomerId
+      !isCreateCustomerMode && selectedCustomerId && selectedCustomerId !== RECIPIENT_EVERYONE_ID
         ? [...customerSource.users, ...customerSource.masters].find((c) => c.id === selectedCustomerId) ?? null
         : null;
     if (customerBeingEdited?.isDummy === true) {
@@ -1725,9 +1713,6 @@ export default function Page() {
       <input type="radio" name="nav" id="nav-data" className="ui-state" checked={activeTab === "data"} onChange={() => setActiveTab("data")} />
       <input type="radio" name="nav" id="nav-settings" className="ui-state" checked={activeTab === "settings"} onChange={() => setActiveTab("settings")} />
   
-      <input type="radio" name="mode" id="mode-text" className="ui-state" checked={createMode === "text"} onChange={() => setCreateMode("text")} />
-      <input type="radio" name="mode" id="mode-photo" className="ui-state" checked={createMode === "photo"} onChange={() => setCreateMode("photo")} />
-  
       <input type="radio" name="visit" id="visit-yes" className="ui-state" checked={visitStatus === "yes"} onChange={() => setVisitStatus("yes")} />
       <input type="radio" name="visit" id="visit-no" className="ui-state" checked={visitStatus === "no"} onChange={() => setVisitStatus("no")} />
   
@@ -1735,59 +1720,6 @@ export default function Page() {
     <div style={{position: "relative", maxWidth: "90%", maxHeight: "90%", margin: "auto", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center"}} data-original-click={"event.stopPropagation()"} onClick={(event) => event.stopPropagation()}>
       <img id="expandedPhoto" src={expandedPhotoUrl} style={{width: "100%", height: "auto", maxHeight: "80vh", objectFit: "contain", borderRadius: "16px", boxShadow: "0 10px 40px rgba(0,0,0,0.3)"}} />
       <div data-original-click={"closePhotoModal(event)"} onClick={closeModal} style={{position: "absolute", top: "-12px", right: "-12px", background: "#FFF", width: "32px", height: "32px", borderRadius: "50%", display: "flex", justifyContent: "center", alignItems: "center", fontWeight: "700", fontSize: "16px", color: "var(--text-main)", cursor: "pointer", boxShadow: "var(--shadow-sm)"}}>×</div>
-    </div>
-  </div>
-
-  <div id="createDetailsBackdrop" className={`half-modal-backdrop ${isCreateDetailsOpen ? "show" : ""}`} data-original-click={"closeCreateDetailsModal()"} onClick={() => setIsCreateDetailsOpen(false)} style={{zIndex: 899}}></div>
-  <div id="createDetailsHalfModal" className={`half-modal create-details-half-modal ${isCreateDetailsOpen ? "open" : ""}`} onClick={(event) => event.stopPropagation()} style={{height: isCreateDetailsOpen ? "320px" : undefined}}>
-    <div className="half-modal-handle" data-original-click={"closeCreateDetailsModal()"} role="button" tabIndex={0} onClick={() => setIsCreateDetailsOpen(false)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setIsCreateDetailsOpen(false); } }} data-original-keydown={"if(event.key==='Enter'||event.key===' '){ event.preventDefault(); closeCreateDetailsModal(); }"}></div>
-    <div className="create-details-modal-header">
-      <span className="label" style={{margin: "0"}}>📝 今日のメモを追加</span>
-      <button type="button" className="create-details-modal-close" data-original-click={"closeCreateDetailsModal()"} onClick={() => setIsCreateDetailsOpen(false)} aria-label="閉じる">×</button>
-    </div>
-    <div id="createDetailsContent" className="create-details-modal-scroll">
-      {/* 感情タグ */}
-      <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px"}}>
-        <span className="label" style={{margin: "0"}}>🎭 感情・ムード</span>
-        <div style={{display: "flex", gap: "6px"}}>
-          <button type="button" data-original-click={"loadMoodPreset()"} onClick={loadMoodPreset} style={{background: "var(--input-bg)", border: "none", color: "var(--text-sub)", fontSize: "10px", padding: "4px 8px", borderRadius: "8px", fontWeight: "700", cursor: "pointer"}}>プリセット読込</button>
-          <button type="button" data-original-click={"saveMoodPreset()"} onClick={saveMoodPreset} style={{background: "var(--primary-light)", border: "none", color: "var(--primary)", fontSize: "10px", padding: "4px 8px", borderRadius: "8px", fontWeight: "700", cursor: "pointer"}}>保存</button>
-        </div>
-      </div>
-      <div className="tags-scroll-container create-details-tags-grid overflow-x-auto no-scrollbar" id="moodTagsArea" style={{marginBottom: "16px"}}>
-        <div className="tag-row">
-          {moodTags.filter((_, index) => index % 2 === 0).map((tag) => (
-            <div key={tag} className={`chip${selectedMoodTags.includes(tag) ? " selected-mood-chip active" : ""}`} onClick={() => toggleStringValue(tag, setSelectedMoodTags)}>{tag}</div>
-          ))}
-        </div>
-        <div className="tag-row">
-          {moodTags.filter((_, index) => index % 2 === 1).map((tag) => (
-            <div key={tag} className={`chip${selectedMoodTags.includes(tag) ? " selected-mood-chip active" : ""}`} onClick={() => toggleStringValue(tag, setSelectedMoodTags)}>{tag}</div>
-          ))}
-        </div>
-      </div>
-
-      {/* 事実タグ */}
-      <span className="label">📝 今日の出来事（トピック）</span>
-      <div className="tags-scroll-container create-details-tags-grid overflow-x-auto no-scrollbar" id="factTagsArea">
-        <div className="tag-row">
-          {factTags.filter((_, index) => index % 2 === 0).map((tag) => (
-            <div key={tag} className={`chip${selectedFactTags.includes(tag) ? " selected-fact-chip active" : ""}`} onClick={() => toggleFactTag(tag)}>{tag}</div>
-          ))}
-        </div>
-        <div className="tag-row">
-          {factTags.filter((_, index) => index % 2 === 1).map((tag) => (
-            <div key={tag} className={`chip${selectedFactTags.includes(tag) ? " selected-fact-chip active" : ""}`} onClick={() => toggleFactTag(tag)}>{tag}</div>
-          ))}
-        </div>
-      </div>
-
-      {/* 本文 */}
-      <span className="label">📝 今日の出来事・接客メモ</span>
-      <div className="textarea-wrapper">
-        <textarea id="todayEpisodeInput" className="input-field" rows={4} placeholder="（例）こけてみんなで爆笑した！ウザ絡みされたけどシャンパン入れてくれた笑&#10;※AIが空気を読んで綺麗なメッセージにします✨" data-original-input={"autoScrollTextarea()"} value={todayEpisodeText} onChange={(event) => setTodayEpisodeText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{background: "var(--input-bg)", border: "1px solid transparent", minHeight: "100px"}}></textarea>
-        <div className="clear-btn" data-original-click={"clearEpisodeInput()"} onClick={() => { if (!todayEpisodeText && selectedFactTags.length === 0 && selectedMoodTags.length === 0) return; if (window.confirm("入力をクリアしますか？")) { setTodayEpisodeText(""); setSelectedFactTags([]); setSelectedMoodTags([]); } }}>🧹 クリア</div>
-      </div>
     </div>
   </div>
 
@@ -1936,12 +1868,7 @@ export default function Page() {
   />
 
   <div className="app-container">
-    <header className="header-area">
-      <div className="toggle-container header-toggle">
-        <label htmlFor="mode-text" className="toggle-label toggle-text">💌 {modeLabels.thanks}</label>
-        <label htmlFor="mode-photo" className="toggle-label toggle-photo">📸 {modeLabels.main}</label>
-      </div>
-    </header>
+    <header className="header-area header-area-create" aria-hidden />
 
     <main ref={mainScrollAreaRef} className="scroll-area">
       {liffAuthStatus === "error" ? (
@@ -2039,19 +1966,36 @@ export default function Page() {
           <span className="label">👤 誰に送る？ <span style={{fontSize: "11px", fontWeight: "normal", color: "var(--text-muted)"}}>(任意)</span></span>
           <div className="fade-scroll-wrapper">
             <div className="stories-scroll" id="quickAccessArea">
+              <div
+                className="story-item"
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setSelectedCustomerId(RECIPIENT_EVERYONE_ID);
+                  setNameInputValue("");
+                  setActiveTab("create");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedCustomerId(RECIPIENT_EVERYONE_ID);
+                    setNameInputValue("");
+                    setActiveTab("create");
+                  }
+                }}
+              >
+                <div className={`story-ring${isEveryoneRecipient ? " story-ring-selected" : ""}`}>
+                  <div className="story-inner" style={{ fontSize: "22px", fontWeight: 800 }}>🌐</div>
+                </div>
+                <span className="story-name">みんなへ</span>
+              </div>
               {showCustomersDataSkeleton ? (
-                <div className="story-item">
+                <div className="story-item" style={{ cursor: "default" }}>
                   <div className="skeleton" style={{width: "58px", height: "58px", borderRadius: "50%", flexShrink: "0"}}></div>
                   <div className="skeleton" style={{width: "40px", height: "8px", borderRadius: "4px", marginTop: "4px"}}></div>
                 </div>
               ) : quickAccessCustomers.length === 0 ? (
-                <>
-                  <div className="story-item" style={{cursor: "default"}}>
-                    <div className="skeleton" style={{width: "58px", height: "58px", borderRadius: "50%", flexShrink: "0"}}></div>
-                    <div className="skeleton" style={{width: "40px", height: "8px", borderRadius: "4px", marginTop: "4px"}}></div>
-                  </div>
-                  <div style={{color: "var(--text-muted)", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "62px"}}>見つかりません</div>
-                </>
+                <div style={{color: "var(--text-muted)", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "62px"}}>見つかりません</div>
               ) : (
                 quickAccessCustomers.map((customer) => {
                   const stats = getCustomerStats(customer);
@@ -2060,7 +2004,8 @@ export default function Page() {
                     : customer.tagsArray.length > 0
                       ? <div className="story-badge">{customer.tagsArray[0]}</div>
                       : null;
-                  const ringClass = stats.isVip ? "story-ring story-ring-vip" : "story-ring";
+                  const sel = Boolean(customer.id && selectedCustomerId === customer.id);
+                  const ringClass = `${stats.isVip ? "story-ring story-ring-vip" : "story-ring"}${sel ? " story-ring-selected" : ""}`;
 
                   return (
                     <div className="story-item" key={customer.id || customer.name} onClick={() => selectCustomer(customer)}>
@@ -2076,47 +2021,124 @@ export default function Page() {
             </div>
           </div>
           <div style={{position: "relative", flexShrink: "0"}}>
-            <input type="text" id="nameInput" className="input-field" placeholder="名前を入力..." data-original-input={"suggestCustomer()"} value={nameInputValue} onChange={(event) => { setNameInputValue(event.target.value); if (selectedCustomer && event.target.value !== selectedCustomer.name) setSelectedCustomerId(null); }} />
+            <input type="text" id="nameInput" className="input-field" placeholder="名前を入力..." data-original-input={"suggestCustomer()"} value={nameInputValue} onChange={(event) => { setNameInputValue(event.target.value); if (selectedCustomer && event.target.value !== selectedCustomer.name) setSelectedCustomerId(RECIPIENT_EVERYONE_ID); }} />
             <div id="resultArea" className="result-box"></div>
           </div>
           <div className="past-memo-box" style={{marginTop: "12px", marginBottom: "0"}}>
-            <div id="pastMemoDisplay"><span className="past-memo-label">📖 過去のメモ</span>{selectedCustomer ? (
-              getPastMemos(selectedCustomer).length === 0 ? (
-                <div style={{color: "var(--text-muted)", textAlign: "center", padding: "10px 0", fontSize: "12px"}}>(過去の記録はありません)</div>
+            <div id="pastMemoDisplay">
+              {isEveryoneRecipient ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: "1", minHeight: "88px", fontSize: "14px", fontWeight: 700, color: "var(--text-main)" }}>
+                  みんなへ送る
+                </div>
+              ) : selectedCustomer ? (
+                <>
+                  <span className="past-memo-label">📖 過去のメモ</span>
+                  {getPastMemos(selectedCustomer).length === 0 ? (
+                    <div style={{color: "var(--text-muted)", textAlign: "center", padding: "10px 0", fontSize: "12px"}}>(過去の記録はありません)</div>
+                  ) : (
+                    getPastMemos(selectedCustomer).map((memo, index) => (
+                      <div key={`${memo.date || "memo"}-${index}`} style={{marginBottom: "12px", paddingBottom: "10px", borderBottom: "1px dashed var(--border-color)", display: "flex", gap: "10px", alignItems: "flex-start"}}>
+                        <div style={{flex: "1"}}>
+                          <div style={{fontSize: "11px", color: "var(--text-sub)", fontWeight: "700", marginBottom: "4px"}}>{memo.date}</div>
+                          <div style={{fontSize: "13px", color: "var(--text-main)"}}>{memo.text}</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </>
               ) : (
-                getPastMemos(selectedCustomer).map((memo, index) => (
-                  <div key={`${memo.date || "memo"}-${index}`} style={{marginBottom: "12px", paddingBottom: "10px", borderBottom: "1px dashed var(--border-color)", display: "flex", gap: "10px", alignItems: "flex-start"}}>
-                    <div style={{flex: "1"}}>
-                      <div style={{fontSize: "11px", color: "var(--text-sub)", fontWeight: "700", marginBottom: "4px"}}>{memo.date}</div>
-                      <div style={{fontSize: "13px", color: "var(--text-main)"}}>{memo.text}</div>
-                    </div>
-                  </div>
-                ))
-              )
-            ) : (
-              <div style={{color: "var(--text-muted)", textAlign: "center", padding: "10px 0", fontSize: "12px"}}>(顧客を選択するか、過去の記録がありません)</div>
-            )}</div>
+                <>
+                  <span className="past-memo-label">📖 過去のメモ</span>
+                  <div style={{color: "var(--text-muted)", textAlign: "center", padding: "10px 0", fontSize: "12px"}}>(過去の記録はありません)</div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="card mode-photo-ui">
-          <span className="label">📷 写真を選ぶ</span>
-          <input
-            ref={photoUploadInputRef}
-            type="file"
-            id="photoUpload"
-            accept="image/*"
-            style={{ display: "none" }}
-            onChange={handlePhotoFileChange}
-          />
-          <label htmlFor="photoUpload" id="uploadArea" className="upload-area">
-            <div id="uploadText" style={{ display: photoPreviewObjectUrl ? "none" : undefined }}>📸<br /><br />タップして写真をアップロード</div>
-            <img id="photoPreview" alt="" src={photoPreviewObjectUrl ?? undefined} style={{ display: photoPreviewObjectUrl ? "block" : "none" }} />
-          </label>
+        <input
+          ref={photoUploadInputRef}
+          type="file"
+          id="photoUpload"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={handlePhotoFileChange}
+        />
+
+        <div className="create-addon-actions" style={{ marginTop: "12px" }}>
+          <button
+            type="button"
+            className="create-addon-photo-btn"
+            aria-expanded={isPhotoAccordionOpen}
+            aria-controls="createPhotoAccordion"
+            onClick={() => setIsPhotoAccordionOpen((v) => !v)}
+          >
+            [ 📷 ＋ ]
+          </button>
+          <button
+            type="button"
+            className="create-addon-memo-btn"
+            aria-expanded={isMemoAccordionOpen}
+            aria-controls="createMemoAccordion"
+            onClick={() => setIsMemoAccordionOpen((v) => !v)}
+          >
+            [ 📝 ＋ ]
+          </button>
+        </div>
+
+        <div id="createPhotoAccordion" className={`create-accordion-panel${isPhotoAccordionOpen ? " is-open" : ""}`} aria-hidden={!isPhotoAccordionOpen}>
+          <div className="create-accordion-inner">
+            <label htmlFor="photoUpload" id="uploadArea" className="upload-area">
+              <div id="uploadText" style={{ display: photoPreviewObjectUrl ? "none" : undefined }}>📸<br /><br />タップして写真をアップロード</div>
+              <img id="photoPreview" alt="" src={photoPreviewObjectUrl ?? undefined} style={{ display: photoPreviewObjectUrl ? "block" : "none" }} />
+            </label>
+          </div>
+        </div>
+
+        <div id="createMemoAccordion" className={`create-accordion-panel${isMemoAccordionOpen ? " is-open" : ""}`} aria-hidden={!isMemoAccordionOpen}>
+          <div className="create-accordion-inner">
+            <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px"}}>
+              <span className="label" style={{margin: "0"}}>🎭 感情・ムード</span>
+              <div style={{display: "flex", gap: "6px"}}>
+                <button type="button" data-original-click={"loadMoodPreset()"} onClick={loadMoodPreset} style={{background: "var(--input-bg)", border: "none", color: "var(--text-sub)", fontSize: "10px", padding: "4px 8px", borderRadius: "8px", fontWeight: "700", cursor: "pointer"}}>プリセット読込</button>
+                <button type="button" data-original-click={"saveMoodPreset()"} onClick={saveMoodPreset} style={{background: "var(--primary-light)", border: "none", color: "var(--primary)", fontSize: "10px", padding: "4px 8px", borderRadius: "8px", fontWeight: "700", cursor: "pointer"}}>保存</button>
+              </div>
+            </div>
+            <div className="tags-scroll-container create-details-tags-grid overflow-x-auto no-scrollbar" id="moodTagsArea" style={{marginBottom: "16px"}}>
+              <div className="tag-row">
+                {moodTags.filter((_, index) => index % 2 === 0).map((tag) => (
+                  <div key={tag} className={`chip${selectedMoodTags.includes(tag) ? " selected-mood-chip active" : ""}`} onClick={() => toggleStringValue(tag, setSelectedMoodTags)}>{tag}</div>
+                ))}
+              </div>
+              <div className="tag-row">
+                {moodTags.filter((_, index) => index % 2 === 1).map((tag) => (
+                  <div key={tag} className={`chip${selectedMoodTags.includes(tag) ? " selected-mood-chip active" : ""}`} onClick={() => toggleStringValue(tag, setSelectedMoodTags)}>{tag}</div>
+                ))}
+              </div>
+            </div>
+            <span className="label">📝 今日の出来事（トピック）</span>
+            <div className="tags-scroll-container create-details-tags-grid overflow-x-auto no-scrollbar" id="factTagsArea">
+              <div className="tag-row">
+                {factTags.filter((_, index) => index % 2 === 0).map((tag) => (
+                  <div key={tag} className={`chip${selectedFactTags.includes(tag) ? " selected-fact-chip active" : ""}`} onClick={() => toggleFactTag(tag)}>{tag}</div>
+                ))}
+              </div>
+              <div className="tag-row">
+                {factTags.filter((_, index) => index % 2 === 1).map((tag) => (
+                  <div key={tag} className={`chip${selectedFactTags.includes(tag) ? " selected-fact-chip active" : ""}`} onClick={() => toggleFactTag(tag)}>{tag}</div>
+                ))}
+              </div>
+            </div>
+            <span className="label">📝 今日の出来事・接客メモ</span>
+            <div className="textarea-wrapper">
+              <textarea id="todayEpisodeInput" className="input-field" rows={4} placeholder="（例）こけてみんなで爆笑した！ウザ絡みされたけどシャンパン入れてくれた笑&#10;※AIが空気を読んで綺麗なメッセージにします✨" data-original-input={"autoScrollTextarea()"} value={todayEpisodeText} onChange={(event) => setTodayEpisodeText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{background: "var(--input-bg)", border: "1px solid transparent", minHeight: "100px"}}></textarea>
+              <div className="clear-btn" data-original-click={"clearEpisodeInput()"} onClick={() => { if (!todayEpisodeText && selectedFactTags.length === 0 && selectedMoodTags.length === 0) return; if (window.confirm("入力をクリアしますか？")) { setTodayEpisodeText(""); setSelectedFactTags([]); setSelectedMoodTags([]); } }}>🧹 クリア</div>
+            </div>
+          </div>
         </div>
 
         {/* 🚶‍♀️ 来店あり/なし トグル */}
-        <div className="mode-text-only" style={{marginBottom: "16px", display: "flex", justifyContent: "center"}}>
+        <div className={`mode-text-only${isEveryoneRecipient ? " visit-toggle-disabled" : ""}`} style={{marginBottom: "16px", display: "flex", justifyContent: "center"}}>
           <div style={{width: "100%", maxWidth: "240px"}}>
             <div className="visit-toggle-hint">
               <span className="hint-text hint-yes">「ありがとう」をつたえる</span>
@@ -2126,13 +2148,6 @@ export default function Page() {
               <label htmlFor="visit-yes" className="toggle-label visit-label-yes">🚶‍♀️ 来店あり</label>
               <label htmlFor="visit-no" className="toggle-label visit-label-no">📱 来店なし(営業)</label>
             </div>
-          </div>
-        </div>
-
-        {/* 📝 今日のメモを追加 */}
-        <div style={{textAlign: "center", margin: "12px 0"}}>
-          <div className="accordion-header" data-original-click={"toggleCreateDetails()"} id="createDetailsHeader" onClick={() => setIsCreateDetailsOpen((isOpen) => !isOpen)} style={{display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", padding: "8px 24px", background: "#FFF", border: "1px solid var(--border-color)", borderRadius: "24px", fontSize: "12px", fontWeight: "700", color: "var(--text-main)", boxShadow: "var(--shadow-sm)", cursor: "pointer", transform: "translateY(-20px)"}}>
-            📝 今日のメモを追加 <span style={{color: "var(--text-sub)", fontSize: "11px", fontWeight: "normal"}}>(任意)</span> <span id="createDetailsIcon">{isCreateDetailsOpen ? "▲" : "▼"}</span>
           </div>
         </div>
 
@@ -2526,9 +2541,9 @@ export default function Page() {
 
     <footer className="fixed-footer">
       <nav className="bottom-nav">
-        <label htmlFor="nav-create" className="nav-item tab-create" onClick={() => { setActiveTab("create"); setIsCreateDetailsOpen(false); }}><span style={{fontSize: "18px"}}>📝</span>作成</label>
-        <label htmlFor="nav-data" className="nav-item tab-data" onClick={() => { setActiveTab("data"); setIsCreateDetailsOpen(false); }}><span style={{fontSize: "18px"}}>📖</span>顧客</label>
-        <label htmlFor="nav-settings" className="nav-item tab-settings" onClick={() => { setActiveTab("settings"); setIsCreateDetailsOpen(false); }}><span style={{fontSize: "18px"}}>⚙️</span>設定</label>
+        <label htmlFor="nav-create" className="nav-item tab-create" onClick={() => { setActiveTab("create"); setIsMemoAccordionOpen(false); setIsPhotoAccordionOpen(false); }}><span style={{fontSize: "18px"}}>📝</span>作成</label>
+        <label htmlFor="nav-data" className="nav-item tab-data" onClick={() => { setActiveTab("data"); setIsMemoAccordionOpen(false); setIsPhotoAccordionOpen(false); }}><span style={{fontSize: "18px"}}>📖</span>顧客</label>
+        <label htmlFor="nav-settings" className="nav-item tab-settings" onClick={() => { setActiveTab("settings"); setIsMemoAccordionOpen(false); setIsPhotoAccordionOpen(false); }}><span style={{fontSize: "18px"}}>⚙️</span>設定</label>
       </nav>
     </footer>
     <style jsx global>{`

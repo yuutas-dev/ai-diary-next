@@ -144,7 +144,7 @@ input[type="radio"].ui-state { display: none; }
 #nav-create:checked ~ .app-container .tab-create,
 #nav-data:checked ~ .app-container .tab-data,
 #nav-settings:checked ~ .app-container .tab-settings { color: var(--primary); }
-#nav-create:not(:checked) ~ .app-container .header-toggle { display: none; }
+#nav-create:not(:checked) ~ .app-container .header-area-create { display: none; }
 
 /* お客様ノート：検索バー スクロール連動（高さ潰し + translate、イベントは rAF） */
 .data-customer-search-clip {
@@ -217,19 +217,8 @@ input[type="radio"].ui-state { display: none; }
   padding: 10px 16px calc(240px + var(--bottom-tab-lift, 0px));
 }
 
-.mode-photo-ui { display: none; }
-#mode-photo:checked ~ .app-container .mode-photo-ui { display: block; }
-#mode-photo:checked ~ .app-container .toggle-photo,
-#mode-text:checked ~ .app-container .toggle-text {
-  background: #FFF;
-  color: var(--primary);
-  box-shadow: var(--shadow-sm);
-}
-
-#mode-photo:checked ~ .app-container .card-customer-select {
-  opacity: 0.6;
-  pointer-events: none;
-  filter: grayscale(40%);
+.story-ring-selected {
+  box-shadow: 0 0 0 3px rgba(229, 95, 150, 0.45);
 }
 
 .visit-toggle {
@@ -332,7 +321,64 @@ input[type="radio"].ui-state { display: none; }
 .favorite-btn:active { transform: scale(0.7); }
 
 .mode-text-only { display: block; }
-#mode-photo:checked ~ .app-container .mode-text-only { display: none !important; }
+
+.visit-toggle-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.create-addon-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  min-height: 44px;
+  align-items: center;
+}
+
+.create-addon-actions button {
+  min-width: 72px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: none;
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+  background: var(--text-main);
+  color: #FFF;
+  box-shadow: var(--shadow-sm);
+  transition: opacity 0.18s ease, transform 0.12s ease;
+}
+
+.create-addon-actions button[aria-expanded="true"] {
+  opacity: 0.92;
+  box-shadow: var(--shadow-float);
+}
+
+.create-addon-actions button:active {
+  transform: scale(0.97);
+}
+
+.create-accordion-panel {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.32s ease, opacity 0.22s ease, margin-bottom 0.22s ease;
+  margin-bottom: 0;
+}
+
+.create-accordion-panel.is-open {
+  max-height: 1200px;
+  opacity: 1;
+  margin-bottom: 12px;
+}
+
+.create-accordion-inner {
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: var(--card-bg);
+  padding: 12px;
+}
 
 .style-content-wrapper {
   min-height: 340px;

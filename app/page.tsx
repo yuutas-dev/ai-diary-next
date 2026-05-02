@@ -1954,7 +1954,7 @@ export default function Page() {
         </div>
       ) : null}
       <div className="page page-create">
-        {currentFavoriteTexts.length === 0 ? (
+        {!customStyleText.trim() ? (
           <div
             role="button"
             tabIndex={0}

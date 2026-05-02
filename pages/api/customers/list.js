@@ -83,8 +83,28 @@ export default async function handler(req, res) {
     if (!userId) return;
     const supabase = getSupabase();
 
-    // 1. ダミー顧客の取得
-    const masterResult = await supabase.from('customers').select('*').eq('is_master_dummy', true);
+    // 1–4: マスタ顧客・ユーザー顧客・全エントリ・お気に入りを並列取得（N+1 / 直列待ちを避ける）
+    const masterQuery = supabase.from('customers').select('*').eq('is_master_dummy', true);
+    const userQuery = supabase.from('customers').select('*').eq('user_id', userId);
+    const entriesQuery = supabase
+      .from('customer_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .order('entry_date', { ascending: false })
+      .order('created_at', { ascending: false });
+    const favoritesQuery = supabase
+      .from('favorite_writing_samples')
+      .select('source_entry_id, sample_text')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
+
+    const [masterResult, userRowsResult, entriesResult, favResult] = await Promise.all([
+      masterQuery,
+      userQuery,
+      entriesQuery,
+      favoritesQuery,
+    ]);
+
     let masterRows = [];
     if (masterResult.error) {
       console.warn('[customers/list] is_master_dummy 取得フォールバック:', masterResult.error.message);
@@ -94,19 +114,9 @@ export default async function handler(req, res) {
       masterRows = masterResult.data || [];
     }
 
-    // 2. ユーザー顧客の取得
-    const userRowsResult = await supabase.from('customers').select('*').eq('user_id', userId);
     if (userRowsResult.error) throw new Error('Supabaseユーザーデータ取得エラー: ' + userRowsResult.error.message);
     const userRows = userRowsResult.data || [];
 
-    // 3. 【NEW】customer_entries（イベントログ）の一括取得
-    const entriesResult = await supabase
-      .from('customer_entries')
-      .select('*')
-      .eq('user_id', userId)
-      .order('entry_date', { ascending: false })
-      .order('created_at', { ascending: false });
-    
     if (entriesResult.error) throw new Error('履歴データ取得エラー: ' + entriesResult.error.message);
 
     // 取得した履歴を customer_id ごとにグループ化する
@@ -120,12 +130,8 @@ export default async function handler(req, res) {
 
     const masterIdsSet = new Set((masterRows || []).map(c => String(c.id)));
 
-    // 4. お気に入りの取得
-    const { data: favorites, error: favError } = await supabase
-      .from('favorite_writing_samples')
-      .select('source_entry_id, sample_text')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false });
+    const favorites = favResult.data;
+    const favError = favResult.error;
     if (favError) console.error('Favorites fetch error:', favError);
     const favoriteIds = favorites ? favorites.map(f => f.source_entry_id) : [];
     const favoriteTexts = favorites ? favorites.map(f => f.sample_text) : [];

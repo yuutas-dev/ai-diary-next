@@ -186,6 +186,34 @@ function isEmotionTag(tag: string) {
   return EMOTION_TAG_KEYWORDS.some((keyword) => tag.includes(keyword));
 }
 
+function mapHistoryApiResponseToRows(data: { success?: boolean; items?: unknown[] }): HistorySourceRow[] {
+  if (!data.success || !Array.isArray(data.items)) return [];
+  const mapped: HistorySourceRow[] = [];
+  for (const raw of data.items) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as {
+      entryId?: unknown;
+      customerId?: unknown;
+      customerName?: unknown;
+      aiGeneratedText?: unknown;
+      finalSentText?: unknown;
+      entryDate?: unknown;
+    };
+    const displayText = String(row.finalSentText ?? "").trim() || String(row.aiGeneratedText ?? "").trim();
+    if (!displayText) continue;
+    mapped.push({
+      id: String(row.entryId ?? ""),
+      customerId: row.customerId != null ? String(row.customerId) : null,
+      customerName: typeof row.customerName === "string" ? row.customerName : "不明な顧客",
+      customerTags: [],
+      displayText,
+      displayDate: typeof row.entryDate === "string" ? row.entryDate : "",
+      inputText: "",
+    });
+  }
+  return mapped;
+}
+
 function getAvatarSvgMarkup(name: string, iconTheme: IconTheme) {
   const hash = getStringHash(name || "ゲスト");
   const hue = hash % 360;
@@ -330,6 +358,8 @@ export default function Page() {
   const [selectedMoodTags, setSelectedMoodTags] = useState<string[]>([]);
   const [selectedFactTags, setSelectedFactTags] = useState<string[]>([]);
   const [customStyleText, setCustomStyleText] = useState("");
+  /** プロフィールの ai_custom_prompt を一度でも取得判断できたら true（未取得の間は文体バナーを出さない） */
+  const [isProfileStyleLoaded, setIsProfileStyleLoaded] = useState(false);
   const [hasCustomPrompt, setHasCustomPrompt] = useState(false);
   const [onboardingLineText, setOnboardingLineText] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -526,33 +556,8 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: targetUserId }),
       });
-      const data = await res.json() as { success?: boolean; items?: unknown[] };
-      if (!data.success || !Array.isArray(data.items)) return;
-      const mapped: HistorySourceRow[] = [];
-      for (const raw of data.items) {
-        if (!raw || typeof raw !== "object") continue;
-        const row = raw as {
-          entryId?: unknown;
-          customerId?: unknown;
-          customerName?: unknown;
-          aiGeneratedText?: unknown;
-          finalSentText?: unknown;
-          entryDate?: unknown;
-        };
-        const displayText =
-          String(row.finalSentText ?? "").trim() || String(row.aiGeneratedText ?? "").trim();
-        if (!displayText) continue;
-        mapped.push({
-          id: String(row.entryId ?? ""),
-          customerId: row.customerId != null ? String(row.customerId) : null,
-          customerName: typeof row.customerName === "string" ? row.customerName : "不明な顧客",
-          customerTags: [],
-          displayText,
-          displayDate: typeof row.entryDate === "string" ? row.entryDate : "",
-          inputText: "",
-        });
-      }
-      setHistorySourceRows(mapped);
+      const data = (await res.json()) as { success?: boolean; items?: unknown[] };
+      setHistorySourceRows(mapHistoryApiResponseToRows(data));
     } catch (e) {
       console.error("fetchHistoryEntries Error:", e);
     }
@@ -562,12 +567,21 @@ export default function Page() {
     const showLoading = options.showLoading !== false;
     if (showLoading) setIsCustomersLoading(true);
     try {
-      const res = await fetch("/api/customers/list", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: targetUserId }),
-      });
-      const data = await res.json();
+      const listPayload = JSON.stringify({ userId: targetUserId });
+      const [listRes, historyRes] = await Promise.all([
+        fetch("/api/customers/list", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: listPayload,
+        }),
+        fetch("/api/entries/history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: listPayload,
+        }),
+      ]);
+      const data = await listRes.json();
+      const historyJson = (await historyRes.json()) as { success?: boolean; items?: unknown[] };
       if (!data.success) throw new Error("list failed");
 
       let mastersRaw: Parameters<typeof normalizeCustomer>[0][] = [];
@@ -589,7 +603,7 @@ export default function Page() {
       setCustomerSource({ masters, users });
       setCurrentFavoriteIds(Array.isArray(data.favoriteIds) ? data.favoriteIds.map((id: unknown) => String(id)).filter(Boolean) : []);
       setCurrentFavoriteTexts(Array.isArray(data.favoriteTexts) ? data.favoriteTexts.map((text: unknown) => String(text)).filter(Boolean) : []);
-      await fetchHistoryEntries(targetUserId);
+      setHistorySourceRows(mapHistoryApiResponseToRows(historyJson));
     } catch (error) {
       console.error("fetchCustomers Error:", error);
       if (showLoading) {
@@ -657,8 +671,16 @@ export default function Page() {
     setIsCompactMode(localStorage.getItem("isCompactMode") === "true");
   }, []);
   useEffect(() => {
-    if (!sessionReady || userId === null) return;
+    if (!sessionReady) return;
+
+    if (userId === null) {
+      setIsProfileStyleLoaded(true);
+      return;
+    }
+
     let isMounted = true;
+    setIsProfileStyleLoaded(false);
+
     void (async () => {
       try {
         const query = new URLSearchParams({ userId }).toString();
@@ -672,8 +694,11 @@ export default function Page() {
         localStorage.setItem("customStyleText", prompt);
       } catch (error) {
         console.error("fetchUserProfile Error:", error);
+      } finally {
+        if (isMounted) setIsProfileStyleLoaded(true);
       }
     })();
+
     return () => {
       isMounted = false;
     };
@@ -1955,7 +1980,7 @@ export default function Page() {
         </div>
       ) : null}
       <div className="page page-create">
-        {!customStyleText.trim() ? (
+        {sessionReady && userId && isProfileStyleLoaded && !customStyleText.trim() ? (
           <div
             role="button"
             tabIndex={0}

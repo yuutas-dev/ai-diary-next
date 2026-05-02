@@ -187,8 +187,7 @@ function parseMemoToJSON(memoStr?: string) {
 }
 
 function getCustomerStats(customer: Customer) {
-  const allMemos = customer.entries;
-  const visitMemos = allMemos.filter((memo) => !memo.type || memo.type === "visit" || memo.status === "legacy");
+  const visitMemos = (customer.entries || []).filter((memo: any) => !memo.type || memo.type === "visit" || memo.status === "legacy");
   const count = visitMemos.length === 0 ? 1 : visitMemos.length;
   const vipKeywords = ["太客", "エース", "一軍", "VIP", "金持ち", "良客", "常連", "一軍固定"];
   const isVip = customer.tagsArray.some((tag) => vipKeywords.includes(tag));
@@ -277,8 +276,7 @@ function mergeCustomerDisplayPipeline(
 }
 
 function getDaysSinceLastVisit(customer: Customer) {
-  const allMemos = customer.entries;
-  const visitMemos = allMemos.filter((memo) => !memo.type || memo.type === "visit" || memo.status === "legacy");
+  const visitMemos = (customer.entries || []).filter((memo: any) => !memo.type || memo.type === "visit" || memo.status === "legacy");
   if (visitMemos.length === 0) return null;
   const lastMemo = visitMemos[visitMemos.length - 1];
   if (!lastMemo?.date) return null;
@@ -289,6 +287,15 @@ function getDaysSinceLastVisit(customer: Customer) {
   const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const diffTime = todayDate.getTime() - date.getTime();
   return diffTime < 0 ? 0 : Math.floor(diffTime / (1000 * 60 * 60 * 24));
+}
+
+function getPastMemos(customer: Customer | null) {
+  if (!customer || !Array.isArray(customer.entries)) return [];
+  return customer.entries.filter((memo: any) => {
+    const isVisit = !memo.type || memo.type === "visit" || memo.status === "legacy";
+    const hasContent = (memo.text && memo.text.trim().length > 0) || (Array.isArray(memo.tags) && memo.tags.length > 0);
+    return isVisit && hasContent;
+  });
 }
 
 function isAlertCustomer(customer: Customer) {
@@ -854,7 +861,7 @@ export default function Page() {
     .filter((customer) => {
       const normalizedSearchText = customerSearchText.trim().toLowerCase();
       if (normalizedSearchText) {
-        const memos = customer.entries.filter((memo) => memo.type !== "sales");
+        const memos = getPastMemos(customer);
         const matchName = customer.name.toLowerCase().includes(normalizedSearchText);
         const matchMemo = memos.some((memo) => String(memo.text || "").toLowerCase().includes(normalizedSearchText) || (memo.tags || []).some((tag: string) => tag.toLowerCase().includes(normalizedSearchText)));
         const matchTags = customer.tagsArray.some((tag) => tag.toLowerCase().includes(normalizedSearchText));
@@ -1249,11 +1256,6 @@ export default function Page() {
     }
   }
 
-  function getPastMemos(customer: Customer | null) {
-    if (!customer) return [];
-    return customer.entries.filter((memo) => memo.type !== "sales");
-  }
-
   function toggleStringValue(value: string, setter: Dispatch<SetStateAction<string[]>>) {
     setter((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
   }
@@ -1646,7 +1648,7 @@ export default function Page() {
 
       const forbiddenTags = ["新規", "初回", "初回来店", "初めて", "一見", "常連", "リピーター", "2回目", "二回目", "3回目", "三回目", "1回目", "一回目"];
       const cleanedCustomerTags = (targetCustomer?.tagsArray || []).filter((tag) => !forbiddenTags.some((forbidden) => tag.includes(forbidden)));
-      const memos = parseMemoToJSON(targetCustomer ? targetCustomer.memo : "").filter((memo) => memo.type !== "sales");
+      const memos = getPastMemos(targetCustomer);
       const filteredMemosStr = memos.map((memo) => {
         const filteredTags = (memo.tags || []).filter((tag: string) => !isEmotionTag(tag));
         const tagsStr = filteredTags.length > 0 ? `(タグ: ${filteredTags.join(", ")})` : "";
@@ -1904,7 +1906,7 @@ export default function Page() {
         {hiddenCustomers.length === 0 ? (
           <p style={{textAlign: "center", color: "var(--text-sub)", marginTop: "40px", fontWeight: "700"}}>非表示の顧客はいません</p>
         ) : hiddenCustomers.map((customer) => {
-          const memos = customer.entries.filter((memo) => memo.type !== "sales");
+          const memos = getPastMemos(customer);
           const lastMemo = memos[memos.length - 1];
           const previewMemo = lastMemo?.text ? `${String(lastMemo.text).substring(0, 30)}...` : "メモなし";
           const visibleTags = customer.tagsArray.filter((tag) => tag !== "ダミー" && tag !== "非表示" && tag !== "一軍固定");
@@ -2475,7 +2477,7 @@ export default function Page() {
               if (customer.tagsArray.includes("一軍固定")) sysBadge = "💎 固定一軍";
 
               const visibleTags = customer.tagsArray.filter((tag) => tag !== "ダミー" && tag !== "非表示" && tag !== "一軍固定");
-              const memos = customer.entries.filter((memo) => memo.type !== "sales");
+              const memos = getPastMemos(customer);
               const lastMemo = memos[memos.length - 1];
               const previewMemo = lastMemo
                 ? lastMemo.text

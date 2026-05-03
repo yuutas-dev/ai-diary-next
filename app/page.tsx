@@ -34,6 +34,7 @@ import {
 } from "@/constants";
 import { CustomerEditModal } from "@/components/CustomerEditModal";
 import { StyleOnboardingModal } from "@/components/StyleOnboardingModal";
+import { compressImageFileToJpegDataUrl, compressImageSrcToJpegDataUrl } from "@/lib/compressImageForApi";
 import {
   apiErrorFieldFromUnknownJson,
   readFetchBodyAsTextAndJson,
@@ -847,7 +848,7 @@ export default function Page() {
     window.alert(message);
   }
 
-  /** 写メ日記: ファイル取得 → imageFile + 即時プレビュー、並行で canvas JPEG を API 用にセット */
+  /** 写メ日記: ファイル取得 → imageFile + 即時プレビュー、並行で canvas JPEG を API 用にセット（`compressImageForApi`） */
   function handlePhotoFileChange(event: ChangeEvent<HTMLInputElement>) {
     const inputEl = event.currentTarget;
     const resetInput = () => {
@@ -874,71 +875,18 @@ export default function Page() {
 
     setImageFile(file);
     setPhotoJpegDataUrl(null);
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const raw = reader.result;
-      if (typeof raw !== "string") {
-        showNotice("ファイルの読み込みに失敗しちゃった💦 (無効なデータ)");
-        setImageFile(null);
-        setPhotoJpegDataUrl(null);
-        return;
-      }
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        const MAX_SIZE = 1024;
-        let width = img.width;
-        let height = img.height;
-        if (!width || !height) {
-          showNotice("画像のサイズ（寸法）が読み取れなかったよ💦 別の画像で試してね");
-          setImageFile(null);
-          setPhotoJpegDataUrl(null);
-          return;
-        }
-        if (width > height) {
-          if (width > MAX_SIZE) {
-            height *= MAX_SIZE / width;
-            width = MAX_SIZE;
-          }
-        } else if (height > MAX_SIZE) {
-          width *= MAX_SIZE / height;
-          height = MAX_SIZE;
-        }
-        canvas.width = width;
-        canvas.height = height;
-        if (!ctx) {
-          showNotice("お使いのブラウザが画像処理に対応していないみたい💦");
-          setImageFile(null);
-          setPhotoJpegDataUrl(null);
-          return;
-        }
-        ctx.drawImage(img, 0, 0, width, height);
-        try {
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
-          setPhotoJpegDataUrl(dataUrl);
-        } catch {
-          console.error("Canvas export failed");
-          showNotice("画像の圧縮に失敗しちゃった💦");
-          setImageFile(null);
-          setPhotoJpegDataUrl(null);
-        }
-      };
-      img.onerror = () => {
-        showNotice("画像の読み込みに失敗しちゃった💦 別の画像で試してね");
-        setImageFile(null);
-        setPhotoJpegDataUrl(null);
-      };
-      img.src = raw;
-    };
-    reader.onerror = () => {
-      showNotice("ファイルの読み込みに失敗しちゃった💦");
-      setImageFile(null);
-      setPhotoJpegDataUrl(null);
-    };
-    reader.readAsDataURL(file);
     resetInput();
+
+    void compressImageFileToJpegDataUrl(file)
+      .then((dataUrl) => {
+        setPhotoJpegDataUrl(dataUrl);
+      })
+      .catch((err: unknown) => {
+        console.error("compressImageFileToJpegDataUrl:", err);
+        showNotice(err instanceof Error ? err.message : "画像の処理に失敗しちゃった💦");
+        setImageFile(null);
+        setPhotoJpegDataUrl(null);
+      });
   }
 
   function showActionToast(message: string) {
@@ -1604,6 +1552,19 @@ export default function Page() {
       const safeCustomStyleText = typeof customStyleText === "string" ? customStyleText : "";
       const safeBaseStyleText = typeof baseStyleText === "string" ? baseStyleText : "";
 
+      let imageForApi: string | null = null;
+      if (hasPhotoPayload) {
+        try {
+          imageForApi = imageFile
+            ? await compressImageFileToJpegDataUrl(imageFile)
+            : await compressImageSrcToJpegDataUrl(photoJpegDataUrl!);
+        } catch (err) {
+          console.error("generateDiary image compress:", err);
+          showNotice(err instanceof Error ? err.message : "画像の処理に失敗しちゃった💦");
+          return;
+        }
+      }
+
       const payload = {
         userId,
         customerId:
@@ -1628,7 +1589,7 @@ export default function Page() {
         baseStyleText: safeBaseStyleText,
         favoriteTexts: currentFavoriteTexts.slice(0, 5).join("\n"),
         messageMode,
-        imageFile: hasPhotoPayload ? photoJpegDataUrl : null,
+        imageFile: imageForApi,
       };
 
       const res = await fetch("/api/entries/generate", {

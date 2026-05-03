@@ -5,6 +5,10 @@ export const HIDDEN_DUMMY_IDS_KEY = "hidden_dummy_customer_ids";
 /** 写メ日記のアップロード上限（バイト）。超える場合はアラートし読み込まない */
 export const MAX_DIARY_PHOTO_FILE_BYTES = 5 * 1024 * 1024;
 
+/** 写メ・生成 API 送信用: canvas 長辺の上限（px）と JPEG 品質（0–1）。`lib/compressImageForApi` と選択時の圧縮で共通利用 */
+export const PHOTO_API_MAX_EDGE_PX = 768;
+export const PHOTO_API_JPEG_QUALITY = 0.68;
+
 export const INDUSTRY_MOOD_CONFIGS: Record<BusinessType, string[]> = {
   cabaret: ["💖 大好き", "✨ 特別な存在", "🥂 一緒に飲みたい", "🥺 早く会いたい", "🤫 ナイショの話", "💕 ずっと一緒にいたい", "🧸 癒やされる", "🍼 頼りにしてる", "💋 ドキドキ", "👗 可愛くなりたい", "🥺 寂しいな", "📱 連絡きて嬉しい", "🖤 独占してほしい", "🎉 楽しすぎた！", "💖 いつもありがとう"],
   fuzoku: ["💖 あなたが特別", "🧸 癒やされた", "🤤 余韻", "💕 相性良すぎ", "🥺 一緒にいたかった", "🤫 2人の秘密", "💋 ドキドキした", "🍼 甘えちゃった", "🖤 独占したい", "🥺 早く会いたい", "✨ 楽しかった", "📱 連絡待ってる", "🥺 依存しちゃいそう", "💖 感謝", "💤 夢で会いたい"],

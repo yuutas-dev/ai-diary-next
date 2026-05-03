@@ -34,6 +34,13 @@ import {
 } from "@/constants";
 import { CustomerEditModal } from "@/components/CustomerEditModal";
 import { StyleOnboardingModal } from "@/components/StyleOnboardingModal";
+import {
+  apiErrorFieldFromUnknownJson,
+  readFetchBodyAsTextAndJson,
+  sanitizeUserFacingApiMessage,
+  SERVER_UNAVAILABLE_USER_MESSAGE,
+  userFacingMessageFromError,
+} from "@/lib/sanitizeUserFacingApiError";
 
 /** クリエイト画面・宛先「全体向け（写メ / ファン向け）」 */
 const RECIPIENT_EVERYONE_ID = "everyone";
@@ -1040,13 +1047,23 @@ export default function Page() {
           newTags: nextTags,
         })),
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "データの更新に失敗しちゃった💦");
+      const { text, json, status } = await readFetchBodyAsTextAndJson(res);
+      const data = (json && typeof json === "object" ? json : {}) as { success?: boolean; error?: string };
+      if (!data.success) {
+        throw new Error(
+          sanitizeUserFacingApiMessage({
+            primaryMessage: apiErrorFieldFromUnknownJson(data, "データの更新に失敗しちゃった💦"),
+            httpStatus: status,
+            rawBody: text,
+          }),
+        );
+      }
     } catch (error) {
       console.error("persistCustomerTags Error:", error);
       updateCustomerTagsOptimistically(customer.id, previousTags);
       setHidingCustomerIds((current) => current.filter((id) => id !== customer.id));
-      showActionToast("通信エラーがおきたので元に戻したよ🥺");
+      const m = userFacingMessageFromError(error);
+      showActionToast(m === SERVER_UNAVAILABLE_USER_MESSAGE ? m : `通信エラーがおきたので元に戻したよ🥺（${m}）`);
     }
   }
 
@@ -1129,12 +1146,22 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, customerId: target.id }),
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || "削除に失敗しちゃった💦");
+      const { text, json, status } = await readFetchBodyAsTextAndJson(res);
+      const data = (json && typeof json === "object" ? json : {}) as { success?: boolean; error?: string };
+      if (!data.success) {
+        throw new Error(
+          sanitizeUserFacingApiMessage({
+            primaryMessage: apiErrorFieldFromUnknownJson(data, "削除に失敗しちゃった💦"),
+            httpStatus: status,
+            rawBody: text,
+          }),
+        );
+      }
     } catch (error) {
       console.error("executeDeleteCustomer Error:", error);
       setCustomerSource(previousSource);
-      showActionToast("通信エラーがおきたので元に戻したよ🥺");
+      const m = userFacingMessageFromError(error);
+      showActionToast(m === SERVER_UNAVAILABLE_USER_MESSAGE ? m : `通信エラーがおきたので元に戻したよ🥺（${m}）`);
     }
   }
 
@@ -1295,15 +1322,28 @@ export default function Page() {
     }
     setIsAnalyzing(true);
     showCuteToast(false, "がくしゅうちゅう...");
+    let analyzeResponseBody = "";
     try {
       const res = await fetch("/api/users/analyze-style", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, pastLineText: trimmed }),
       });
-      const data = await res.json().catch(() => ({}));
+      const { text, json, status } = await readFetchBodyAsTextAndJson(res);
+      analyzeResponseBody = text;
+      const data = (json && typeof json === "object" ? json : {}) as {
+        success?: boolean;
+        error?: string;
+        customPrompt?: string;
+      };
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "分析に失敗しました");
+        throw new Error(
+          sanitizeUserFacingApiMessage({
+            primaryMessage: apiErrorFieldFromUnknownJson(data, "分析に失敗しました"),
+            httpStatus: status,
+            rawBody: text,
+          }),
+        );
       }
       const customPrompt = typeof data.customPrompt === "string" ? data.customPrompt : "";
       if (!customPrompt.trim()) {
@@ -1320,7 +1360,8 @@ export default function Page() {
       await fetchCustomers(userId, { showLoading: false });
     } catch (error) {
       console.error("executeStyleAnalysis Error:", error);
-      showNotice(`分析に失敗しました: ${error instanceof Error ? error.message : "不明なエラー"}`);
+      const m = userFacingMessageFromError(error, { rawBody: analyzeResponseBody });
+      showNotice(m === SERVER_UNAVAILABLE_USER_MESSAGE ? m : `分析に失敗しました: ${m}`);
     } finally {
       setIsAnalyzing(false);
     }
@@ -1341,7 +1382,7 @@ export default function Page() {
       showActionToast("📋 コピーしました！");
       sendCompletionStatus("copied");
     }).catch((error) => {
-      showActionToast(`コピーに失敗しました: ${error}`);
+      showActionToast(`コピーに失敗しました: ${userFacingMessageFromError(error)}`);
     });
   }
 
@@ -1397,17 +1438,31 @@ export default function Page() {
           customerName: item.customerName,
         }),
       });
-      const data = await res.json();
+      const { text, json, status } = await readFetchBodyAsTextAndJson(res);
+      const data = (json && typeof json === "object" ? json : {}) as {
+        success?: boolean;
+        limitReached?: boolean;
+        error?: string;
+      };
       if (!data.success || data.limitReached) {
         setCurrentFavoriteIds(previousFavoriteIds);
         setCurrentFavoriteTexts(previousFavoriteTexts);
-        showActionToast(data.limitReached ? "お気に入りは最大5件までです。" : "通信エラーが発生しました。元に戻します。");
+        if (data.limitReached) {
+          showActionToast("お気に入りは最大5件までです。");
+        } else {
+          const msg = sanitizeUserFacingApiMessage({
+            primaryMessage: apiErrorFieldFromUnknownJson(data, "通信エラーが発生しました。元に戻します。"),
+            httpStatus: status,
+            rawBody: text,
+          });
+          showActionToast(msg === SERVER_UNAVAILABLE_USER_MESSAGE ? msg : `通信エラー: ${msg} 元に戻します。`);
+        }
       }
     } catch (error) {
       console.error("Toggle Error:", error);
       setCurrentFavoriteIds(previousFavoriteIds);
       setCurrentFavoriteTexts(previousFavoriteTexts);
-      showActionToast("通信エラーが発生しました。元に戻します。");
+      showActionToast(userFacingMessageFromError(error));
     }
   }
 
@@ -1516,6 +1571,7 @@ export default function Page() {
     setIsGenerating(true);
     showCuteToast(false);
 
+    let generateResponseBody = "";
     try {
       let customerRank = "新規";
       let visitCount = 1;
@@ -1580,10 +1636,23 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const { text, json, status } = await readFetchBodyAsTextAndJson(res);
+      generateResponseBody = text;
+      const data = (json && typeof json === "object" ? json : {}) as {
+        success?: boolean;
+        error?: string;
+        generatedText?: string;
+        entry_id?: string;
+      };
 
       if (!data.success) {
-        throw new Error(data.error || "不明なエラー");
+        throw new Error(
+          sanitizeUserFacingApiMessage({
+            primaryMessage: apiErrorFieldFromUnknownJson(data, "不明なエラー"),
+            httpStatus: status,
+            rawBody: text,
+          }),
+        );
       }
 
       showCuteToast(true);
@@ -1602,7 +1671,8 @@ export default function Page() {
     } catch (error) {
       console.error("generateDiary Error:", error);
       showCuteErrorToast();
-      showNotice(`エラーが発生しました: ${error instanceof Error ? error.message : "不明なエラー"}`);
+      const m = userFacingMessageFromError(error, { rawBody: generateResponseBody });
+      showNotice(m === SERVER_UNAVAILABLE_USER_MESSAGE ? m : `エラーが発生しました: ${m}`);
     } finally {
       setIsGenerating(false);
     }
@@ -1646,6 +1716,7 @@ export default function Page() {
     showActionToast("保存したよ！");
 
     void (async () => {
+      let lastResponseBody = "";
       try {
         let customerId: string | null = initialCustomerId;
         if (creating) {
@@ -1659,8 +1730,22 @@ export default function Page() {
               businessType: selectedBusinessType,
             })),
           });
-          const data = await res.json();
-          if (!data.success) throw new Error(data.error || "顧客作成に失敗しました");
+          const { text, json, status } = await readFetchBodyAsTextAndJson(res);
+          lastResponseBody = text;
+          const data = (json && typeof json === "object" ? json : {}) as {
+            success?: boolean;
+            error?: string;
+            customer?: { id?: string };
+          };
+          if (!data.success) {
+            throw new Error(
+              sanitizeUserFacingApiMessage({
+                primaryMessage: apiErrorFieldFromUnknownJson(data, "顧客作成に失敗しました"),
+                httpStatus: status,
+                rawBody: text,
+              }),
+            );
+          }
           customerId = data.customer?.id || null;
         } else {
           const res = await fetch("/api/customers/update", {
@@ -1674,8 +1759,18 @@ export default function Page() {
               businessType: selectedBusinessType,
             })),
           });
-          const data = await res.json();
-          if (!data.success) throw new Error(data.error || "顧客更新に失敗しました");
+          const { text, json, status } = await readFetchBodyAsTextAndJson(res);
+          lastResponseBody = text;
+          const data = (json && typeof json === "object" ? json : {}) as { success?: boolean; error?: string };
+          if (!data.success) {
+            throw new Error(
+              sanitizeUserFacingApiMessage({
+                primaryMessage: apiErrorFieldFromUnknownJson(data, "顧客更新に失敗しました"),
+                httpStatus: status,
+                rawBody: text,
+              }),
+            );
+          }
         }
 
         if (customerId) {
@@ -1689,9 +1784,17 @@ export default function Page() {
               deletedEntryIds,
             }),
           });
-          const upsertData = (await upsertRes.json().catch(() => ({}))) as { success?: boolean; error?: string };
+          const { text, json, status } = await readFetchBodyAsTextAndJson(upsertRes);
+          lastResponseBody = text;
+          const upsertData = (json && typeof json === "object" ? json : {}) as { success?: boolean; error?: string };
           if (!upsertRes.ok || upsertData.success === false) {
-            throw new Error(upsertData.error || "エントリの保存に失敗しました");
+            throw new Error(
+              sanitizeUserFacingApiMessage({
+                primaryMessage: apiErrorFieldFromUnknownJson(upsertData, "エントリの保存に失敗しました"),
+                httpStatus: status,
+                rawBody: text,
+              }),
+            );
           }
         }
 
@@ -1699,7 +1802,8 @@ export default function Page() {
         setDeletedEntryIds([]);
       } catch (error) {
         console.error("saveCustomerEdit Error:", error);
-        showActionToast("通信エラーがおきたので元に戻したよ🥺");
+        const m = userFacingMessageFromError(error, { rawBody: lastResponseBody });
+        showActionToast(m === SERVER_UNAVAILABLE_USER_MESSAGE ? m : `通信エラーがおきたので元に戻したよ🥺（${m}）`);
         await fetchCustomers(userId);
       }
     })();

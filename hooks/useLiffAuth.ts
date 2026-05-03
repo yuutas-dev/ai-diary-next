@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { sanitizeUserFacingApiMessage } from "@/lib/sanitizeUserFacingApiError";
 
 /** 外部ブラウザ（Safari / Chrome など LINE アプリ以外）での閲覧・試行用モック userId — API validateUserId と対応 */
 export const BROWSER_FALLBACK_LINE_USER_ID = "testuser";
@@ -37,16 +38,19 @@ export function formatLiffAuthFailureMessage(err: unknown): string {
     const code = (err as { code?: unknown }).code;
     const codePart =
       code !== undefined && code !== null && String(code).length > 0 ? ` code=${String(code)}` : "";
-    return `${base}${codePart} ${err.message}`.trimEnd();
+    const raw = `${base}${codePart} ${err.message}`.trimEnd();
+    return sanitizeUserFacingApiMessage({ primaryMessage: raw });
   }
   if (err !== null && typeof err === "object") {
     try {
-      return `${base} ${JSON.stringify(err)}`;
+      const raw = `${base} ${JSON.stringify(err)}`;
+      return sanitizeUserFacingApiMessage({ primaryMessage: raw });
     } catch {
       /* fall through */
     }
   }
-  return `${base} ${String(err)}`;
+  const raw = `${base} ${String(err)}`;
+  return sanitizeUserFacingApiMessage({ primaryMessage: raw });
 }
 
 async function initLiffWithRetry(liffId: string): Promise<typeof import("@line/liff").default> {

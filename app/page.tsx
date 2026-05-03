@@ -1589,7 +1589,7 @@ export default function Page() {
         baseStyleText: safeBaseStyleText,
         favoriteTexts: currentFavoriteTexts.slice(0, 5).join("\n"),
         messageMode,
-        imageFile: imageForApi,
+        ...(typeof imageForApi === "string" && imageForApi.trim() ? { imageFile: imageForApi } : {}),
       };
 
       const res = await fetch("/api/entries/generate", {

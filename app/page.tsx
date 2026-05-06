@@ -2514,7 +2514,7 @@ export default function Page() {
                   </div>
                 </div>
                 <button type="button" onClick={() => setIsOnboardingStyleModalOpen(true)} style={{width: "100%", background: "#FFF", border: "1px solid #fae6f0", color: "#b47b93", borderRadius: "18px", padding: "13px 14px", fontWeight: "700", cursor: "pointer"}}>
-                  ➕ さらにLINEを読み込ませて賢くする
+                  ➕ 別のLINEを読み込ませる
                 </button>
               </>
             ) : (

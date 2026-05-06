@@ -463,6 +463,22 @@ export default function Page() {
     }, 130);
   }
 
+  function clearGeneratingToastTextTimers() {
+    if (generatingToastIntervalRef.current) {
+      window.clearInterval(generatingToastIntervalRef.current);
+      generatingToastIntervalRef.current = null;
+    }
+    if (generatingToastFadeTimerRef.current) {
+      window.clearTimeout(generatingToastFadeTimerRef.current);
+      generatingToastFadeTimerRef.current = null;
+    }
+    if (generatingToastSyncTimerRef.current) {
+      window.clearTimeout(generatingToastSyncTimerRef.current);
+      generatingToastSyncTimerRef.current = null;
+    }
+    generatingToastStartAtRef.current = null;
+  }
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -763,35 +779,14 @@ export default function Page() {
     return () => {
       if (actionToastTimerRef.current) window.clearTimeout(actionToastTimerRef.current);
       if (cuteToastTimerRef.current) window.clearTimeout(cuteToastTimerRef.current);
-      if (generatingToastIntervalRef.current) window.clearInterval(generatingToastIntervalRef.current);
-      if (generatingToastFadeTimerRef.current) window.clearTimeout(generatingToastFadeTimerRef.current);
-      if (generatingToastSyncTimerRef.current) window.clearTimeout(generatingToastSyncTimerRef.current);
+      clearGeneratingToastTextTimers();
       if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
     };
   }, []);
 
   useEffect(() => {
     if (!isGenerating) {
-      if (generatingToastIntervalRef.current) {
-        window.clearInterval(generatingToastIntervalRef.current);
-        generatingToastIntervalRef.current = null;
-      }
-      if (generatingToastFadeTimerRef.current) {
-        window.clearTimeout(generatingToastFadeTimerRef.current);
-        generatingToastFadeTimerRef.current = null;
-      }
-      if (generatingToastSyncTimerRef.current) {
-        window.clearTimeout(generatingToastSyncTimerRef.current);
-        generatingToastSyncTimerRef.current = null;
-      }
-      generatingToastStartAtRef.current = null;
-      if (isCuteToastIconAnimating) {
-        generatingToastSyncTimerRef.current = window.setTimeout(() => {
-          setIsCuteToastTextVisible(true);
-          setCuteToastText("考え中だよ...");
-          generatingToastSyncTimerRef.current = null;
-        }, 0);
-      }
+      clearGeneratingToastTextTimers();
       return;
     }
 
@@ -810,21 +805,9 @@ export default function Page() {
     generatingToastIntervalRef.current = window.setInterval(syncText, 250);
 
     return () => {
-      if (generatingToastIntervalRef.current) {
-        window.clearInterval(generatingToastIntervalRef.current);
-        generatingToastIntervalRef.current = null;
-      }
-      if (generatingToastFadeTimerRef.current) {
-        window.clearTimeout(generatingToastFadeTimerRef.current);
-        generatingToastFadeTimerRef.current = null;
-      }
-      if (generatingToastSyncTimerRef.current) {
-        window.clearTimeout(generatingToastSyncTimerRef.current);
-        generatingToastSyncTimerRef.current = null;
-      }
-      generatingToastStartAtRef.current = null;
+      clearGeneratingToastTextTimers();
     };
-  }, [isGenerating, isCuteToastIconAnimating]);
+  }, [isGenerating]);
 
   useEffect(() => {
     if (activeTab !== "data" || dataView !== "customer") return;
@@ -989,15 +972,19 @@ export default function Page() {
     if (cuteToastTimerRef.current) window.clearTimeout(cuteToastTimerRef.current);
 
     if (!isComplete) {
+      clearGeneratingToastTextTimers();
       setCuteToastIcon("🐰");
       setCuteToastText(customText || "考え中だよ...");
+      setIsCuteToastTextVisible(true);
       setIsCuteToastIconAnimating(true);
       setIsCuteToastVisible(true);
       return;
     }
 
+    clearGeneratingToastTextTimers();
     setCuteToastIcon("✨");
     setCuteToastText("できたよ！");
+    setIsCuteToastTextVisible(true);
     setIsCuteToastIconAnimating(false);
     setIsCuteToastVisible(true);
     cuteToastTimerRef.current = window.setTimeout(() => {
@@ -1007,8 +994,10 @@ export default function Page() {
 
   function showCuteErrorToast() {
     if (cuteToastTimerRef.current) window.clearTimeout(cuteToastTimerRef.current);
+    clearGeneratingToastTextTimers();
     setCuteToastIcon("💦");
     setCuteToastText("❌ エラー発生");
+    setIsCuteToastTextVisible(true);
     setIsCuteToastIconAnimating(false);
     setIsCuteToastVisible(true);
     cuteToastTimerRef.current = window.setTimeout(() => {

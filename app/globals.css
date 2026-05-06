@@ -1875,12 +1875,15 @@ input:checked + .slider:before { transform: translateX(18px); }
   right: -250px;
   background: #FFF;
   padding: 10px 18px;
+  width: 196px;
+  box-sizing: border-box;
   border-radius: 30px 0 0 30px;
   box-shadow: var(--shadow-md);
   border: 1px solid var(--border-color);
   border-right: none;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   z-index: 9999;
   transition: right 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -1889,8 +1892,16 @@ input:checked + .slider:before { transform: translateX(18px); }
   color: var(--primary);
 }
 
+#cuteToastIcon {
+  flex: 0 0 16px;
+  width: 16px;
+  text-align: center;
+}
+
 #cuteToastText {
   display: inline-block;
+  flex: 1;
+  text-align: center;
   opacity: 1;
   transition: opacity 0.22s ease;
 }

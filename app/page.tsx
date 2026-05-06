@@ -398,6 +398,7 @@ export default function Page() {
   const [cuteToastText, setCuteToastText] = useState("考え中だよ...");
   const [isCuteToastVisible, setIsCuteToastVisible] = useState(false);
   const [isCuteToastIconAnimating, setIsCuteToastIconAnimating] = useState(false);
+  const [isCuteToastTextVisible, setIsCuteToastTextVisible] = useState(true);
   const [currentFavoriteIds, setCurrentFavoriteIds] = useState<string[]>([]);
   const [currentFavoriteTexts, setCurrentFavoriteTexts] = useState<string[]>([]);
   const [expandedHistoryIds, setExpandedHistoryIds] = useState<string[]>([]);
@@ -411,6 +412,11 @@ export default function Page() {
   const [deleteTargetCustomer, setDeleteTargetCustomer] = useState<Customer | null>(null);
   const actionToastTimerRef = useRef<number | null>(null);
   const cuteToastTimerRef = useRef<number | null>(null);
+  const generatingToastIntervalRef = useRef<number | null>(null);
+  const generatingToastFadeTimerRef = useRef<number | null>(null);
+  const generatingToastSyncTimerRef = useRef<number | null>(null);
+  const generatingToastStartAtRef = useRef<number | null>(null);
+  const cuteToastTextRef = useRef(cuteToastText);
   const inlineResultRef = useRef<HTMLDivElement | null>(null);
   const longPressTimerRef = useRef<number | null>(null);
   const filterContainerRef = useRef<HTMLDivElement | null>(null);
@@ -434,6 +440,28 @@ export default function Page() {
   const dataViewRef = useRef<DataView>(dataView);
   activeTabRef.current = activeTab;
   dataViewRef.current = dataView;
+  cuteToastTextRef.current = cuteToastText;
+
+  function resolveGeneratingToastText(elapsedMs: number) {
+    if (elapsedMs >= 12000) return "あともうちょい！ ";
+    if (elapsedMs >= 8000) return "いいかんじ！";
+    if (elapsedMs >= 4000) return "どう書こうかな… ";
+    return "カルテをよんでるよ… ";
+  }
+
+  function updateGeneratingToastText(nextText: string) {
+    if (cuteToastTextRef.current === nextText) return;
+    if (generatingToastFadeTimerRef.current) {
+      window.clearTimeout(generatingToastFadeTimerRef.current);
+      generatingToastFadeTimerRef.current = null;
+    }
+    setIsCuteToastTextVisible(false);
+    generatingToastFadeTimerRef.current = window.setTimeout(() => {
+      setCuteToastText(nextText);
+      setIsCuteToastTextVisible(true);
+      generatingToastFadeTimerRef.current = null;
+    }, 130);
+  }
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -735,9 +763,68 @@ export default function Page() {
     return () => {
       if (actionToastTimerRef.current) window.clearTimeout(actionToastTimerRef.current);
       if (cuteToastTimerRef.current) window.clearTimeout(cuteToastTimerRef.current);
+      if (generatingToastIntervalRef.current) window.clearInterval(generatingToastIntervalRef.current);
+      if (generatingToastFadeTimerRef.current) window.clearTimeout(generatingToastFadeTimerRef.current);
+      if (generatingToastSyncTimerRef.current) window.clearTimeout(generatingToastSyncTimerRef.current);
       if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isGenerating) {
+      if (generatingToastIntervalRef.current) {
+        window.clearInterval(generatingToastIntervalRef.current);
+        generatingToastIntervalRef.current = null;
+      }
+      if (generatingToastFadeTimerRef.current) {
+        window.clearTimeout(generatingToastFadeTimerRef.current);
+        generatingToastFadeTimerRef.current = null;
+      }
+      if (generatingToastSyncTimerRef.current) {
+        window.clearTimeout(generatingToastSyncTimerRef.current);
+        generatingToastSyncTimerRef.current = null;
+      }
+      generatingToastStartAtRef.current = null;
+      if (isCuteToastIconAnimating) {
+        generatingToastSyncTimerRef.current = window.setTimeout(() => {
+          setIsCuteToastTextVisible(true);
+          setCuteToastText("考え中だよ...");
+          generatingToastSyncTimerRef.current = null;
+        }, 0);
+      }
+      return;
+    }
+
+    generatingToastStartAtRef.current = Date.now();
+    generatingToastSyncTimerRef.current = window.setTimeout(() => {
+      setIsCuteToastTextVisible(true);
+      updateGeneratingToastText("カルテをよんでるよ… ");
+      generatingToastSyncTimerRef.current = null;
+    }, 0);
+
+    const syncText = () => {
+      const startedAt = generatingToastStartAtRef.current;
+      if (startedAt == null) return;
+      updateGeneratingToastText(resolveGeneratingToastText(Date.now() - startedAt));
+    };
+    generatingToastIntervalRef.current = window.setInterval(syncText, 250);
+
+    return () => {
+      if (generatingToastIntervalRef.current) {
+        window.clearInterval(generatingToastIntervalRef.current);
+        generatingToastIntervalRef.current = null;
+      }
+      if (generatingToastFadeTimerRef.current) {
+        window.clearTimeout(generatingToastFadeTimerRef.current);
+        generatingToastFadeTimerRef.current = null;
+      }
+      if (generatingToastSyncTimerRef.current) {
+        window.clearTimeout(generatingToastSyncTimerRef.current);
+        generatingToastSyncTimerRef.current = null;
+      }
+      generatingToastStartAtRef.current = null;
+    };
+  }, [isGenerating, isCuteToastIconAnimating]);
 
   useEffect(() => {
     if (activeTab !== "data" || dataView !== "customer") return;
@@ -1776,7 +1863,7 @@ export default function Page() {
 
   <div id="cuteToast" style={{right: isCuteToastVisible ? "0px" : "-250px"}}>
     <span id="cuteToastIcon" style={{fontSize: "16px", display: "inline-block", animation: isCuteToastIconAnimating ? "bounce-icon 1s infinite" : "none"}}>{cuteToastIcon}</span>
-    <span id="cuteToastText">{cuteToastText}</span>
+    <span id="cuteToastText" className={isCuteToastTextVisible ? "" : "fade-out"}>{cuteToastText}</span>
   </div>
 
       <input type="radio" name="nav" id="nav-create" className="ui-state" checked={activeTab === "create"} onChange={() => setActiveTab("create")} />

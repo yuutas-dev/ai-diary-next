@@ -1889,6 +1889,16 @@ input:checked + .slider:before { transform: translateX(18px); }
   color: var(--primary);
 }
 
+#cuteToastText {
+  display: inline-block;
+  opacity: 1;
+  transition: opacity 0.22s ease;
+}
+
+#cuteToastText.fade-out {
+  opacity: 0;
+}
+
 #actionToast {
   position: fixed;
   top: -150px;

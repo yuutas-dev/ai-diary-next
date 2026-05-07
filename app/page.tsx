@@ -350,7 +350,7 @@ export default function Page() {
     typeof window !== "undefined" ? readHiddenDummyIdsFromStorage() : new Set(),
   );
   const [isCustomersLoading, setIsCustomersLoading] = useState(true);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(RECIPIENT_EVERYONE_ID);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([RECIPIENT_EVERYONE_ID]);
   const [nameInputValue, setNameInputValue] = useState("");
   const [isPhotoAccordionOpen, setIsPhotoAccordionOpen] = useState(false);
   const [isMemoAccordionOpen, setIsMemoAccordionOpen] = useState(false);
@@ -491,9 +491,18 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    if (selectedCustomerId !== RECIPIENT_EVERYONE_ID) return;
+    if (!selectedCustomerIds.includes(RECIPIENT_EVERYONE_ID)) return;
     setNameInputValue("");
-  }, [selectedCustomerId]);
+  }, [selectedCustomerIds]);
+  useEffect(() => {
+    if (visitStatus !== "yes") return;
+    setSelectedCustomerIds((current) => {
+      if (current.length <= 1) return current;
+      const firstPersonId = current.find((id) => id !== RECIPIENT_EVERYONE_ID);
+      return firstPersonId ? [firstPersonId] : [RECIPIENT_EVERYONE_ID];
+    });
+  }, [visitStatus]);
+
 
   useEffect(() => {
     customerSearchBarVisibleRef.current = isCustomerSearchBarVisible;
@@ -859,10 +868,11 @@ export default function Page() {
     });
   const alertCount = customerData.filter(isAlertCustomer).length;
   const hiddenCustomers = customerData.filter((customer) => customer.tagsArray.includes("非表示"));
-  const isEveryoneRecipient = selectedCustomerId === RECIPIENT_EVERYONE_ID;
+  const isEveryoneRecipient = selectedCustomerIds.includes(RECIPIENT_EVERYONE_ID);
+  const selectedPrimaryCustomerId = selectedCustomerIds.find((id) => id !== RECIPIENT_EVERYONE_ID) || null;
   const selectedCustomer =
-    selectedCustomerId && !isEveryoneRecipient
-      ? customerData.find((customer) => customer.id === selectedCustomerId) || null
+    selectedPrimaryCustomerId && !isEveryoneRecipient
+      ? customerData.find((customer) => customer.id === selectedPrimaryCustomerId) || null
       : null;
   const isEditingDummyCustomer =
     !isCreateCustomerMode &&
@@ -1006,15 +1016,22 @@ export default function Page() {
   }
 
   function selectCustomer(customer: Customer) {
-    const isSameCustomer = selectedCustomerId === customer.id && nameInputValue === customer.name;
+    if (!customer.id) return;
 
-    if (isSameCustomer) {
-      setSelectedCustomerId(RECIPIENT_EVERYONE_ID);
-      setNameInputValue("");
+    if (visitStatus === "yes") {
+      setSelectedCustomerIds([customer.id]);
+      setNameInputValue(customer.name);
+      setActiveTab("create");
       return;
     }
 
-    setSelectedCustomerId(customer.id);
+    setSelectedCustomerIds((current) => {
+      const withoutEveryone = current.filter((id) => id !== RECIPIENT_EVERYONE_ID);
+      if (withoutEveryone.includes(customer.id)) {
+        return withoutEveryone.filter((id) => id !== customer.id);
+      }
+      return [...withoutEveryone, customer.id];
+    });
     setNameInputValue(customer.name);
     setActiveTab("create");
   }
@@ -1203,7 +1220,7 @@ export default function Page() {
     setIsCreateCustomerMode(false);
     setIsEditingHiddenCustomer(fromHiddenList);
     setDeleteTargetCustomer(null);
-    setSelectedCustomerId(customer.id);
+    setSelectedCustomerIds(customer.id ? [customer.id] : []);
     setNameInputValue(customer.name);
     setEditCustomerName(customer.name);
     setEditAttributeTags(customer.tagsArray.filter((tag) => tag !== "非表示" && tag !== "一軍固定" && tag !== "ダミー"));
@@ -1217,7 +1234,7 @@ export default function Page() {
     setIsCreateCustomerMode(true);
     setIsEditingHiddenCustomer(false);
     setDeleteTargetCustomer(null);
-    setSelectedCustomerId(null);
+    setSelectedCustomerIds([]);
     setNameInputValue("");
     setEditCustomerName("");
     setEditAttributeTags([]);
@@ -1644,7 +1661,7 @@ export default function Page() {
       const payload = {
         userId,
         customerId:
-          isEveryoneRecipient ? null : (targetCustomer?.id ?? (selectedCustomerId !== RECIPIENT_EVERYONE_ID ? selectedCustomerId : null)),
+          isEveryoneRecipient ? null : (targetCustomer?.id ?? selectedPrimaryCustomerId),
         customerName: isEveryoneRecipient ? "" : (targetCustomer ? targetCustomer.name : name),
         businessType: selectedBusinessType,
         customerRank,
@@ -1728,8 +1745,8 @@ export default function Page() {
     }
 
     const customerBeingEdited =
-      !isCreateCustomerMode && selectedCustomerId && selectedCustomerId !== RECIPIENT_EVERYONE_ID
-        ? [...customerSource.users, ...customerSource.masters].find((c) => c.id === selectedCustomerId) ?? null
+      !isCreateCustomerMode && selectedPrimaryCustomerId
+        ? [...customerSource.users, ...customerSource.masters].find((c) => c.id === selectedPrimaryCustomerId) ?? null
         : null;
     if (customerBeingEdited?.isDummy === true) {
       return;
@@ -1745,7 +1762,7 @@ export default function Page() {
       type: block.type,
     }));
     const creating = isCreateCustomerMode;
-    const initialCustomerId = selectedCustomerId;
+    const initialCustomerId = selectedPrimaryCustomerId;
 
     closeEditModal();
     setActiveTab("data");
@@ -2003,7 +2020,7 @@ export default function Page() {
     onAddCustomAttributeTag={addCustomAttributeTag}
     memoBlocks={memoBlocks}
     lineFactTags={lineFactTags}
-    selectedCustomerId={selectedCustomerId}
+    selectedCustomerId={selectedPrimaryCustomerId}
     onExpandPhoto={(url) => { setExpandedPhotoUrl(url); setActiveModal("photo"); }}
     updateMemoBlock={updateMemoBlock}
     removeMemoTag={removeMemoTag}
@@ -2117,14 +2134,14 @@ export default function Page() {
                 role="button"
                 tabIndex={0}
                 onClick={() => {
-                  setSelectedCustomerId(RECIPIENT_EVERYONE_ID);
+                  setSelectedCustomerIds([RECIPIENT_EVERYONE_ID]);
                   setNameInputValue("");
                   setActiveTab("create");
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    setSelectedCustomerId(RECIPIENT_EVERYONE_ID);
+                    setSelectedCustomerIds([RECIPIENT_EVERYONE_ID]);
                     setNameInputValue("");
                     setActiveTab("create");
                   }
@@ -2150,7 +2167,7 @@ export default function Page() {
                     : customer.tagsArray.length > 0
                       ? <div className="story-badge">{customer.tagsArray[0]}</div>
                       : null;
-                  const sel = Boolean(customer.id && selectedCustomerId === customer.id);
+                  const sel = Boolean(customer.id && selectedCustomerIds.includes(customer.id));
                   const ringClass = `${stats.isVip ? "story-ring story-ring-vip" : "story-ring"}${sel ? " story-ring-selected" : ""}`;
 
                   return (
@@ -2179,7 +2196,7 @@ export default function Page() {
               onChange={(event) => {
                 if (isEveryoneRecipient) return;
                 setNameInputValue(event.target.value);
-                if (selectedCustomer && event.target.value !== selectedCustomer.name) setSelectedCustomerId(RECIPIENT_EVERYONE_ID);
+                if (selectedCustomer && event.target.value !== selectedCustomer.name) setSelectedCustomerIds([RECIPIENT_EVERYONE_ID]);
               }}
               style={
                 isEveryoneRecipient
@@ -2294,9 +2311,9 @@ export default function Page() {
                 ))}
               </div>
             </div>
-            <span className="label">📝 今日の出来事・接客メモ</span>
+            <span className="label">{visitStatus === "yes" ? "📝 今日の出来事・接客メモ" : "📢 共通の話題・送る口実"}</span>
             <div className="textarea-wrapper">
-              <textarea id="todayEpisodeInput" className="input-field" rows={4} placeholder="（例）こけてみんなで爆笑した！ウザ絡みされたけどシャンパン入れてくれた笑&#10;※AIが空気を読んで綺麗なメッセージにします✨" data-original-input={"autoScrollTextarea()"} value={todayEpisodeText} onChange={(event) => setTodayEpisodeText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{background: "var(--input-bg)", border: "1px solid transparent", minHeight: "100px"}}></textarea>
+              <textarea id="todayEpisodeInput" className="input-field" rows={4} placeholder={visitStatus === "yes" ? "（例）こけてみんなで爆笑した！ウザ絡みされたけどシャンパン入れてくれた笑..." : "（例）今週は火曜と木曜にいるよ！..."} data-original-input={"autoScrollTextarea()"} value={todayEpisodeText} onChange={(event) => setTodayEpisodeText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{background: "var(--input-bg)", border: "1px solid transparent", minHeight: "100px"}}></textarea>
               <div className="clear-btn" data-original-click={"clearEpisodeInput()"} onClick={() => { if (!todayEpisodeText && selectedFactTags.length === 0 && selectedMoodTags.length === 0) return; if (window.confirm("入力をクリアしますか？")) { setTodayEpisodeText(""); setSelectedFactTags([]); setSelectedMoodTags([]); } }}>🧹 クリア</div>
             </div>
           </div>

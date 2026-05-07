@@ -163,8 +163,8 @@ async function fetchValidPastContext({ supabase, userId, customerId }) {
   return context;
 }
 
-async function createDraftEntry({ supabase, userId, customerId, visitStatus, episodeText, factTags, moodTags, aiText, mode }) {
-  if (mode === 'diary' || mode === 'photo' || !customerId) return null;
+async function createDraftEntry({ supabase, userId, customerId, visitStatus, episodeText, factTags, moodTags, aiText }) {
+  if (!customerId) return null;
 
   const hasEpisodeContent = (episodeText && episodeText.length > 0) || (factTags && factTags.length > 0);
   const entryType = hasEpisodeContent ? (visitStatus === 'visit' ? 'visit' : 'sales') : 'generation_only';
@@ -192,6 +192,19 @@ async function createDraftEntry({ supabase, userId, customerId, visitStatus, epi
   return data?.id || null;
 }
 
+async function fetchUserStylePrompt({ supabase, userId }) {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('ai_custom_prompt')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) {
+    console.error('user_profiles 取得エラー:', error);
+    return '';
+  }
+  return trimText(data?.ai_custom_prompt);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return sendJson(res, 405, { success: false, error: 'Method Not Allowed' });
   try {
@@ -201,8 +214,9 @@ export default async function handler(req, res) {
     const difyApiKey = (process.env.DIFY_API_KEY || '').trim();
     if (!difyApiKey) throw new Error('Difyの環境変数が読み込めていません');
     const supabase = getSupabase();
-    const mode = data?.messageMode === 'diary' || data?.messageMode === 'photo' ? 'diary' : 'line';
-    const visitStatus = data?.visitStatus === 'visit' ? 'visit' : 'sales';
+    const mode = 'line';
+    const visitStatusRaw = trimText(data?.visitStatus);
+    const visitStatus = visitStatusRaw === 'visit' || visitStatusRaw === 'yes' ? 'visit' : 'sales';
     const episodeText = typeof data?.episodeText === 'string' ? data.episodeText : (typeof data?.episode === 'string' ? data.episode : '');
     const factTags = normalizeTags(data?.factTags || data?.episodeTags);
     const moodTags = normalizeTags(data?.moodTags);
@@ -216,8 +230,12 @@ export default async function handler(req, res) {
       : (typeof data?.favoriteTexts === 'string' ? data.favoriteTexts : '');
     const favoriteTextCount = favoriteTexts ? favoriteTexts.split('\n').filter(Boolean).length : 0;
     const baseStyleText = trimText(data?.baseStyleText);
+    const userStyleFromRequest = trimText(data?.user_style);
     const customerName = trimText(data?.customerName);
     const customerId = await findCustomerIdByName({ supabase, userId, customerId: data?.customerId, name: customerName });
+    const userStyleFromProfile = await fetchUserStylePrompt({ supabase, userId });
+    const userStyle = userStyleFromRequest || userStyleFromProfile;
+    const factTagsText = factTags.join(',');
 
     // 【NEW】フロントエンドから送られる不確かな `pastMemo` に依存せず、DBから確実に抽出
     const autoFetchedPastContext = await fetchValidPastContext({ supabase, userId, customerId });
@@ -227,20 +245,21 @@ export default async function handler(req, res) {
       businessType: data?.businessType || 'cabaret',
       customerRank: data?.customerRank || '新規',
       visitCount: String(data?.visitCount || '1'),
-      visitStatus,
+      visitStatus: visitStatusRaw || visitStatus,
       isAlert: String(data?.isAlert || 'false'),
       dayOfWeek: data?.dayOfWeek || '',
       currentMonth: data?.currentMonth || '',
-      episodeText: data?.episodeText || episodeText,
+      episodeText,
       pastMemo: autoFetchedPastContext, // DBから取得したクリーンな履歴をセット
       customerTags: data?.customerTags || '',
-      factTags: data?.factTags || '',
+      factTags: factTagsText,
       moodTags: data?.moodTags || '',
       style: data?.style || 'cute',
       tension: data?.tension || '3',
       emoji: data?.emoji || '4',
       customText: data?.customText || '',
       baseStyleText,
+      user_style: userStyle,
       favoriteTexts,
       messageMode: mode,
     };
@@ -285,7 +304,6 @@ export default async function handler(req, res) {
       factTags,
       moodTags,
       aiText,
-      mode,
     });
     return sendJson(res, 200, { success: true, generatedText: aiText, entry_id: entryId, learned_style_count: favoriteTextCount });
   } catch (err) {

@@ -43,37 +43,6 @@ export const INDUSTRY_FACT_CONFIGS: Record<BusinessType, string[]> = {
   ]
 };
 
-export const DIARY_FACT_CONFIGS: Record<BusinessType, string[]> = {
-  cabaret: [
-    "👗 新ドレス", "🍾 お祝い感謝", "🎉 満員御礼", "🥺 暇アピ", "📸 盛れた",
-    "🍰 差し入れ感謝", "💇‍♀️ ヘアメ完了", "💤 営業後・余韻"
-  ],
-  fuzoku: [
-    "✨ 枠空き", "🏩 ロング歓迎", "🏃‍♂️ 突撃歓迎", "👗 新衣装・コス", "🛁 癒やし",
-    "🤫 秘密の共有", "💄 準備完了", "💤 退勤・感謝"
-  ],
-  garuba: [
-    "🍻 乾杯しよ", "🥃 テキーラ", "🎮 フルメン", "🍜 締めラー", "🥺 暇アピ",
-    "📸 チェキ感謝", "👕 私服デー", "💤 朝まで・始発"
-  ],
-};
-
-export const MODE_LABELS: Record<BusinessType, { main: string; thanks: string }> = {
-  fuzoku: { main: "写メ日記", thanks: "お礼日記" },
-  cabaret: { main: "ブログ・SNS", thanks: "お礼LINE" },
-  garuba: { main: "ブログ・SNS", thanks: "お礼LINE" },
-};
-
-/** Dify / カスタム文体の説明用プレースホルダ（UIでは未使用の場合あり） */
-export const STYLE_PLACEHOLDERS: Record<BusinessType, string> = {
-  cabaret:
-    "（例）・語尾は○○に固定して！\n　・絵文字は😸😹😻😼😺😽🙀😿😾だけ使って！\n　・誤字や間違った使い方を自然に入れて！",
-  fuzoku:
-    "（例）・語尾は○○に固定して！\n　・絵文字は😸😹😻😼😺😽🙀😿😾だけ使って！\n　・誤字や間違った使い方を自然に入れて！",
-  garuba:
-    "（例）・語尾は○○に固定して！\n　・絵文字は😸😹😻😼😺😽🙀😿😾だけ使って！\n　・誤字や間違った使い方を自然に入れて！",
-};
-
 export const STYLE_DEFAULTS: Record<BusinessType, { tension: string; emoji: string }> = {
   cabaret: { tension: "4", emoji: "5" },
   fuzoku: { tension: "3", emoji: "4" },

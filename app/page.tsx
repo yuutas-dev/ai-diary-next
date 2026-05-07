@@ -887,7 +887,6 @@ export default function Page() {
   const isEditingDummyCustomer =
     !isCreateCustomerMode &&
     selectedCustomer?.isDummy === true;
-  const messageMode = "line";
   const favoriteProgress = Math.min(currentFavoriteIds.length, 5);
   const favoriteProgressRatio = favoriteProgress / 5;
   const customStylePreview = customStyleText
@@ -1771,8 +1770,9 @@ export default function Page() {
           emoji: safeEmoji,
           customText: safeCustomStyleText,
           baseStyleText: safeBaseStyleText,
+          user_style: safeCustomStyleText,
           favoriteTexts: baseFavoriteTexts,
-          messageMode,
+          messageMode: "line",
           ...(typeof imageForApi === "string" && imageForApi.trim() ? { imageFile: imageForApi } : {}),
         };
 

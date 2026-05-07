@@ -393,12 +393,14 @@ export default function Page() {
   const [sentResultIds, setSentResultIds] = useState<string[]>([]);
   const [isInlineResultVisible, setIsInlineResultVisible] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRosterUploading, setIsRosterUploading] = useState(false);
   /** OSから選んだ元ファイル（プレビューは URL.createObjectURL 側と同期） */
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [photoPreviewObjectUrl, setPhotoPreviewObjectUrl] = useState<string | null>(null);
   /** API 送信用（canvas リサイズ後の JPEG data URL） */
   const [photoJpegDataUrl, setPhotoJpegDataUrl] = useState<string | null>(null);
   const photoUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const rosterUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [actionToastText, setActionToastText] = useState("完了しました");
   const [isActionToastVisible, setIsActionToastVisible] = useState(false);
   const [cuteToastIcon, setCuteToastIcon] = useState("🐰");
@@ -1454,6 +1456,60 @@ export default function Page() {
     showActionToast("💬 LINEに送信しました！");
   }
 
+  function openRosterUploadPicker() {
+    if (isRosterUploading) return;
+    rosterUploadInputRef.current?.click();
+  }
+
+  async function handleRosterUploadChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!sessionReady || userId === null) {
+      showNotice("ユーザー認証が終わるまで少し待ってね⏳");
+      return;
+    }
+
+    setIsRosterUploading(true);
+    showCuteToast(false, "画像から顧客リストを生成中… 🪄（少し時間がかかります）");
+    let responseText = "";
+    try {
+      const imageBase64 = await compressImageFileToJpegDataUrl(file);
+      const res = await fetch("/api/customers/upload-roster", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, imageBase64 }),
+      });
+      const { text, json, status } = await readFetchBodyAsTextAndJson(res);
+      responseText = text;
+      const data = (json && typeof json === "object" ? json : {}) as {
+        success?: boolean;
+        error?: string;
+        insertedCount?: number;
+      };
+      if (!res.ok || !data.success) {
+        throw new Error(
+          sanitizeUserFacingApiMessage({
+            primaryMessage: apiErrorFieldFromUnknownJson(data, "顧客名簿の生成に失敗しました"),
+            httpStatus: status,
+            rawBody: text,
+          }),
+        );
+      }
+      const insertedCount = Number(data.insertedCount || 0);
+      await fetchCustomers(userId, { showLoading: false });
+      showCuteToast(true);
+      showActionToast(`${insertedCount}人の顧客を登録しました！`);
+    } catch (error) {
+      console.error("handleRosterUploadChange Error:", error);
+      showCuteErrorToast();
+      const m = userFacingMessageFromError(error, { rawBody: responseText });
+      showNotice(m === SERVER_UNAVAILABLE_USER_MESSAGE ? m : `名簿登録に失敗しました: ${m}`);
+    } finally {
+      setIsRosterUploading(false);
+    }
+  }
+
   function toggleHistoryText(entryId: string) {
     if (!entryId || editingHistoryId === entryId) return;
     setExpandedHistoryIds((current) => (
@@ -2303,6 +2359,13 @@ export default function Page() {
           style={{ display: "none" }}
           onChange={handlePhotoFileChange}
         />
+      <input
+        ref={rosterUploadInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleRosterUploadChange}
+      />
 
         <div className="create-addon-actions" style={{ marginTop: "12px" }}>
           <button
@@ -2437,6 +2500,27 @@ export default function Page() {
             <h2 style={{margin: "0", fontWeight: "700", fontSize: "18px"}}>お客様ノート</h2>
             <div className="view-toggle" data-original-click={"toggleCompactMode()"} onClick={toggleCompactMode}><span id="viewIcon">{isCompactMode ? "📋 すっきり" : "🗂️ くわしく"}</span></div>
           </div>
+          {dataView === "customer" ? (
+            <button
+              type="button"
+              onClick={openRosterUploadPicker}
+              disabled={isRosterUploading || !sessionReady}
+              style={{
+                width: "100%",
+                marginBottom: "12px",
+                border: "1px solid #f1dce7",
+                background: "#fff6fb",
+                color: "var(--primary)",
+                borderRadius: "14px",
+                padding: "12px 14px",
+                fontWeight: "700",
+                fontSize: "13px",
+                cursor: isRosterUploading ? "wait" : "pointer",
+              }}
+            >
+              {isRosterUploading ? "📸 スクショ解析中…（少し待ってね）" : "📸 スクショで名簿を一括作成（魔法の機能）"}
+            </button>
+          ) : null}
 
           <div style={{display: "flex", justifyContent: "center", marginBottom: "12px"}}>
             <div className="visit-toggle data-view-toggle" style={{maxWidth: "280px", padding: "4px"}}>

@@ -390,6 +390,7 @@ export default function Page() {
   const [editCustomerName, setEditCustomerName] = useState("");
   const [todayEpisodeText, setTodayEpisodeText] = useState("");
   const [generatedResults, setGeneratedResults] = useState<GeneratedResult[]>([]);
+  const [sentResultIds, setSentResultIds] = useState<string[]>([]);
   const [isInlineResultVisible, setIsInlineResultVisible] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   /** OSから選んだ元ファイル（プレビューは URL.createObjectURL 側と同期） */
@@ -875,6 +876,7 @@ export default function Page() {
   const alertCount = customerData.filter(isAlertCustomer).length;
   const hiddenCustomers = customerData.filter((customer) => customer.tagsArray.includes("非表示"));
   const isEveryoneRecipient = selectedCustomerIds.includes(RECIPIENT_EVERYONE_ID);
+  const selectedPersonCount = selectedCustomerIds.filter((id) => id !== RECIPIENT_EVERYONE_ID).length;
   const selectedPrimaryCustomerId = selectedCustomerIds.find((id) => id !== RECIPIENT_EVERYONE_ID) || null;
   const selectedCustomer =
     selectedPrimaryCustomerId && !isEveryoneRecipient
@@ -895,6 +897,13 @@ export default function Page() {
   const moodTags = INDUSTRY_MOOD_CONFIGS[selectedBusinessType] || INDUSTRY_MOOD_CONFIGS.cabaret;
   const lineFactTags = INDUSTRY_FACT_CONFIGS[selectedBusinessType] || INDUSTRY_FACT_CONFIGS.cabaret;
   const factTags = lineFactTags;
+  const generateButtonLabel = (() => {
+    if (isGenerating) return "考え中...";
+    if (isEveryoneRecipient) return "✨ AIで作成する (宛先指定なし)";
+    if (visitStatus === "no" && selectedPersonCount > 1) return `✨ AIで作成する (${selectedPersonCount}人)`;
+    if (selectedPersonCount === 1) return "✨ AIで作成する (1人)";
+    return "✨ AIで作成する";
+  })();
   const editAttributeOptions = Array.from(new Set([
     ...(INDUSTRY_ATTRIBUTE_TAGS[selectedBusinessType] || INDUSTRY_ATTRIBUTE_TAGS.cabaret),
     ...(selectedCustomer?.tagsArray || []),
@@ -1021,10 +1030,11 @@ export default function Page() {
   }
 
   function selectCustomer(customer: Customer) {
-    if (!customer.id) return;
+    const customerId = customer.id;
+    if (!customerId) return;
 
     if (visitStatus === "yes") {
-      setSelectedCustomerIds([customer.id]);
+      setSelectedCustomerIds([customerId]);
       setNameInputValue(customer.name);
       setActiveTab("create");
       return;
@@ -1032,10 +1042,10 @@ export default function Page() {
 
     setSelectedCustomerIds((current) => {
       const withoutEveryone = current.filter((id) => id !== RECIPIENT_EVERYONE_ID);
-      if (withoutEveryone.includes(customer.id)) {
-        return withoutEveryone.filter((id) => id !== customer.id);
+      if (withoutEveryone.includes(customerId)) {
+        return withoutEveryone.filter((id) => id !== customerId);
       }
-      return [...withoutEveryone, customer.id];
+      return [...withoutEveryone, customerId];
     });
     setNameInputValue(customer.name);
     setActiveTab("create");
@@ -1438,6 +1448,7 @@ export default function Page() {
 
   function sendGeneratedToLine(result: GeneratedResult) {
     sendCompletionStatus(result.entryId, result.text, "line_sent");
+    setSentResultIds((current) => (current.includes(result.localId) ? current : [...current, result.localId]));
     const url = `https://line.me/R/msg/text/?${encodeURIComponent(result.text)}`;
     window.open(url, "_blank");
     showActionToast("💬 LINEに送信しました！");
@@ -1621,6 +1632,7 @@ export default function Page() {
 
     setIsInlineResultVisible(false);
     setGeneratedResults([]);
+    setSentResultIds([]);
     setIsGenerating(true);
     showCuteToast(false);
 
@@ -2219,6 +2231,7 @@ export default function Page() {
                       <div className={ringClass}>
                         {topBadge}
                         <div className="story-inner" dangerouslySetInnerHTML={{__html: getAvatarSvgMarkup(customer.name, iconTheme)}}></div>
+                        {visitStatus === "no" && sel ? <span className="story-check-badge">✅</span> : null}
                       </div>
                       <span className="story-name">{customer.name}</span>
                     </div>
@@ -2384,7 +2397,7 @@ export default function Page() {
           </div>
           <div style={{display: "flex", flexDirection: "column", gap: "14px"}}>
             {generatedResults.map((result) => (
-              <div key={result.localId} style={{border: "1px solid var(--border-color)", borderRadius: "14px", padding: "12px", background: "var(--input-bg)"}}>
+              <div key={result.localId} className={`generated-result-card${sentResultIds.includes(result.localId) ? " sent-item" : ""}`} style={{border: "1px solid var(--border-color)", borderRadius: "14px", padding: "12px", background: "var(--input-bg)"}}>
                 <div style={{fontSize: "12px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "8px"}}>
                   {result.customerName ? `${result.customerName} さん向け` : "宛先指定なし（汎用）"}
                 </div>
@@ -2411,7 +2424,7 @@ export default function Page() {
 
         {/* 💎 CTA 下部固定浮遊 */}
         <div className="sticky-submit" style={{pointerEvents: "auto"}}>
-          <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"} onClick={generateDiary} disabled={isGenerating || !sessionReady} style={{pointerEvents: "auto"}}>{isGenerating ? "考え中..." : "✨ AIで作成する"}</button>
+          <button className="submit-btn" id="submitBtn" data-original-click={"generateDiary()"} onClick={generateDiary} disabled={isGenerating || !sessionReady} style={{pointerEvents: "auto"}}>{generateButtonLabel}</button>
         </div>
 
       </div>

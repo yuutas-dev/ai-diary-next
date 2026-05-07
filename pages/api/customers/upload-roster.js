@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireResolvedUserId } from '../../../lib/validateUserId.js';
 
+export const config = { maxDuration: 120 };
+
 function sendJson(res, status, payload) {
   return res.status(status).json(payload);
 }
@@ -84,7 +86,24 @@ function parseRosterFromUnknown(value) {
   const stripped = stripMarkdownFence(value);
   if (!stripped) throw new Error('Difyの名簿解析結果が空です');
 
+  const repairLooseJson = (input) => {
+    let fixed = String(input || '');
+    // { name: ... } -> { "name": ... }
+    fixed = fixed.replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*:)/g, '$1"$2"$3');
+    // "name": 斉藤 -> "name": "斉藤"
+    // bare words before comma/}/] are quoted unless they are true/false/null or numeric.
+    fixed = fixed.replace(/(:\s*)([^",\[\]\{\}\s][^,\}\]]*)(\s*[,}\]])/g, (all, p1, rawValue, p3) => {
+      const v = String(rawValue).trim();
+      if (!v) return all;
+      if (/^(true|false|null)$/i.test(v)) return `${p1}${v}${p3}`;
+      if (/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(v)) return `${p1}${v}${p3}`;
+      if (v.startsWith('"') || v.startsWith('{') || v.startsWith('[')) return `${p1}${v}${p3}`;
+      return `${p1}"${v.replace(/"/g, '\\"')}"${p3}`;
+    });
+    return fixed;
+  };
   const tryDirect = () => JSON.parse(stripped);
+  const tryRepaired = () => JSON.parse(repairLooseJson(stripped));
   const tryArraySlice = () => {
     const start = stripped.indexOf('[');
     const end = stripped.lastIndexOf(']');
@@ -93,12 +112,28 @@ function parseRosterFromUnknown(value) {
     }
     throw new Error('JSON配列が見つかりません');
   };
+  const tryArraySliceRepaired = () => {
+    const start = stripped.indexOf('[');
+    const end = stripped.lastIndexOf(']');
+    if (start !== -1 && end !== -1 && end > start) {
+      return JSON.parse(repairLooseJson(stripped.slice(start, end + 1)));
+    }
+    throw new Error('JSON配列が見つかりません');
+  };
 
   let parsed;
   try {
     parsed = tryDirect();
   } catch {
-    parsed = tryArraySlice();
+    try {
+      parsed = tryRepaired();
+    } catch {
+      try {
+        parsed = tryArraySlice();
+      } catch {
+        parsed = tryArraySliceRepaired();
+      }
+    }
   }
 
   if (Array.isArray(parsed)) return parsed;
@@ -233,7 +268,15 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('upload-roster APIエラー:', err);
-    return sendJson(res, 500, { success: false, error: err.message || 'Internal Server Error' });
+    const fallbackMsg = '名簿の読み取りに失敗しました。画像が不鮮明な可能性があります。';
+    const rawMsg = typeof err?.message === 'string' ? err.message : '';
+    const isRosterParseLikeError =
+      rawMsg.includes('JSON') ||
+      rawMsg.includes('配列') ||
+      rawMsg.includes('名簿解析結果') ||
+      rawMsg.includes('読み取り');
+    const msg = isRosterParseLikeError ? fallbackMsg : (rawMsg || 'Internal Server Error');
+    return sendJson(res, 500, { success: false, error: msg });
   }
 }
 

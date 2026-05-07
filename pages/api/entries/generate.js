@@ -227,7 +227,7 @@ export default async function handler(req, res) {
       businessType: data?.businessType || 'cabaret',
       customerRank: data?.customerRank || '新規',
       visitCount: String(data?.visitCount || '1'),
-      visitStatus: data?.visitStatus || visitStatus,
+      visitStatus,
       isAlert: String(data?.isAlert || 'false'),
       dayOfWeek: data?.dayOfWeek || '',
       currentMonth: data?.currentMonth || '',

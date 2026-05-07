@@ -23,7 +23,6 @@ import type {
 import {
   APP_FONT_OPTIONS,
   APP_THEME_OPTIONS,
-  DIARY_FACT_CONFIGS,
   EMOTION_TAG_KEYWORDS,
   HIDDEN_DUMMY_IDS_KEY,
   INDUSTRY_ATTRIBUTE_TAGS,
@@ -43,7 +42,15 @@ import {
   userFacingMessageFromError,
 } from "@/lib/sanitizeUserFacingApiError";
 
-/** クリエイト画面・宛先「全体向け（写メ / ファン向け）」 */
+type GeneratedResult = {
+  localId: string;
+  entryId: string;
+  customerId: string | null;
+  customerName: string;
+  text: string;
+};
+
+/** クリエイト画面・宛先「誰にでも使える汎用文章」 */
 const RECIPIENT_EVERYONE_ID = "everyone";
 
 function parseCustomerBusinessType(value: unknown): BusinessType | undefined {
@@ -382,8 +389,7 @@ export default function Page() {
   const [isCreateCustomerMode, setIsCreateCustomerMode] = useState(false);
   const [editCustomerName, setEditCustomerName] = useState("");
   const [todayEpisodeText, setTodayEpisodeText] = useState("");
-  const [inlineResultText, setInlineResultText] = useState("");
-  const [currentEntryId, setCurrentEntryId] = useState("");
+  const [generatedResults, setGeneratedResults] = useState<GeneratedResult[]>([]);
   const [isInlineResultVisible, setIsInlineResultVisible] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   /** OSから選んだ元ファイル（プレビューは URL.createObjectURL 側と同期） */
@@ -877,7 +883,7 @@ export default function Page() {
   const isEditingDummyCustomer =
     !isCreateCustomerMode &&
     selectedCustomer?.isDummy === true;
-  const messageMode = isEveryoneRecipient ? "diary" : "line";
+  const messageMode = "line";
   const favoriteProgress = Math.min(currentFavoriteIds.length, 5);
   const favoriteProgressRatio = favoriteProgress / 5;
   const customStylePreview = customStyleText
@@ -888,8 +894,7 @@ export default function Page() {
     .join(" ");
   const moodTags = INDUSTRY_MOOD_CONFIGS[selectedBusinessType] || INDUSTRY_MOOD_CONFIGS.cabaret;
   const lineFactTags = INDUSTRY_FACT_CONFIGS[selectedBusinessType] || INDUSTRY_FACT_CONFIGS.cabaret;
-  const diaryFactTags = DIARY_FACT_CONFIGS[selectedBusinessType] || DIARY_FACT_CONFIGS.cabaret;
-  const factTags = messageMode === "diary" ? diaryFactTags : lineFactTags;
+  const factTags = lineFactTags;
   const editAttributeOptions = Array.from(new Set([
     ...(INDUSTRY_ATTRIBUTE_TAGS[selectedBusinessType] || INDUSTRY_ATTRIBUTE_TAGS.cabaret),
     ...(selectedCustomer?.tagsArray || []),
@@ -1408,28 +1413,32 @@ export default function Page() {
     }
   }
 
-  function sendCompletionStatus(status: string) {
-    if (!currentEntryId || !inlineResultText) return;
+  function sendCompletionStatus(entryId: string, finalSentText: string, status: string) {
+    if (!entryId || !finalSentText) return;
     if (!sessionReady || userId === null) return;
     fetch("/api/entries/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, entryId: currentEntryId, finalSentText: inlineResultText, deliveryStatus: status }),
+      body: JSON.stringify({ userId, entryId, finalSentText, deliveryStatus: status }),
     }).catch((error) => console.error("sendCompletionStatus Error:", error));
   }
 
-  function copyInlineResult() {
-    navigator.clipboard.writeText(inlineResultText).then(() => {
+  function updateGeneratedResultText(localId: string, text: string) {
+    setGeneratedResults((current) => current.map((result) => (result.localId === localId ? { ...result, text } : result)));
+  }
+
+  function copyGeneratedResult(result: GeneratedResult) {
+    navigator.clipboard.writeText(result.text).then(() => {
       showActionToast("📋 コピーしました！");
-      sendCompletionStatus("copied");
+      sendCompletionStatus(result.entryId, result.text, "copied");
     }).catch((error) => {
       showActionToast(`コピーに失敗しました: ${userFacingMessageFromError(error)}`);
     });
   }
 
-  function sendInlineToLine() {
-    sendCompletionStatus("line_sent");
-    const url = `https://line.me/R/msg/text/?${encodeURIComponent(inlineResultText)}`;
+  function sendGeneratedToLine(result: GeneratedResult) {
+    sendCompletionStatus(result.entryId, result.text, "line_sent");
+    const url = `https://line.me/R/msg/text/?${encodeURIComponent(result.text)}`;
     window.open(url, "_blank");
     showActionToast("💬 LINEに送信しました！");
   }
@@ -1594,10 +1603,14 @@ export default function Page() {
 
     const name = isEveryoneRecipient ? "" : nameInputValue.trim();
     const hasPhotoPayload = Boolean(photoJpegDataUrl);
-    const targetCustomer =
+    const fallbackCustomer =
       selectedCustomer || (!isEveryoneRecipient ? customerData.find((customer) => customer.name === name) || null : null);
+    const selectedTargets = selectedCustomerIds
+      .filter((id) => id !== RECIPIENT_EVERYONE_ID)
+      .map((id) => customerData.find((customer) => customer.id === id) || null)
+      .filter((customer): customer is Customer => customer !== null);
 
-    if (!isEveryoneRecipient && !targetCustomer && !name && !window.confirm("名前が入力されていませんが、そのまま作成しますか？")) {
+    if (!isEveryoneRecipient && selectedTargets.length === 0 && !fallbackCustomer && !name && !window.confirm("名前が入力されていませんが、そのまま作成しますか？")) {
       return;
     }
 
@@ -1607,33 +1620,13 @@ export default function Page() {
     }
 
     setIsInlineResultVisible(false);
-    setInlineResultText("");
-    setCurrentEntryId("");
+    setGeneratedResults([]);
     setIsGenerating(true);
     showCuteToast(false);
 
-    let generateResponseBody = "";
+    let firstErrorMessage = "";
+    let successCount = 0;
     try {
-      let customerRank = "新規";
-      let visitCount = 1;
-      if (targetCustomer) {
-        const stats = getCustomerStats(targetCustomer);
-        visitCount = stats.count;
-        if (stats.isVip) customerRank = "VIP";
-        else if (stats.count === 1) customerRank = "新規";
-        else if (stats.count === 2) customerRank = "2回目";
-        else customerRank = "常連";
-      }
-
-      const forbiddenTags = ["新規", "初回", "初回来店", "初めて", "一見", "常連", "リピーター", "2回目", "二回目", "3回目", "三回目", "1回目", "一回目"];
-      const cleanedCustomerTags = (targetCustomer?.tagsArray || []).filter((tag) => !forbiddenTags.some((forbidden) => tag.includes(forbidden)));
-      const memos = getPastMemos(targetCustomer);
-      const filteredMemosStr = memos.map((memo) => {
-        const filteredTags = (memo.tags || []).filter((tag: string) => !isEmotionTag(tag));
-        const tagsStr = filteredTags.length > 0 ? `(タグ: ${filteredTags.join(", ")})` : "";
-        return `${memo.date}: ${memo.text} ${tagsStr}`.trim();
-      }).join("\n---\n");
-      const isAlertStatus = targetCustomer ? isAlertCustomer(targetCustomer) : false;
       const now = new Date();
       const dayOfWeek = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"][now.getDay()];
       const currentMonth = `${now.getMonth() + 1}月`;
@@ -1658,74 +1651,125 @@ export default function Page() {
         }
       }
 
-      const payload = {
-        userId,
-        customerId:
-          isEveryoneRecipient ? null : (targetCustomer?.id ?? selectedPrimaryCustomerId),
-        customerName: isEveryoneRecipient ? "" : (targetCustomer ? targetCustomer.name : name),
-        businessType: selectedBusinessType,
-        customerRank,
-        visitCount: String(visitCount),
-        visitStatus: visitStatus === "yes" ? "visit" : "sales",
-        isAlert: String(isAlertStatus),
-        dayOfWeek,
-        currentMonth,
-        episodeText: todayEpisodeText,
-        pastMemo: filteredMemosStr,
-        customerTags: cleanedCustomerTags.join(","),
-        factTags: selectedFactTags.filter((tag) => factTags.includes(tag)).join(","),
-        moodTags: selectedMoodTags.join(","),
-        style: safeStyle,
-        tension: safeTension,
-        emoji: safeEmoji,
-        customText: safeCustomStyleText,
-        baseStyleText: safeBaseStyleText,
-        favoriteTexts: currentFavoriteTexts.slice(0, 5).join("\n"),
-        messageMode,
-        ...(typeof imageForApi === "string" && imageForApi.trim() ? { imageFile: imageForApi } : {}),
-      };
+      const targets: { customer: Customer | null; customerName: string }[] = isEveryoneRecipient
+        ? [{ customer: null, customerName: "" }]
+        : selectedTargets.length > 0
+          ? selectedTargets.map((customer) => ({ customer, customerName: customer.name }))
+          : [{ customer: fallbackCustomer, customerName: fallbackCustomer?.name || name }];
 
-      const res = await fetch("/api/entries/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      const visitStatusValue = visitStatus === "yes" ? "visit" : "sales";
+      const baseFavoriteTexts = currentFavoriteTexts.slice(0, 5).join("\n");
+      const baseFactTags = selectedFactTags.filter((tag) => factTags.includes(tag)).join(",");
+      const forbiddenTags = ["新規", "初回", "初回来店", "初めて", "一見", "常連", "リピーター", "2回目", "二回目", "3回目", "三回目", "1回目", "一回目"];
+
+      const generationTasks = targets.map(async ({ customer, customerName }, index) => {
+        let customerRank = "新規";
+        let visitCount = 1;
+        if (customer) {
+          const stats = getCustomerStats(customer);
+          visitCount = stats.count;
+          if (stats.isVip) customerRank = "VIP";
+          else if (stats.count === 2) customerRank = "2回目";
+          else if (stats.count >= 3) customerRank = "常連";
+        }
+
+        const cleanedCustomerTags = (customer?.tagsArray || []).filter((tag) => !forbiddenTags.some((forbidden) => tag.includes(forbidden)));
+        const memos = getPastMemos(customer);
+        const filteredMemosStr = memos.map((memo) => {
+          const filteredTags = (memo.tags || []).filter((tag: string) => !isEmotionTag(tag));
+          const tagsStr = filteredTags.length > 0 ? `(タグ: ${filteredTags.join(", ")})` : "";
+          return `${memo.date}: ${memo.text} ${tagsStr}`.trim();
+        }).join("\n---\n");
+        const isAlertStatus = customer ? isAlertCustomer(customer) : false;
+
+        const payload = {
+          userId,
+          customerId: customer?.id || null,
+          customerName,
+          businessType: selectedBusinessType,
+          customerRank,
+          visitCount: String(visitCount),
+          visitStatus: visitStatusValue,
+          isAlert: String(isAlertStatus),
+          dayOfWeek,
+          currentMonth,
+          episodeText: todayEpisodeText,
+          pastMemo: filteredMemosStr,
+          customerTags: cleanedCustomerTags.join(","),
+          factTags: baseFactTags,
+          moodTags: selectedMoodTags.join(","),
+          style: safeStyle,
+          tension: safeTension,
+          emoji: safeEmoji,
+          customText: safeCustomStyleText,
+          baseStyleText: safeBaseStyleText,
+          favoriteTexts: baseFavoriteTexts,
+          messageMode,
+          ...(typeof imageForApi === "string" && imageForApi.trim() ? { imageFile: imageForApi } : {}),
+        };
+
+        const res = await fetch("/api/entries/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const { text, json, status } = await readFetchBodyAsTextAndJson(res);
+        const data = (json && typeof json === "object" ? json : {}) as {
+          success?: boolean;
+          error?: string;
+          generatedText?: string;
+          entry_id?: string;
+        };
+        if (!data.success) {
+          throw new Error(
+            sanitizeUserFacingApiMessage({
+              primaryMessage: apiErrorFieldFromUnknownJson(data, "不明なエラー"),
+              httpStatus: status,
+              rawBody: text,
+            }),
+          );
+        }
+
+        successCount += 1;
+        setGeneratedResults((current) => [
+          ...current,
+          {
+            localId: `${Date.now()}-${index}-${customer?.id || "generic"}`,
+            entryId: String(data.entry_id || ""),
+            customerId: customer?.id || null,
+            customerName,
+            text: data.generatedText || "（テキストがありません）",
+          },
+        ]);
+        setIsInlineResultVisible(true);
       });
-      const { text, json, status } = await readFetchBodyAsTextAndJson(res);
-      generateResponseBody = text;
-      const data = (json && typeof json === "object" ? json : {}) as {
-        success?: boolean;
-        error?: string;
-        generatedText?: string;
-        entry_id?: string;
-      };
 
-      if (!data.success) {
-        throw new Error(
-          sanitizeUserFacingApiMessage({
-            primaryMessage: apiErrorFieldFromUnknownJson(data, "不明なエラー"),
-            httpStatus: status,
-            rawBody: text,
-          }),
-        );
+      const settled = await Promise.allSettled(generationTasks);
+      const firstFailed = settled.find((result) => result.status === "rejected");
+      if (firstFailed && firstFailed.status === "rejected") {
+        firstErrorMessage = userFacingMessageFromError(firstFailed.reason);
       }
 
-      showCuteToast(true);
-      if (messageMode === "line" && (targetCustomer || name.trim())) {
+      if (successCount > 0) {
+        showCuteToast(true);
+      } else {
+        showCuteErrorToast();
+        showNotice(firstErrorMessage ? `エラーが発生しました: ${firstErrorMessage}` : "エラーが発生しました");
+        return;
+      }
+
+      if (targets.some((target) => Boolean(target.customer || target.customerName.trim()))) {
         await fetchCustomers(userId, { showLoading: false });
       } else {
         await fetchHistoryEntries(userId);
       }
-
-      setInlineResultText(data.generatedText || "（テキストがありません）");
-      setIsInlineResultVisible(true);
       setSelectedFactTags([]);
-      setCurrentEntryId(data.entry_id || "");
 
       // iOS/Safari の viewport ずれ対策のため、自動スクロールは無効化
     } catch (error) {
       console.error("generateDiary Error:", error);
       showCuteErrorToast();
-      const m = userFacingMessageFromError(error, { rawBody: generateResponseBody });
+      const m = userFacingMessageFromError(error);
       showNotice(m === SERVER_UNAVAILABLE_USER_MESSAGE ? m : `エラーが発生しました: ${m}`);
     } finally {
       setIsGenerating(false);
@@ -2150,7 +2194,7 @@ export default function Page() {
                 <div className={`story-ring${isEveryoneRecipient ? " story-ring-selected" : ""}`}>
                   <div className="story-inner" style={{ fontSize: "22px", fontWeight: 800 }}>🌐</div>
                 </div>
-                <span className="story-name">みんなへ</span>
+                <span className="story-name">誰にでも</span>
               </div>
               {showCustomersDataSkeleton ? (
                 <div className="story-item" style={{ cursor: "default" }}>
@@ -2188,7 +2232,7 @@ export default function Page() {
               type="text"
               id="nameInput"
               className="input-field"
-              placeholder={isEveryoneRecipient ? "全体への発信（SNS・ブログ等）" : "名前を入力..."}
+              placeholder={isEveryoneRecipient ? "（特定の相手を選ばず、誰にでも送れる汎用文章を作ります）" : "名前を入力..."}
               data-original-input={"suggestCustomer()"}
               value={isEveryoneRecipient ? "" : nameInputValue}
               readOnly={isEveryoneRecipient}
@@ -2210,7 +2254,7 @@ export default function Page() {
             <div id="pastMemoDisplay">
               {isEveryoneRecipient ? (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: "1", minHeight: "88px", fontSize: "14px", fontWeight: 700, color: "var(--text-main)" }}>
-                  みんなへ送る
+                  宛先指定なし（汎用）
                 </div>
               ) : selectedCustomer ? (
                 <>
@@ -2334,19 +2378,34 @@ export default function Page() {
         </div>
 
         <div id="inlineResultArea" ref={inlineResultRef} className="card" style={{display: isInlineResultVisible ? "block" : "none", border: "1px solid var(--primary-light)", background: "#FFF", marginTop: "24px", position: "relative"}}>
-          <textarea id="inlineResultText" className="input-field" value={inlineResultText} onChange={(event) => setInlineResultText(event.target.value)} onBlur={() => window.scrollTo(0, 0)} style={{height: "200px", lineHeight: "1.6", fontSize: "14px", marginBottom: "12px", resize: "vertical"}} placeholder="ここに生成された文章が表示されます。自由に修正できます。"></textarea>
-          <input type="hidden" id="currentEntryId" value={currentEntryId} />
           <h3 style={{textAlign: "center", marginBottom: "6px", color: "var(--primary)", fontSize: "16px"}}>✨ 文章ができたよ！</h3>
           <div style={{textAlign: "center", fontSize: "11px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "16px"}}>
-            💡 自由に手直しOK！送信・コピー時に履歴に上書き保存されるよ✨
+            💡 できた順に追加されるよ。自由に手直しOK！送信・コピー時に履歴に上書き保存されるよ✨
           </div>
-          <div style={{display: "flex", gap: "10px"}}>
-            <button data-original-click={"copyInlineResult()"} onClick={copyInlineResult} style={{flex: "1", background: "#FFF", color: "var(--primary)", border: "2px solid var(--primary)", padding: "12px", borderRadius: "24px", fontWeight: "700"}}>
-              📋 コピー
-            </button>
-            <button data-original-click={"sendInlineToLine()"} onClick={sendInlineToLine} style={{flex: "1", background: "var(--primary)", color: "#FFF", border: "none", padding: "12px", borderRadius: "24px", fontWeight: "700"}}>
-              💬 LINE送信
-            </button>
+          <div style={{display: "flex", flexDirection: "column", gap: "14px"}}>
+            {generatedResults.map((result) => (
+              <div key={result.localId} style={{border: "1px solid var(--border-color)", borderRadius: "14px", padding: "12px", background: "var(--input-bg)"}}>
+                <div style={{fontSize: "12px", fontWeight: "700", color: "var(--text-sub)", marginBottom: "8px"}}>
+                  {result.customerName ? `${result.customerName} さん向け` : "宛先指定なし（汎用）"}
+                </div>
+                <textarea
+                  className="input-field"
+                  value={result.text}
+                  onChange={(event) => updateGeneratedResultText(result.localId, event.target.value)}
+                  onBlur={() => window.scrollTo(0, 0)}
+                  style={{height: "180px", lineHeight: "1.6", fontSize: "14px", marginBottom: "10px", resize: "vertical", background: "#FFF"}}
+                  placeholder="ここに生成された文章が表示されます。自由に修正できます。"
+                />
+                <div style={{display: "flex", gap: "10px"}}>
+                  <button type="button" onClick={() => copyGeneratedResult(result)} style={{flex: "1", background: "#FFF", color: "var(--primary)", border: "2px solid var(--primary)", padding: "10px", borderRadius: "24px", fontWeight: "700"}}>
+                    📋 コピー
+                  </button>
+                  <button type="button" onClick={() => sendGeneratedToLine(result)} style={{flex: "1", background: "var(--primary)", color: "#FFF", border: "none", padding: "10px", borderRadius: "24px", fontWeight: "700"}}>
+                    💬 LINE送信
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

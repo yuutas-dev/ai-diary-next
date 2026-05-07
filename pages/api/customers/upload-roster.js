@@ -147,7 +147,20 @@ export default async function handler(req, res) {
       mimeType: parsedImage.mimeType,
     });
 
+    const fileInputPayload = {
+      transfer_method: 'local_file',
+      upload_file_id: uploadFileId,
+      type: 'image',
+    };
+    const filesPayload = [
+      {
+        type: 'image',
+        transfer_method: 'local_file',
+        upload_file_id: uploadFileId,
+      },
+    ];
     const difyInputs = {
+      image: fileInputPayload,
       rosterImage: {
         transfer_method: 'local_file',
         upload_file_id: uploadFileId,
@@ -155,12 +168,27 @@ export default async function handler(req, res) {
       },
     };
 
-    const difyRes = await fetch(`${getDifyApiBase()}/workflows/run`, {
+    const difyBase = getDifyApiBase();
+    let difyRes = await fetch(`${difyBase}/workflows/run`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${rosterApiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inputs: difyInputs, response_mode: 'blocking', user: userId }),
+      body: JSON.stringify({ inputs: difyInputs, files: filesPayload, response_mode: 'blocking', user: userId }),
     });
-    const difyText = await difyRes.text().catch(() => '');
+    let difyText = await difyRes.text().catch(() => '');
+    if (!difyRes.ok) {
+      difyRes = await fetch(`${difyBase}/completion-messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${rosterApiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inputs: difyInputs,
+          files: filesPayload,
+          query: '画像から顧客名とタグを抽出してください',
+          response_mode: 'blocking',
+          user: userId,
+        }),
+      });
+      difyText = await difyRes.text().catch(() => '');
+    }
     if (!difyRes.ok) throw new Error(`Dify名簿抽出エラー: ${difyRes.status} ${difyText}`);
 
     let difyData;

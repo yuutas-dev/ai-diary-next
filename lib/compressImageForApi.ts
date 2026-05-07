@@ -64,6 +64,52 @@ export function compressImageSrcToJpegDataUrl(sourceDataUrl: string): Promise<st
   });
 }
 
+/**
+ * 名簿スクショ読み取り専用: 通常生成より高解像度を維持して JPEG 化する。
+ * 長辺 1600px / 品質 0.8 で OCR 精度低下を抑える。
+ */
+export function compressImageSrcToJpegDataUrlForRoster(sourceDataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 1600;
+      let width = img.width;
+      let height = img.height;
+      if (!width || !height) {
+        reject(new Error("画像のサイズ（寸法）が読み取れなかったよ💦 別の画像で試してね"));
+        return;
+      }
+      if (width > height) {
+        if (width > max) {
+          height *= max / width;
+          width = max;
+        }
+      } else if (height > max) {
+        width *= max / height;
+        height = max;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("お使いのブラウザが画像処理に対応していないみたい💦"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      try {
+        resolve(canvas.toDataURL("image/jpeg", 0.8));
+      } catch {
+        reject(new Error("画像の圧縮に失敗しちゃった💦"));
+      }
+    };
+    img.onerror = () => {
+      reject(new Error("画像の読み込みに失敗しちゃった💦 別の画像で試してね"));
+    };
+    img.src = sourceDataUrl;
+  });
+}
+
 export async function compressImageFileToJpegDataUrl(file: File): Promise<string> {
   const raw = await readFileAsDataUrl(file);
   return compressImageSrcToJpegDataUrl(raw);

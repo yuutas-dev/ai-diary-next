@@ -33,7 +33,7 @@ import {
 } from "@/constants";
 import { CustomerEditModal } from "@/components/CustomerEditModal";
 import { StyleOnboardingModal } from "@/components/StyleOnboardingModal";
-import { compressImageFileToJpegDataUrl, compressImageSrcToJpegDataUrl } from "@/lib/compressImageForApi";
+import { compressImageFileToJpegDataUrl, compressImageSrcToJpegDataUrl, compressImageSrcToJpegDataUrlForRoster } from "@/lib/compressImageForApi";
 import {
   apiErrorFieldFromUnknownJson,
   readFetchBodyAsTextAndJson,
@@ -1473,7 +1473,19 @@ export default function Page() {
     showCuteToast(false, "画像から顧客リストを生成中… 🪄（少し時間がかかります）");
     let responseText = "";
     try {
-      const imageBase64 = await compressImageFileToJpegDataUrl(file);
+      const imageBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const raw = reader.result;
+          if (typeof raw !== "string") {
+            reject(new Error("画像の読み込みに失敗しちゃった💦"));
+            return;
+          }
+          resolve(raw);
+        };
+        reader.onerror = () => reject(new Error("画像の読み込みに失敗しちゃった💦"));
+        reader.readAsDataURL(file);
+      }).then((rawDataUrl) => compressImageSrcToJpegDataUrlForRoster(rawDataUrl));
       const res = await fetch("/api/customers/upload-roster", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -2518,7 +2518,7 @@ export default function Page() {
                 cursor: isRosterUploading ? "wait" : "pointer",
               }}
             >
-              {isRosterUploading ? "📸 スクショ解析中…（少し待ってね）" : "📸 スクショで名簿を一括作成（魔法の機能）"}
+              {isRosterUploading ? "📸 スクショ解析中…（少し待ってね）" : "📸 スクショを読み込ませて名簿を一括作成"}
             </button>
           ) : null}
 
